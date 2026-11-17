@@ -1,0 +1,7 @@
+packages:
+  - gateway
+  - widget
+
+# Dependencies allowed to run install scripts (esbuild downloads its native binary).
+allowBuilds:
+  esbuild: true

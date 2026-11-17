@@ -1,0 +1,12 @@
+{
+  "name": "widget",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "vitest": "^5.1.0"
+  }
+}
