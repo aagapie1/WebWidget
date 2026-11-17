@@ -9,6 +9,7 @@ export const ro = {
     minimize: 'Minimizează',
     close: 'Închide fereastra',
     newConversation: 'Conversație nouă',
+    subtitle: 'Răspunde imediat',
   },
   messages: {
     label: 'Mesaje',

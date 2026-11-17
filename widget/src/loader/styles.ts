@@ -1,13 +1,15 @@
 /**
- * Loader styles, scoped by the Shadow DOM. Neutral theme with AA contrast; per-tenant theming
- * arrives in E4 (custom properties are already the extension point).
+ * Loader styles, scoped by the Shadow DOM. Same tokens as the chat app; per-tenant theming
+ * arrives in E4 (custom properties are the extension point).
  */
 export const LOADER_CSS = `
 :host {
-  --cw-accent: #0b5cad;
-  --cw-accent-contrast: #ffffff;
-  --cw-focus: #ffbf47;
-  --cw-offset: 20px;
+  --cw-accent: #3a36d0;
+  --cw-accent-2: #1166c4;
+  --cw-gradient: linear-gradient(135deg, var(--cw-accent) 0%, var(--cw-accent-2) 100%);
+  --cw-on-accent: #ffffff;
+  --cw-focus: #2c2aa8;
+  --cw-offset: 24px;
   all: initial;
 }
 .launcher {
@@ -15,33 +17,46 @@ export const LOADER_CSS = `
   right: var(--cw-offset);
   bottom: var(--cw-offset);
   z-index: 2147483000;
-  width: 56px;
-  height: 56px;
+  width: 60px;
+  height: 60px;
+  padding: 0;
   border: 0;
   border-radius: 50%;
-  background: var(--cw-accent);
-  color: var(--cw-accent-contrast);
-  box-shadow: 0 4px 12px rgb(0 0 0 / 0.25);
-  cursor: pointer;
   display: grid;
   place-items: center;
-  padding: 0;
+  color: var(--cw-on-accent);
+  background: var(--cw-gradient);
+  box-shadow: 0 8px 24px rgb(58 54 208 / 0.45), 0 2px 6px rgb(0 0 0 / 0.15);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.launcher:hover {
+  transform: translateY(-2px) scale(1.04);
+  box-shadow: 0 12px 28px rgb(58 54 208 / 0.55), 0 2px 6px rgb(0 0 0 / 0.15);
 }
 .launcher:focus-visible {
   outline: 3px solid var(--cw-focus);
-  outline-offset: 3px;
+  outline-offset: 4px;
+}
+.launcher svg {
+  transition: transform 0.2s ease;
+}
+.launcher[aria-expanded='true'] svg {
+  transform: rotate(180deg);
 }
 .panel {
   position: fixed;
   right: var(--cw-offset);
-  bottom: calc(var(--cw-offset) + 68px);
+  bottom: calc(var(--cw-offset) + 76px);
   z-index: 2147483000;
   width: 380px;
-  height: min(600px, calc(100vh - 120px));
-  border-radius: 12px;
+  height: min(640px, calc(100vh - 130px));
+  border-radius: 20px;
   overflow: hidden;
-  box-shadow: 0 8px 28px rgb(0 0 0 / 0.28);
   background: #ffffff;
+  box-shadow: 0 24px 60px rgb(16 24 40 / 0.22), 0 6px 18px rgb(16 24 40 / 0.12);
+  transform-origin: bottom right;
+  animation: cw-open 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .panel[hidden] {
   display: none;
@@ -52,6 +67,10 @@ export const LOADER_CSS = `
   border: 0;
   display: block;
 }
+@keyframes cw-open {
+  from { opacity: 0; transform: translateY(12px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
 @media (max-width: 480px) {
   .panel {
     inset: 0;
@@ -60,9 +79,11 @@ export const LOADER_CSS = `
     border-radius: 0;
   }
 }
+@media (prefers-reduced-motion: reduce) {
+  .launcher, .launcher svg, .panel { transition: none; animation: none; }
+  .launcher:hover { transform: none; }
+}
 @media (forced-colors: active) {
-  .launcher {
-    border: 2px solid ButtonText;
-  }
+  .launcher { border: 2px solid ButtonText; }
 }
 `;

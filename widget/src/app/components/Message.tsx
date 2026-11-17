@@ -2,6 +2,7 @@ import { useMemo } from 'preact/hooks';
 import type { ChatMessage } from '../chat/controller.js';
 import type { Texts } from '../i18n/index.js';
 import { renderMarkdown } from '../markdown.js';
+import { AssistantIcon } from './icons.js';
 import { TypingIndicator } from './TypingIndicator.js';
 
 export interface MessageProps {
@@ -30,24 +31,31 @@ export function Message({ message, assistantName, texts, canRetry, onRetry }: Me
 
   return (
     <li class={`message message--${message.author} message--${message.status}`} aria-busy={busy}>
-      {authorLabel && <span class="visually-hidden">{authorLabel}: </span>}
-      {message.status === 'waiting' && <TypingIndicator label={texts.messages.typing} />}
-      {message.author === 'user' ? (
-        <p class="message__text">{message.text}</p>
-      ) : (
-        message.text && <div class="message__text" dangerouslySetInnerHTML={{ __html: html }} />
+      {(message.author === 'assistant' || message.author === 'operator') && (
+        <span class="avatar avatar--small" aria-hidden="true">
+          <AssistantIcon size={16} />
+        </span>
       )}
-      {message.status === 'stopped' && <p class="message__note">{texts.messages.stopped}</p>}
-      {message.status === 'error' && message.error && (
-        <div class="message__error">
-          <p>{message.error.message}</p>
-          {canRetry && message.error.retryable && (
-            <button type="button" class="button button--secondary" onClick={onRetry}>
-              {texts.errors.retry}
-            </button>
-          )}
-        </div>
-      )}
+      <div class="message__bubble">
+        {authorLabel && <span class="visually-hidden">{authorLabel}: </span>}
+        {message.status === 'waiting' && <TypingIndicator label={texts.messages.typing} />}
+        {message.author === 'user' ? (
+          <p class="message__text">{message.text}</p>
+        ) : (
+          message.text && <div class="message__text" dangerouslySetInnerHTML={{ __html: html }} />
+        )}
+        {message.status === 'stopped' && <p class="message__note">{texts.messages.stopped}</p>}
+        {message.status === 'error' && message.error && (
+          <div class="message__error">
+            <p>{message.error.message}</p>
+            {canRetry && message.error.retryable && (
+              <button type="button" class="pill-button" onClick={onRetry}>
+                {texts.errors.retry}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
     </li>
   );
 }

@@ -10,6 +10,7 @@ export const en: Texts = {
     minimize: 'Minimize',
     close: 'Close window',
     newConversation: 'New conversation',
+    subtitle: 'Answers right away',
   },
   messages: {
     label: 'Messages',
