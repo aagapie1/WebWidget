@@ -2,16 +2,20 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { Dispatcher } from 'undici';
 import type { AppEnv } from '../config/env.js';
 import type { TenantRegistry } from '../config/tenants.js';
-import { classifyNetworkError, sendChatMessage, stopTask } from '../dify/client.js';
+import {
+  classifyNetworkError,
+  renameConversation,
+  sendChatMessage,
+  stopTask,
+} from '../dify/client.js';
 import { DifyEventNormalizer, type NormalizeResult } from '../dify/events.js';
 import { SseParser } from '../protocol/sse.js';
-import { chatError, HTTP_STATUS } from '../errors/index.js';
+import { replyError } from '../errors/index.js';
 import {
   chatRequestSchema,
   stopRequestSchema,
   type ChatStreamEvent,
   type ErrorCode,
-  type ErrorResponse,
   type Locale,
 } from '../protocol/index.js';
 import type { Tenant } from '../config/tenants.js';
@@ -30,17 +34,17 @@ export function chatRoute(app: FastifyInstance, options: ChatRouteOptions): void
     // The chat iframe is served by this gateway, so its requests carry the gateway's own origin.
     // Embedding sites are checked when the iframe loads (allowedOrigins, frame-ancestors).
     if (request.headers.origin !== env.PUBLIC_ORIGIN) {
-      return sendError(reply, 'forbidden_origin', 'ro');
+      return replyError(reply, 'forbidden_origin', 'ro');
     }
 
     const parsed = chatRequestSchema.safeParse(request.body);
     if (!parsed.success) {
-      return sendError(reply, 'invalid_request', 'ro');
+      return replyError(reply, 'invalid_request', 'ro');
     }
     const { tenant: tenantId, message, conversationId, locale } = parsed.data;
 
     const tenant = tenants.get(tenantId);
-    if (!tenant) return sendError(reply, 'tenant_not_found', locale);
+    if (!tenant) return replyError(reply, 'tenant_not_found', locale);
 
     const user = resolveVisitor(request, reply, tenant.visitorCookieDays);
     const log = request.log.child({ tenant: tenant.id, conversationId });
@@ -70,7 +74,7 @@ export function chatRoute(app: FastifyInstance, options: ChatRouteOptions): void
         log.info('client disconnected before Dify answered');
         return reply;
       }
-      return sendError(reply, 'upstream_timeout', locale, tenant);
+      return replyError(reply, 'upstream_timeout', locale, tenant);
     }
 
     if (!result.ok) {
@@ -78,7 +82,7 @@ export function chatRoute(app: FastifyInstance, options: ChatRouteOptions): void
         { difyStatus: result.status, difyCode: result.difyCode, code: result.code },
         'Dify request failed',
       );
-      return sendError(reply, result.code, locale, tenant);
+      return replyError(reply, result.code, locale, tenant);
     }
 
     // From here on the response is a raw SSE stream.
@@ -95,18 +99,23 @@ export function chatRoute(app: FastifyInstance, options: ChatRouteOptions): void
     });
 
     const stats = await pipeStream(result.body, reply, tenant, locale, signal, totalTimeout);
+
+    // New conversation: set its title from the question, without a model call (SPEC §4).
+    if (!conversationId && stats.conversationId) {
+      void renameConversation(tenant, user, stats.conversationId, conversationTitle(message)).then(
+        (renamed) => {
+          if (!renamed.ok) log.warn({ code: renamed.code }, 'conversation rename failed');
+        },
+      );
+    }
+
     if (clientGone.signal.aborted) {
+      // Dify keeps generating and stores the answer: it appears in the history when the visitor
+      // comes back (ADR 005). Only the explicit stop button stops the task.
       log.info(
         { ...stats, durationMs: Math.round(performance.now() - startedAt) },
         'client disconnected during stream',
       );
-      // Closing the upstream connection does not stop generation in Dify: stop it explicitly
-      // so the GPU is not busy with an answer nobody reads.
-      if (stats.taskId && stats.outcome === 'aborted') {
-        void stopTask(tenant, stats.taskId, user).then((stop) => {
-          if (!stop.ok) log.warn({ code: stop.code, difyStatus: stop.status }, 'Dify stop failed');
-        });
-      }
       return reply;
     }
     log.info({ ...stats, durationMs: Math.round(performance.now() - startedAt) }, 'chat answered');
@@ -116,13 +125,13 @@ export function chatRoute(app: FastifyInstance, options: ChatRouteOptions): void
 
   app.post('/api/chat/stop', async (request, reply) => {
     if (request.headers.origin !== env.PUBLIC_ORIGIN) {
-      return sendError(reply, 'forbidden_origin', 'ro');
+      return replyError(reply, 'forbidden_origin', 'ro');
     }
     const parsed = stopRequestSchema.safeParse(request.body);
-    if (!parsed.success) return sendError(reply, 'invalid_request', 'ro');
+    if (!parsed.success) return replyError(reply, 'invalid_request', 'ro');
 
     const tenant = tenants.get(parsed.data.tenant);
-    if (!tenant) return sendError(reply, 'tenant_not_found', 'ro');
+    if (!tenant) return replyError(reply, 'tenant_not_found', 'ro');
 
     // Dify only stops tasks of the same `user`, so a visitor cannot stop someone else's answer.
     const user = resolveVisitor(request, reply, tenant.visitorCookieDays);
@@ -132,7 +141,7 @@ export function chatRoute(app: FastifyInstance, options: ChatRouteOptions): void
         { tenant: tenant.id, code: result.code, difyStatus: result.status },
         'Dify stop failed',
       );
-      return sendError(reply, result.code, 'ro', tenant);
+      return replyError(reply, result.code, 'ro', tenant);
     }
     return reply.code(204).send();
   });
@@ -142,6 +151,18 @@ interface StreamStats {
   deltas: number;
   outcome: 'end' | ErrorCode | 'aborted';
   taskId?: string;
+  conversationId?: string;
+}
+
+const TITLE_LENGTH = 50;
+
+/** First ~50 characters of the question, cut at a word boundary. */
+export function conversationTitle(question: string): string {
+  const clean = question.replace(/\s+/g, ' ').trim();
+  if (clean.length <= TITLE_LENGTH) return clean;
+  const cut = clean.slice(0, TITLE_LENGTH);
+  const space = cut.lastIndexOf(' ');
+  return `${(space > 30 ? cut.slice(0, space) : cut).trimEnd()}…`;
 }
 
 async function pipeStream(
@@ -183,19 +204,12 @@ async function pipeStream(
 }
 
 function writeEvent(reply: FastifyReply, event: ChatStreamEvent, stats: StreamStats): void {
-  if (event.type === 'start') stats.taskId = event.taskId;
+  if (event.type === 'start') {
+    stats.taskId = event.taskId;
+    stats.conversationId = event.conversationId;
+  }
   if (event.type === 'delta') stats.deltas++;
   if (event.type === 'end') stats.outcome = 'end';
   if (event.type === 'error') stats.outcome = event.error.code;
   reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
-}
-
-function sendError(
-  reply: FastifyReply,
-  code: ErrorCode,
-  locale: Locale,
-  tenant?: Tenant,
-): FastifyReply {
-  const body: ErrorResponse = { error: chatError(code, locale, tenant) };
-  return reply.code(HTTP_STATUS[code]).send(body);
 }

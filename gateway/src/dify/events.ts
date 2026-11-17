@@ -1,10 +1,9 @@
 import type { Tenant } from '../config/tenants.js';
 import { chatError, mapDifyError } from '../errors/index.js';
-import type { ChatStreamEvent, Citation, ErrorCode, Locale } from '../protocol/index.js';
+import type { ChatStreamEvent, ErrorCode, Locale } from '../protocol/index.js';
+import { toCitations } from './citations.js';
 import { difyStreamEventSchema, type DifyStreamEvent } from './schemas.js';
 import type { SseMessage } from '../protocol/sse.js';
-
-const SNIPPET_LENGTH = 280;
 
 export interface NormalizeResult {
   events: ChatStreamEvent[];
@@ -101,7 +100,7 @@ export class DifyEventNormalizer {
               type: 'end',
               conversationId: event.conversation_id,
               messageId: event.message_id,
-              citations: toCitations(event.metadata?.retriever_resources ?? []),
+              citations: toCitations(event.metadata?.retriever_resources ?? [], this.#tenant),
             },
           ],
           done: true,
@@ -138,34 +137,4 @@ export class DifyEventNormalizer {
       done: true,
     };
   }
-}
-
-type RetrieverResource = NonNullable<
-  NonNullable<Extract<DifyStreamEvent, { event: 'message_end' }>['metadata']>['retriever_resources']
->[number];
-
-/** One citation per source document, in Dify's order. */
-function toCitations(resources: readonly RetrieverResource[]): Citation[] {
-  const seen = new Set<string>();
-  const citations: Citation[] = [];
-  for (const resource of [...resources].sort((a, b) => a.position - b.position)) {
-    const documentName = resource.document_name ?? resource.dataset_name;
-    if (!documentName) continue;
-    const key = resource.document_id ?? documentName;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    citations.push({
-      position: resource.position,
-      documentName,
-      ...(resource.document_id ? { documentId: resource.document_id } : {}),
-      ...(resource.dataset_name ? { datasetName: resource.dataset_name } : {}),
-      ...(resource.content ? { snippet: truncate(resource.content, SNIPPET_LENGTH) } : {}),
-    });
-  }
-  return citations;
-}
-
-function truncate(text: string, length: number): string {
-  const clean = text.replace(/\s+/g, ' ').trim();
-  return clean.length <= length ? clean : `${clean.slice(0, length - 1).trimEnd()}…`;
 }

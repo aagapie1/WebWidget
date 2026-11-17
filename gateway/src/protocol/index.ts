@@ -50,11 +50,13 @@ export const stopRequestSchema = z.strictObject({
 });
 export type StopRequest = z.infer<typeof stopRequestSchema>;
 
+/** One source document under an answer (grouped per document, ADR 005). */
 export const citationSchema = z.object({
   position: z.int(),
   documentId: z.optional(z.string()),
-  documentName: z.string(),
-  datasetName: z.optional(z.string()),
+  /** Display title: tenant mapping, otherwise the file name without extension. */
+  title: z.string(),
+  /** Only when the tenant enables `citations.showSnippets`. */
   snippet: z.optional(z.string()),
 });
 export type Citation = z.infer<typeof citationSchema>;
@@ -99,5 +101,69 @@ export const widgetConfigSchema = z.object({
   assistantName: z.string(),
   /** Shown automatically when the window opens; empty when neither Dify nor the tenant has one. */
   welcomeMessage: z.string(),
+  /** Initial suggested questions (Dify `/parameters`, no model call). */
+  suggestedQuestions: z.array(z.string()),
 });
+
+export const ratingSchema = z.enum(['like', 'dislike']);
+export type Rating = z.infer<typeof ratingSchema>;
+
+/** `GET /api/conversations`: the visitor's conversations, most recent first. */
+export const conversationSummarySchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  /** Unix seconds. */
+  updatedAt: z.number(),
+});
+export type ConversationSummary = z.infer<typeof conversationSummarySchema>;
+
+export const conversationListSchema = z.object({
+  conversations: z.array(conversationSummarySchema),
+  hasMore: z.boolean(),
+});
+export type ConversationList = z.infer<typeof conversationListSchema>;
+
+/** One message from the history, already split into the visitor's question and the answer. */
+export const historyMessageSchema = z.object({
+  id: z.string(),
+  author: authorSchema,
+  text: z.string(),
+  /** Unix seconds. */
+  createdAt: z.number(),
+  citations: z.array(citationSchema),
+  /** The visitor's rating of an answer (assistant messages only). */
+  feedback: z.nullable(ratingSchema),
+  /** Dify could not produce this answer. */
+  failed: z.boolean(),
+});
+export type HistoryMessage = z.infer<typeof historyMessageSchema>;
+
+/** `GET /api/conversations/:id/messages`: oldest first; `hasMore` means older pages exist. */
+export const historySchema = z.object({
+  messages: z.array(historyMessageSchema),
+  hasMore: z.boolean(),
+});
+export type History = z.infer<typeof historySchema>;
+
+export const listQuerySchema = z.object({
+  tenant: tenantIdSchema,
+  /** Pagination cursor: id of the last item of the previous page. */
+  after: z.optional(z.uuid()),
+});
+
+/** Body of `POST /api/messages/:id/feedback`; `null` removes the rating. */
+export const messageFeedbackSchema = z.strictObject({
+  tenant: tenantIdSchema,
+  rating: z.nullable(ratingSchema),
+});
+
+export const MAX_FEEDBACK_COMMENT = 1000;
+
+/** Body of `POST /api/conversations/:id/feedback` (closing feedback, ADR 005). */
+export const conversationFeedbackSchema = z.strictObject({
+  tenant: tenantIdSchema,
+  rating: ratingSchema,
+  comment: z.optional(z.string().check(z.trim(), z.maxLength(MAX_FEEDBACK_COMMENT))),
+});
+export type ConversationFeedback = z.infer<typeof conversationFeedbackSchema>;
 export type WidgetConfig = z.infer<typeof widgetConfigSchema>;

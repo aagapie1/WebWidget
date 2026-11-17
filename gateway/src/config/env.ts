@@ -8,6 +8,9 @@ const envSchema = z.object({
   TENANTS_DIR: z.string().min(1).default('../config/tenants'),
   /** Built widget (loader.js, app/), served under /w/. */
   WIDGET_DIST_DIR: z.string().min(1).default('../widget/dist'),
+  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  /** Redis for closing feedback (and rate limiting in E5). Required in production. */
+  REDIS_URL: z.url({ protocol: /^rediss?$/ }).optional(),
   VISITOR_COOKIE_SECRET: z.string().min(32, 'must be at least 32 characters'),
   /** Time allowed for Dify to answer with response headers. */
   DIFY_CONNECT_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),

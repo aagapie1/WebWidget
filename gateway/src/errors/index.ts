@@ -1,5 +1,6 @@
 import type { Tenant } from '../config/tenants.js';
-import type { ChatError, ErrorCode, Locale } from '../protocol/index.js';
+import type { FastifyReply } from 'fastify';
+import type { ChatError, ErrorCode, ErrorResponse, Locale } from '../protocol/index.js';
 
 const RETRYABLE: Readonly<Record<ErrorCode, boolean>> = {
   invalid_request: false,
@@ -101,4 +102,15 @@ export function mapDifyError(status: number | undefined, difyCode: string | unde
   if (status >= 500) return 'model_error';
   if (status === 400) return 'model_error';
   return 'internal_error';
+}
+
+/** Sends a JSON error (`{ error }`) with the matching HTTP status. */
+export function replyError(
+  reply: FastifyReply,
+  code: ErrorCode,
+  locale: Locale,
+  tenant?: Tenant,
+): FastifyReply {
+  const body: ErrorResponse = { error: chatError(code, locale, tenant) };
+  return reply.code(HTTP_STATUS[code]).send(body);
 }

@@ -2,7 +2,15 @@ import { errors as undiciErrors, request, type Dispatcher } from 'undici';
 import type { Tenant } from '../config/tenants.js';
 import { mapDifyError } from '../errors/index.js';
 import type { ErrorCode } from '../protocol/index.js';
-import { difyErrorBodySchema, difyParametersSchema, type DifyParameters } from './schemas.js';
+import {
+  difyConversationListSchema,
+  difyErrorBodySchema,
+  difyMessageListSchema,
+  difyParametersSchema,
+  type DifyConversationList,
+  type DifyMessageList,
+  type DifyParameters,
+} from './schemas.js';
 
 export interface DifyTimeouts {
   /** Until Dify sends response headers. */
@@ -103,7 +111,7 @@ export type SimpleResult<T> =
 
 async function callJson(
   tenant: Tenant,
-  method: 'GET' | 'POST',
+  method: 'GET' | 'POST' | 'DELETE',
   path: string,
   body?: object,
 ): Promise<SimpleResult<unknown>> {
@@ -156,4 +164,93 @@ export async function getParameters(tenant: Tenant): Promise<SimpleResult<DifyPa
   if (!result.ok) return result;
   const parsed = difyParametersSchema.safeParse(result.value);
   return parsed.success ? { ok: true, value: parsed.data } : { ok: false, code: 'internal_error' };
+}
+
+const pageQuery = (params: Record<string, string | undefined>): string => {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) if (value) search.set(key, value);
+  return search.toString();
+};
+
+/** `GET /conversations` — the user's conversations, most recent first. */
+export async function listConversations(
+  tenant: Tenant,
+  user: string,
+  lastId?: string,
+): Promise<SimpleResult<DifyConversationList>> {
+  const query = pageQuery({ user, last_id: lastId, limit: '20', sort_by: '-updated_at' });
+  const result = await callJson(tenant, 'GET', `/conversations?${query}`);
+  if (!result.ok) return result;
+  const parsed = difyConversationListSchema.safeParse(result.value);
+  return parsed.success ? { ok: true, value: parsed.data } : { ok: false, code: 'internal_error' };
+}
+
+/** `GET /messages` — one page of a conversation, oldest first; `firstId` pages backwards. */
+export async function getMessages(
+  tenant: Tenant,
+  user: string,
+  conversationId: string,
+  firstId?: string,
+): Promise<SimpleResult<DifyMessageList>> {
+  const query = pageQuery({
+    user,
+    conversation_id: conversationId,
+    first_id: firstId,
+    limit: '20',
+  });
+  const result = await callJson(tenant, 'GET', `/messages?${query}`);
+  if (!result.ok) return result;
+  const parsed = difyMessageListSchema.safeParse(result.value);
+  return parsed.success ? { ok: true, value: parsed.data } : { ok: false, code: 'internal_error' };
+}
+
+export async function deleteConversation(
+  tenant: Tenant,
+  user: string,
+  conversationId: string,
+): Promise<SimpleResult<null>> {
+  const result = await callJson(
+    tenant,
+    'DELETE',
+    `/conversations/${encodeURIComponent(conversationId)}`,
+    {
+      user,
+    },
+  );
+  return result.ok ? { ok: true, value: null } : result;
+}
+
+/** Sets a title without a model call (`auto_generate: false`, SPEC §4). */
+export async function renameConversation(
+  tenant: Tenant,
+  user: string,
+  conversationId: string,
+  name: string,
+): Promise<SimpleResult<null>> {
+  const result = await callJson(
+    tenant,
+    'POST',
+    `/conversations/${encodeURIComponent(conversationId)}/name`,
+    { name, auto_generate: false, user },
+  );
+  return result.ok ? { ok: true, value: null } : result;
+}
+
+/** `POST /messages/{id}/feedbacks`; `rating: null` removes the visitor's rating. */
+export async function sendMessageFeedback(
+  tenant: Tenant,
+  user: string,
+  messageId: string,
+  rating: 'like' | 'dislike' | null,
+): Promise<SimpleResult<null>> {
+  const result = await callJson(
+    tenant,
+    'POST',
+    `/messages/${encodeURIComponent(messageId)}/feedbacks`,
+    {
+      rating,
+      user,
+    },
+  );
+  return result.ok ? { ok: true, value: null } : result;
 }

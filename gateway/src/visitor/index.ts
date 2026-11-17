@@ -41,3 +41,11 @@ export function resolveVisitor(
   reply.header('set-cookie', cookie);
   return visitorId;
 }
+
+/** The visitor id if a valid signed cookie exists; never issues a cookie (read-only endpoints). */
+export function readVisitor(request: FastifyRequest): string | undefined {
+  const raw = request.cookies[VISITOR_COOKIE];
+  if (raw === undefined) return undefined;
+  const unsigned = request.unsignCookie(raw);
+  return unsigned.valid && UUID.test(unsigned.value) ? unsigned.value : undefined;
+}

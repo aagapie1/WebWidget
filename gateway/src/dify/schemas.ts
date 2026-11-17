@@ -10,6 +10,8 @@ const base = {
   conversation_id: z.string(),
 };
 
+export type DifyRetrieverResource = z.infer<typeof difyRetrieverResourceSchema>;
+
 export const difyRetrieverResourceSchema = z.looseObject({
   position: z.number().int(),
   document_id: z.string().nullish(),
@@ -56,3 +58,37 @@ export const difyParametersSchema = z.looseObject({
   suggested_questions: z.array(z.string()).nullish(),
 });
 export type DifyParameters = z.infer<typeof difyParametersSchema>;
+
+/** `GET /conversations` (fields used by the gateway; verified on the pilot, ADR 005). */
+export const difyConversationListSchema = z.looseObject({
+  has_more: z.boolean(),
+  data: z.array(
+    z.looseObject({
+      id: z.string(),
+      name: z.string().nullish(),
+      status: z.string().nullish(),
+      created_at: z.number(),
+      updated_at: z.number().nullish(),
+    }),
+  ),
+});
+export type DifyConversationList = z.infer<typeof difyConversationListSchema>;
+
+/** `GET /messages`: each item is one question + its answer. */
+export const difyMessageListSchema = z.looseObject({
+  has_more: z.boolean(),
+  data: z.array(
+    z.looseObject({
+      id: z.string(),
+      conversation_id: z.string(),
+      query: z.string(),
+      answer: z.string(),
+      created_at: z.number(),
+      status: z.string().nullish(),
+      error: z.string().nullish(),
+      feedback: z.looseObject({ rating: z.enum(['like', 'dislike']).nullish() }).nullish(),
+      retriever_resources: z.array(difyRetrieverResourceSchema).nullish(),
+    }),
+  ),
+});
+export type DifyMessageList = z.infer<typeof difyMessageListSchema>;

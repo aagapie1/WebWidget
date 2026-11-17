@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../src/app.js';
 import { loadEnv } from '../src/config/env.js';
 import type { Tenant } from '../src/config/tenants.js';
+import type { FeedbackStore } from '../src/feedback/store.js';
 import { FakeDify } from './fake-dify.js';
 import { testTenant } from './helpers.js';
 
@@ -16,7 +17,11 @@ export interface Harness {
 
 /** Gateway listening on a random port, wired to a fresh fake Dify. */
 export async function startHarness(
-  options: { env?: Record<string, string>; tenant?: Partial<Tenant> } = {},
+  options: {
+    env?: Record<string, string>;
+    tenant?: Partial<Tenant>;
+    feedbackStore?: FeedbackStore;
+  } = {},
 ): Promise<Harness> {
   const dify = new FakeDify();
   const difyBaseUrl = await dify.start();
@@ -29,6 +34,7 @@ export async function startHarness(
       ...options.env,
     }),
     tenants: new Map([[tenant.id, tenant]]),
+    ...(options.feedbackStore ? { feedbackStore: options.feedbackStore } : {}),
   });
   const url = await app.listen({ host: '127.0.0.1', port: 0 });
   return {

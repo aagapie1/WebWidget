@@ -5,7 +5,9 @@ import type { Dispatcher } from 'undici';
 import { chatRoute } from './chat/route.js';
 import type { AppEnv } from './config/env.js';
 import type { TenantRegistry } from './config/tenants.js';
-import { chatError } from './errors/index.js';
+import { conversationRoutes } from './conversations/route.js';
+import { chatError, replyError } from './errors/index.js';
+import { MemoryFeedbackStore, type FeedbackStore } from './feedback/store.js';
 import type { ErrorResponse } from './protocol/index.js';
 import { widgetConfigRoute } from './widget-config/route.js';
 import { widgetRoute } from './widget/route.js';
@@ -13,6 +15,8 @@ import { widgetRoute } from './widget/route.js';
 export interface BuildAppOptions {
   env: AppEnv;
   tenants: TenantRegistry;
+  /** Closing feedback storage (Redis in production, ADR 005). Defaults to in-memory. */
+  feedbackStore?: FeedbackStore;
   /** Test hook: route Dify requests through a custom undici dispatcher. */
   difyDispatcher?: Dispatcher;
 }
@@ -40,6 +44,13 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
 
   app.addHook('onRequest', async (request, reply) => {
     reply.header('x-request-id', request.id);
+    // Defence in depth (ADR 005): browsers say where a request comes from. Only the chat iframe,
+    // served from this origin, may call the API. Requests without the header are not rejected
+    // here; the signed visitor cookie and rate limiting (E5) are the main protections.
+    const site = request.headers['sec-fetch-site'];
+    if (request.url.startsWith('/api/') && site !== undefined && site !== 'same-origin') {
+      return replyError(reply, 'forbidden_origin', 'ro');
+    }
   });
 
   await app.register(cookie, { secret: options.env.VISITOR_COOKIE_SECRET });
@@ -59,6 +70,12 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
 
   widgetConfigRoute(app, options.tenants);
   await widgetRoute(app, { tenants: options.tenants, distDir: options.env.WIDGET_DIST_DIR });
+
+  conversationRoutes(app, {
+    env: options.env,
+    tenants: options.tenants,
+    feedbackStore: options.feedbackStore ?? new MemoryFeedbackStore(),
+  });
 
   chatRoute(app, {
     env: options.env,

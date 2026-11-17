@@ -38,20 +38,9 @@ describe('DifyEventNormalizer', () => {
         conversationId: '45701982-8118-4bc5-8e9b-64562b4555f2',
         messageId: '663c5084-a254-4040-8ad3-51f2a3c1a77c',
         citations: [
-          {
-            position: 1,
-            documentId: 'doc-1',
-            documentName: 'Regulament.pdf',
-            datasetName: 'Ghiduri',
-            snippet: 'Art. 3 Programul instituției',
-          },
-          {
-            position: 2,
-            documentId: 'doc-2',
-            documentName: 'Program.pdf',
-            datasetName: 'Ghiduri',
-            snippet: 'Programul de lucru cu publicul',
-          },
+          // Tenant mapping for Regulament.pdf, file name without extension otherwise.
+          { position: 1, documentId: 'doc-1', title: 'Regulamentul intern' },
+          { position: 2, documentId: 'doc-2', title: 'Program' },
         ],
       },
     ]);
