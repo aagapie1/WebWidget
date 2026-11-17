@@ -1,0 +1,8 @@
+data: {"event": "message", "task_id": "900bbd43-dc0b-4383-a372-aa6e6c414227", "id": "663c5084-a254-4040-8ad3-51f2a3c1a77c", "message_id": "663c5084-a254-4040-8ad3-51f2a3c1a77c", "conversation_id": "45701982-8118-4bc5-8e9b-64562b4555f2", "answer": "Bună ziua! ", "created_at": 1705398420}
+
+data: {"event": "message", "task_id": "900bbd43-dc0b-4383-a372-aa6e6c414227", "id": "663c5084-a254-4040-8ad3-51f2a3c1a77c", "message_id": "663c5084-a254-4040-8ad3-51f2a3c1a77c", "conversation_id": "45701982-8118-4bc5-8e9b-64562b4555f2", "answer": "Programul este luni–vineri, 8–16.", "created_at": 1705398420}
+
+event: ping
+
+data: {"event": "message_end", "task_id": "900bbd43-dc0b-4383-a372-aa6e6c414227", "id": "663c5084-a254-4040-8ad3-51f2a3c1a77c", "message_id": "663c5084-a254-4040-8ad3-51f2a3c1a77c", "conversation_id": "45701982-8118-4bc5-8e9b-64562b4555f2", "metadata": {"usage": {"total_tokens": 42}, "retriever_resources": [{"position": 2, "dataset_id": "d1", "dataset_name": "Ghiduri", "document_id": "doc-2", "document_name": "Program.pdf", "segment_id": "s2", "score": 0.71, "content": "Programul de lucru cu publicul"}, {"position": 1, "dataset_id": "d1", "dataset_name": "Ghiduri", "document_id": "doc-1", "document_name": "Regulament.pdf", "segment_id": "s1", "score": 0.82, "content": "Art. 3\n  Programul   instituției"}, {"position": 3, "dataset_id": "d1", "dataset_name": "Ghiduri", "document_id": "doc-1", "document_name": "Regulament.pdf", "segment_id": "s3", "score": 0.6, "content": "alt fragment"}]}}
+
