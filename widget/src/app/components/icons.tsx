@@ -54,3 +54,47 @@ export const AssistantIcon = (props: IconProps) => (
     <path d="M12 4v4M9 14h.01M15 14h.01" />
   </Svg>
 );
+
+export const ListIcon = (props: IconProps) => (
+  <Svg {...props}>
+    <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+  </Svg>
+);
+
+export const CheckCircleIcon = (props: IconProps) => (
+  <Svg {...props}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="m8 12 3 3 5-6" />
+  </Svg>
+);
+
+export const TrashIcon = (props: IconProps) => (
+  <Svg {...props}>
+    <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" />
+  </Svg>
+);
+
+export const ArrowLeftIcon = (props: IconProps) => (
+  <Svg {...props}>
+    <path d="M19 12H5M12 19l-7-7 7-7" />
+  </Svg>
+);
+
+export const ThumbUpIcon = (props: IconProps) => (
+  <Svg {...props}>
+    <path d="M7 10v11H4V10zM7 10l4-8a3 3 0 0 1 3 3v4h5.5a2 2 0 0 1 2 2.3l-1.3 8A2 2 0 0 1 18.2 21H7" />
+  </Svg>
+);
+
+export const ThumbDownIcon = (props: IconProps) => (
+  <Svg {...props}>
+    <path d="M17 14V3h3v11zM17 14l-4 8a3 3 0 0 1-3-3v-4H4.5a2 2 0 0 1-2-2.3l1.3-8A2 2 0 0 1 5.8 3H17" />
+  </Svg>
+);
+
+export const DocumentIcon = (props: IconProps) => (
+  <Svg {...props}>
+    <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
+    <path d="M14 3v6h6" />
+  </Svg>
+);

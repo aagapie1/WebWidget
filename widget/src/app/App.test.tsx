@@ -64,12 +64,56 @@ describe('App', () => {
     expect(onHide).toHaveBeenCalledTimes(2);
   });
 
-  it('starts a new conversation and moves focus to the input', () => {
+  it('opens the conversation list (focus on its heading), starts a new conversation from it', async () => {
     setup([]);
-    fireEvent.click(screen.getByRole('button', { name: 'Conversație nouă' }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Conversațiile mele' }));
+      await Promise.resolve();
+    });
+    expect(document.activeElement).toBe(screen.getByRole('heading', { level: 2 }));
+    expect(screen.queryByLabelText('Mesajul dumneavoastră')).toBeNull();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Conversație nouă' }));
+      await Promise.resolve();
+    });
     expect(document.activeElement).toBe(screen.getByLabelText('Mesajul dumneavoastră'));
     expect(document.querySelector('[aria-live="polite"]')?.textContent).toBe(
       ro.messages.newConversationStarted,
     );
+  });
+
+  it('shows the suggested questions until the first question', async () => {
+    const { controller } = setup([
+      { type: 'start', conversationId: 'c', messageId: 'm', taskId: 't', author: 'assistant' },
+      { type: 'end', conversationId: 'c', messageId: 'm', citations: [] },
+    ]);
+    await act(() => {
+      controller.setSuggestions(['Care e programul?']);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Care e programul?' }));
+      await Promise.resolve();
+    });
+    expect(screen.queryByRole('group', { name: 'Întrebări sugerate' })).toBeNull();
+    expect(screen.getByText('Care e programul?')).toBeTruthy();
+  });
+
+  it('closes the conversation through the feedback view', async () => {
+    const { controller } = setup([
+      { type: 'start', conversationId: 'c', messageId: 'm', taskId: 't', author: 'assistant' },
+      { type: 'end', conversationId: 'c', messageId: 'm', citations: [] },
+    ]);
+    await act(async () => {
+      await controller.send('Întrebare');
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Închide conversația' }));
+    expect(screen.getByRole('heading', { level: 2, name: 'Cum a fost conversația?' })).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Închide fără evaluare' }));
+      await Promise.resolve();
+    });
+    expect(controller.conversationId).toBeUndefined();
+    expect(screen.queryByRole('button', { name: 'Închide conversația' })).toBeNull();
   });
 });

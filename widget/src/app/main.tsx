@@ -74,10 +74,14 @@ async function start(): Promise<void> {
     toPlainText: markdownToText,
   });
   controller.setWelcome(config.welcomeMessage);
+  controller.setSuggestions(config.suggestedQuestions);
+  // Resume the latest conversation with its history (ADR 005); no-op for new visitors.
+  void controller.resumeLatest();
   document.title = config.assistantName;
 
   render(
     <App
+      locale={locale}
       controller={controller}
       texts={texts}
       assistantName={config.assistantName}

@@ -1,27 +1,45 @@
+import type { Rating } from 'gateway/protocol';
 import { useEffect, useRef } from 'preact/hooks';
 import type { ChatMessage } from '../chat/controller.js';
 import type { Texts } from '../i18n/index.js';
 import { Message } from './Message.js';
+import { SuggestedQuestions } from './SuggestedQuestions.js';
 
 export interface MessageListProps {
   messages: readonly ChatMessage[];
   assistantName: string;
   texts: Texts;
   onRetry: () => void;
+  onRate?: (id: string, rating: Rating) => void;
+  /** Initial suggestions, shown until the first question of the conversation. */
+  suggestions?: readonly string[];
+  onAsk?: (question: string) => void;
+  busy?: boolean;
+  hasOlder?: boolean;
+  loading?: boolean;
+  onLoadOlder?: () => void;
 }
 
 /**
  * No aria-live here: streamed deltas would be read piece by piece. Completed answers are
  * announced once by <Announcer> (ADR 004).
  */
-export function MessageList({ messages, assistantName, texts, onRetry }: MessageListProps) {
+export function MessageList(props: MessageListProps) {
+  const { messages, assistantName, texts, onRetry } = props;
   const scroller = useRef<HTMLElement>(null);
   const stickToBottom = useRef(true);
+  const newestId = messages.at(-1)?.id;
+  const previousNewest = useRef(newestId);
 
   useEffect(() => {
     const element = scroller.current;
-    if (element && stickToBottom.current) element.scrollTop = element.scrollHeight;
-  }, [messages]);
+    // Loading older messages adds above: keep the reader's position instead of jumping down.
+    const appendedOrStreaming = newestId !== previousNewest.current || stickToBottom.current;
+    previousNewest.current = newestId;
+    if (element && appendedOrStreaming && stickToBottom.current) {
+      element.scrollTop = element.scrollHeight;
+    }
+  }, [messages, newestId]);
 
   const onScroll = () => {
     const element = scroller.current;
@@ -31,6 +49,7 @@ export function MessageList({ messages, assistantName, texts, onRetry }: Message
   };
 
   const last = messages.at(-1);
+  const hasQuestion = messages.some((message) => message.author === 'user');
   return (
     // Focusable so keyboard users can scroll long conversations (scrollable region).
     <section
@@ -40,6 +59,16 @@ export function MessageList({ messages, assistantName, texts, onRetry }: Message
       onScroll={onScroll}
       tabIndex={0}
     >
+      {props.hasOlder && props.onLoadOlder && (
+        <button
+          type="button"
+          class="text-button messages__older"
+          disabled={props.loading}
+          onClick={props.onLoadOlder}
+        >
+          {texts.messages.loadOlder}
+        </button>
+      )}
       <ol class="messages__list">
         {messages.map((message) => (
           <Message
@@ -49,9 +78,18 @@ export function MessageList({ messages, assistantName, texts, onRetry }: Message
             texts={texts}
             canRetry={message === last}
             onRetry={onRetry}
+            {...(props.onRate ? { onRate: props.onRate } : {})}
           />
         ))}
       </ol>
+      {!hasQuestion && props.suggestions && props.onAsk && (
+        <SuggestedQuestions
+          questions={props.suggestions}
+          texts={texts}
+          disabled={props.busy ?? false}
+          onAsk={props.onAsk}
+        />
+      )}
     </section>
   );
 }

@@ -1,15 +1,25 @@
 import type { Texts } from '../i18n/index.js';
-import { AssistantIcon, ChevronDownIcon, NewChatIcon } from './icons.js';
+import { AssistantIcon, CheckCircleIcon, ChevronDownIcon, ListIcon } from './icons.js';
 
 export interface HeaderProps {
   assistantName: string;
   texts: Texts;
-  onNewConversation: () => void;
+  /** Shows "Închide conversația" only when there is a conversation to close. */
+  canClose: boolean;
+  onShowConversations: () => void;
+  onCloseConversation: () => void;
   onHide: () => void;
 }
 
 /** Window title and controls. Minimize hides the window and keeps the conversation (ADR 004). */
-export function Header({ assistantName, texts, onNewConversation, onHide }: HeaderProps) {
+export function Header({
+  assistantName,
+  texts,
+  canClose,
+  onShowConversations,
+  onCloseConversation,
+  onHide,
+}: HeaderProps) {
   return (
     <header class="header">
       <div class="header__bar">
@@ -27,12 +37,23 @@ export function Header({ assistantName, texts, onNewConversation, onHide }: Head
           <button
             type="button"
             class="icon-button"
-            aria-label={texts.header.newConversation}
-            title={texts.header.newConversation}
-            onClick={onNewConversation}
+            aria-label={texts.header.conversations}
+            title={texts.header.conversations}
+            onClick={onShowConversations}
           >
-            <NewChatIcon />
+            <ListIcon />
           </button>
+          {canClose && (
+            <button
+              type="button"
+              class="icon-button"
+              aria-label={texts.header.closeConversation}
+              title={texts.header.closeConversation}
+              onClick={onCloseConversation}
+            >
+              <CheckCircleIcon />
+            </button>
+          )}
           <button
             type="button"
             class="icon-button"
