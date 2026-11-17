@@ -3,7 +3,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "vitest run --passWithNoTests",
+    "dev": "pnpm run --parallel \"/^dev:/\"",
+    "dev:app": "vite build --watch --mode development",
+    "dev:loader": "vite build -c vite.loader.config.ts --watch --mode development",
+    "dev:demo": "vite -c vite.demo.config.ts",
+    "build": "vite build && vite build -c vite.loader.config.ts && node scripts/check-size.mjs",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
