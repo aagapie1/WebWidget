@@ -1,18 +1,39 @@
 // Test servers for Playwright:
-//  - fake Dify on :4010 (scripted answers chosen by keywords in the question)
+//  - fake Dify on :4010: scripted answers chosen by keywords in the question, and an in-memory
+//    store of conversations per `user` (history, rename, delete, feedback), like the pilot
 //  - client sites: :5180 (in allowedOrigins) and :5181 (not allowed), each embedding the widget
+import { randomUUID } from 'node:crypto';
 import { createServer } from 'node:http';
 
 const GATEWAY = process.env.E2E_GATEWAY ?? 'http://localhost:3100';
-const ids = {
-  task_id: '11111111-1111-4111-8111-111111111111',
-  message_id: '22222222-2222-4222-8222-222222222222',
-  conversation_id: '33333333-3333-4333-8333-333333333333',
-};
 
 const requests = [];
 let failuresLeft = 1;
+/** id → { id, user, name, createdAt, updatedAt, messages: [{ id, query, answer, created_at, feedback, retriever_resources }] } */
+const conversations = new Map();
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const now = () => Math.floor(Date.now() / 1000);
+
+const SOURCES = [
+  {
+    position: 1,
+    document_id: 'doc-1',
+    document_name: 'Regulament_v3.pdf',
+    content: '## Art. 3 Programul',
+  },
+  {
+    position: 2,
+    document_id: 'doc-1',
+    document_name: 'Regulament_v3.pdf',
+    content: 'alt fragment',
+  },
+  {
+    position: 3,
+    document_id: 'doc-2',
+    document_name: 'Tarife 2026.docx',
+    content: 'Taxa este 100 lei',
+  },
+];
 
 function readBody(req) {
   return new Promise((resolve) => {
@@ -25,71 +46,174 @@ function readBody(req) {
   });
 }
 
-async function stream(res, chunks, pause) {
+const json = (res, status, body) =>
+  res.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(body));
+
+function scriptFor(query) {
+  if (query.includes('xss')) {
+    return {
+      chunks: [
+        'Text sigur. <img src=x onerror="window.__xss=1"> <script>window.__xss=2</script> ',
+        '[rău](javascript:window.__xss=3) [site](https://example.org/pagina) ',
+        '![pixel](https://tracker.example/p.png)',
+      ],
+      pause: 20,
+    };
+  }
+  if (query.includes('lung')) {
+    return { chunks: Array.from({ length: 200 }, (_, i) => `cuvânt${String(i)} `), pause: 50 };
+  }
+  if (query.includes('absent')) {
+    // Finishes even when the browser leaves (like Dify, ADR 005).
+    return { chunks: ['Răspuns ', 'terminat ', 'în lipsa ', 'vizitatorului.'], pause: 400 };
+  }
+  if (query.includes('surse')) {
+    return {
+      chunks: ['Conform regulamentului, ', 'taxa este 100 lei.'],
+      pause: 30,
+      sources: SOURCES,
+    };
+  }
+  return { chunks: ['Programul este ', '**luni–vineri**', ', între 8 și 16.'], pause: 40 };
+}
+
+/** Streams the answer; generation continues and is stored even if the client disconnects. */
+async function chat(res, body) {
+  const query = String(body?.query ?? '');
+  if (query.includes('eroare') && failuresLeft > 0) {
+    failuresLeft--;
+    json(res, 503, { code: 'unavailable' });
+    return;
+  }
+  let conversation = body?.conversation_id ? conversations.get(body.conversation_id) : undefined;
+  if (body?.conversation_id && (!conversation || conversation.user !== body.user)) {
+    json(res, 404, { code: 'not_found', message: 'Conversation Not Exists.', status: 404 });
+    return;
+  }
+  if (!conversation) {
+    conversation = {
+      id: randomUUID(),
+      user: body.user,
+      // Dify's own default name: the question truncated (no model call with auto_generate_name false).
+      name: query.slice(0, 20),
+      createdAt: now(),
+      updatedAt: now(),
+      messages: [],
+    };
+    conversations.set(conversation.id, conversation);
+  }
+  const ids = { task_id: randomUUID(), message_id: randomUUID(), conversation_id: conversation.id };
+  const { chunks, pause, sources = [] } = scriptFor(query);
+  const record = {
+    id: ids.message_id,
+    query,
+    answer: '',
+    created_at: now(),
+    feedback: null,
+    retriever_resources: sources,
+    status: 'normal',
+  };
+  conversation.messages.push(record);
+
+  const send = (data) => {
+    if (!res.destroyed) res.write(`data: ${JSON.stringify(data)}\n\n`);
+  };
   res.writeHead(200, { 'content-type': 'text/event-stream' });
   res.write('event: ping\n\n');
   for (const answer of chunks) {
-    if (res.destroyed) return;
-    res.write(`data: ${JSON.stringify({ event: 'message', ...ids, answer })}\n\n`);
+    record.answer += answer;
+    send({ event: 'message', ...ids, answer });
     await delay(pause);
   }
-  res.end(`data: ${JSON.stringify({ event: 'message_end', ...ids, metadata: {} })}\n\n`);
+  conversation.updatedAt = now();
+  send({ event: 'message_end', ...ids, metadata: { retriever_resources: sources } });
+  if (!res.destroyed) res.end();
 }
+
+const owned = (id, user) => {
+  const conversation = conversations.get(id);
+  return conversation && conversation.user === user ? conversation : undefined;
+};
 
 const dify = createServer(async (req, res) => {
   const body = await readBody(req);
-  const url = req.url ?? '';
-  if (url === '/__requests') {
-    res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(requests));
-    return;
-  }
-  if (url === '/__reset') {
+  const url = new URL(req.url ?? '/', 'http://dify.test');
+  const path = url.pathname;
+  if (path === '/__requests') return json(res, 200, requests);
+  if (path === '/__reset') {
     requests.length = 0;
     failuresLeft = 1;
-    res.writeHead(204).end();
-    return;
+    conversations.clear();
+    return res.writeHead(204).end();
   }
-  requests.push({ method: req.method, url, authorization: req.headers.authorization, body });
+  requests.push({
+    method: req.method,
+    url: req.url,
+    authorization: req.headers.authorization,
+    body,
+  });
 
-  if (url.startsWith('/v1/parameters')) {
-    res
-      .writeHead(200, { 'content-type': 'application/json' })
-      .end(JSON.stringify({ opening_statement: 'Bună ziua! Sunt asistentul de test.' }));
-    return;
+  if (path === '/v1/parameters') {
+    return json(res, 200, {
+      opening_statement: 'Bună ziua! Sunt asistentul de test.',
+      suggested_questions: ['Care e programul?', 'Ce taxe sunt? surse'],
+    });
   }
-  if (/^\/v1\/chat-messages\/[^/]+\/stop$/.test(url)) {
-    res.writeHead(200, { 'content-type': 'application/json' }).end('{"result":"success"}');
-    return;
+  if (/^\/v1\/chat-messages\/[^/]+\/stop$/.test(path)) return json(res, 200, { result: 'success' });
+  if (path === '/v1/chat-messages') return chat(res, body);
+
+  if (path === '/v1/conversations' && req.method === 'GET') {
+    const user = url.searchParams.get('user');
+    const data = [...conversations.values()]
+      .filter((c) => c.user === user)
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .map((c) => ({
+        id: c.id,
+        name: c.name,
+        status: 'normal',
+        created_at: c.createdAt,
+        updated_at: c.updatedAt,
+      }));
+    return json(res, 200, { limit: 20, has_more: false, data });
   }
-  if (url === '/v1/chat-messages') {
-    const query = String(body?.query ?? '');
-    if (query.includes('xss')) {
-      await stream(
-        res,
-        [
-          'Text sigur. <img src=x onerror="window.__xss=1"> <script>window.__xss=2</script> ',
-          '[rău](javascript:window.__xss=3) [site](https://example.org/pagina) ',
-          '![pixel](https://tracker.example/p.png)',
-        ],
-        20,
-      );
-      return;
+  const rename = path.match(/^\/v1\/conversations\/([^/]+)\/name$/);
+  if (rename && req.method === 'POST') {
+    const conversation = owned(rename[1], body?.user);
+    if (!conversation) return json(res, 404, { code: 'not_found' });
+    conversation.name = body.name;
+    return json(res, 200, { id: conversation.id, name: conversation.name });
+  }
+  const remove = path.match(/^\/v1\/conversations\/([^/]+)$/);
+  if (remove && req.method === 'DELETE') {
+    if (!owned(remove[1], body?.user)) return json(res, 404, { code: 'not_found' });
+    conversations.delete(remove[1]);
+    return res.writeHead(204).end();
+  }
+  if (path === '/v1/messages' && req.method === 'GET') {
+    const conversation = owned(
+      url.searchParams.get('conversation_id'),
+      url.searchParams.get('user'),
+    );
+    if (!conversation)
+      return json(res, 404, { code: 'not_found', message: 'Conversation Not Exists.' });
+    const data = conversation.messages.map((m) => ({
+      ...m,
+      conversation_id: conversation.id,
+      feedback: m.feedback ? { rating: m.feedback } : null,
+    }));
+    return json(res, 200, { limit: 20, has_more: false, data });
+  }
+  const feedback = path.match(/^\/v1\/messages\/([^/]+)\/feedbacks$/);
+  if (feedback && req.method === 'POST') {
+    for (const conversation of conversations.values()) {
+      if (conversation.user !== body?.user) continue;
+      const message = conversation.messages.find((m) => m.id === feedback[1]);
+      if (message) {
+        message.feedback = body.rating;
+        return json(res, 200, { result: 'success' });
+      }
     }
-    if (query.includes('lung')) {
-      await stream(
-        res,
-        Array.from({ length: 200 }, (_, i) => `cuvânt${String(i)} `),
-        50,
-      );
-      return;
-    }
-    if (query.includes('eroare') && failuresLeft > 0) {
-      failuresLeft--;
-      res.writeHead(503, { 'content-type': 'application/json' }).end('{"code":"unavailable"}');
-      return;
-    }
-    await stream(res, ['Programul este ', '**luni–vineri**', ', între 8 și 16.'], 40);
-    return;
+    return json(res, 404, { code: 'not_found' });
   }
   res.writeHead(404).end();
 });

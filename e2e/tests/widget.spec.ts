@@ -161,6 +161,8 @@ test('minimize only hides; "Conversație nouă" starts over', async ({ page }) =
   await launcher(page).click();
   await expect(chat(page).locator('.message--user')).toHaveCount(1);
 
+  // A new conversation starts from the conversation list (E3).
+  await chat(page).getByRole('button', { name: 'Conversațiile mele' }).click();
   await chat(page).getByRole('button', { name: 'Conversație nouă' }).click();
   await expect(chat(page).locator('.message--user')).toHaveCount(0);
   await expect(chat(page).getByText('Bună ziua! Sunt asistentul de test.')).toBeVisible();

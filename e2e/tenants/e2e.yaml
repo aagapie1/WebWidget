@@ -5,3 +5,6 @@ difyBaseUrl: ${DIFY_BASE_URL}
 difyApiKeyEnv: DIFY_API_KEY_E2E
 allowedOrigins:
   - http://127.0.0.1:5180
+citations:
+  documentTitles:
+    Regulament_v3.pdf: Regulamentul de organizare
