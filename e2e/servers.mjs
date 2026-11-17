@@ -13,6 +13,8 @@ let failuresLeft = 1;
 const conversations = new Map();
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const now = () => Math.floor(Date.now() / 1000);
+// Dify timestamps have 1 s resolution; a sequence keeps "most recent first" deterministic in tests.
+let sequence = 0;
 
 const SOURCES = [
   {
@@ -98,6 +100,7 @@ async function chat(res, body) {
       name: query.slice(0, 20),
       createdAt: now(),
       updatedAt: now(),
+      seq: ++sequence,
       messages: [],
     };
     conversations.set(conversation.id, conversation);
@@ -126,6 +129,7 @@ async function chat(res, body) {
     await delay(pause);
   }
   conversation.updatedAt = now();
+  conversation.seq = ++sequence;
   send({ event: 'message_end', ...ids, metadata: { retriever_resources: sources } });
   if (!res.destroyed) res.end();
 }
@@ -166,7 +170,7 @@ const dify = createServer(async (req, res) => {
     const user = url.searchParams.get('user');
     const data = [...conversations.values()]
       .filter((c) => c.user === user)
-      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .sort((a, b) => b.updatedAt - a.updatedAt || b.seq - a.seq)
       .map((c) => ({
         id: c.id,
         name: c.name,
