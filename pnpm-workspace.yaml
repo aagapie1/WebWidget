@@ -1,6 +1,7 @@
 packages:
   - gateway
   - widget
+  - e2e
 
 # Dependencies allowed to run install scripts (esbuild downloads its native binary).
 allowBuilds:
