@@ -6,6 +6,8 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   PUBLIC_ORIGIN: z.url({ protocol: /^https?$/ }).transform((value) => new URL(value).origin),
   TENANTS_DIR: z.string().min(1).default('../config/tenants'),
+  /** Built widget (loader.js, app/), served under /w/. */
+  WIDGET_DIST_DIR: z.string().min(1).default('../widget/dist'),
   VISITOR_COOKIE_SECRET: z.string().min(32, 'must be at least 32 characters'),
   /** Time allowed for Dify to answer with response headers. */
   DIFY_CONNECT_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),
