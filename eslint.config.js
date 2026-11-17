@@ -26,6 +26,11 @@ export default defineConfig(
     languageOptions: { globals: globals.browser },
   },
   {
+    // Test doubles implement async interfaces without awaiting anything.
+    files: ['**/*.test.{ts,tsx}'],
+    rules: { '@typescript-eslint/require-await': 'off' },
+  },
+  {
     files: ['*.js'],
     languageOptions: { globals: globals.node },
   },
