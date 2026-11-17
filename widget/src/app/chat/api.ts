@@ -46,15 +46,40 @@ export interface ChatTransport {
 /** Response/request header carrying the signed visitor id when cookies are blocked (ADR 006). */
 const VISITOR_HEADER = 'x-visitor-token';
 
+// Storage can be unavailable (privacy modes, blocked third-party storage): never fatal.
+function readSession(key: string): string | undefined {
+  try {
+    return sessionStorage.getItem(key) ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function writeSession(key: string, value: string): void {
+  try {
+    sessionStorage.setItem(key, value);
+  } catch {
+    // Memory-only fallback.
+  }
+}
+
 export class GatewayTransport implements ChatTransport {
-  /** Kept in memory only (never in storage): lost on reload, like a session. */
+  /**
+   * Signed visitor id, for browsers that block the iframe cookie (Safari). Kept in memory and in
+   * sessionStorage: survives reloads in the same tab, gone when the tab closes. Only this
+   * identifier is stored, never conversation content (ADR 006).
+   */
   #visitorToken: string | undefined;
+  readonly #storageKey: string;
 
   constructor(
     private readonly tenant: string,
     private readonly locale: Locale,
     private readonly internalError: ChatError,
-  ) {}
+  ) {
+    this.#storageKey = `chat-widget-visitor:${tenant}`;
+    this.#visitorToken = readSession(this.#storageKey);
+  }
 
   /** Same-origin fetch that sends and remembers the fallback visitor token. */
   async #fetch(path: string, init: RequestInit = {}): Promise<Response> {
@@ -62,7 +87,10 @@ export class GatewayTransport implements ChatTransport {
     if (this.#visitorToken) headers.set(VISITOR_HEADER, this.#visitorToken);
     const response = await fetch(path, { ...init, headers, credentials: 'same-origin' });
     const issued = response.headers.get(VISITOR_HEADER);
-    if (issued) this.#visitorToken = issued;
+    if (issued) {
+      this.#visitorToken = issued;
+      writeSession(this.#storageKey, issued);
+    }
     return response;
   }
 

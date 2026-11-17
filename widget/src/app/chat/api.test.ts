@@ -99,3 +99,41 @@ describe('visitor token fallback (ADR 006)', () => {
     expect(secondHeaders.get('x-visitor-token')).toBe('signed-token');
   });
 });
+
+describe('visitor token in sessionStorage (ADR 006)', () => {
+  afterEach(() => {
+    sessionStorage.clear();
+  });
+
+  it('stores only the token, per tenant, and reuses it after a reload', async () => {
+    const issued = sseResponse(['data: {"type":"delta","text":"a"}\n\n']);
+    issued.headers.set('x-visitor-token', 'signed-token');
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(issued));
+    await collect(new GatewayTransport('pilot', 'ro', internal));
+    expect(Object.keys(sessionStorage)).toEqual(['chat-widget-visitor:pilot']);
+    expect(sessionStorage.getItem('chat-widget-visitor:pilot')).toBe('signed-token');
+
+    // "Reload": a new transport reads the token and sends it with the first request.
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(Response.json({ conversations: [], hasMore: false }));
+    vi.stubGlobal('fetch', fetchMock);
+    await new GatewayTransport('pilot', 'ro', internal).listConversations();
+    const headers = (fetchMock.mock.calls[0] as [string, RequestInit])[1].headers as Headers;
+    expect(headers.get('x-visitor-token')).toBe('signed-token');
+  });
+
+  it('keeps working when storage throws', async () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new DOMException('blocked', 'SecurityError');
+    });
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('blocked', 'SecurityError');
+    });
+    const issued = sseResponse(['data: {"type":"delta","text":"a"}\n\n']);
+    issued.headers.set('x-visitor-token', 'signed-token');
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(issued));
+    expect(await collect(new GatewayTransport('pilot', 'ro', internal))).toHaveLength(1);
+    vi.restoreAllMocks();
+  });
+});

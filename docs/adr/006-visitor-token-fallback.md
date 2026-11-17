@@ -14,24 +14,20 @@ multi-turn conversations broke, closing feedback was refused, history was empty.
 - When the gateway issues a visitor id it also returns the same signed value in the
   `X-Visitor-Token` response header. Requests may carry it back in `X-Visitor-Token`; the cookie
   wins when both are present. Forged or malformed values are ignored (same signature check).
-- The iframe keeps the token **in memory only** (`GatewayTransport`), never in `localStorage` or
-  `sessionStorage`. A conversation works for as long as the page stays open in every browser.
+- The iframe keeps the token in memory **and in ** (key
+  ), decided by the product owner on 2026-11-17. Only this signed
+  identifier is stored, never conversation content (CLAUDE.md: no history on the device). The
+  storage is per tab, partitioned per embedding site, and cleared when the tab closes. If storage
+  is unavailable the token stays in memory.
 - Same-origin requests only (the iframe and the API share the gateway origin); no CORS change.
 
 ## Consequences
 
 - Browsers that keep the partitioned cookie (Chromium, Firefox): unchanged, history survives
-  reloads for `visitorCookieDays`.
-- Browsers that block it (Safari/WebKit): conversations work within the page; history across
-  reloads and "answers received while away" are **not** available. The e2e tests that need a
-  reload are skipped on WebKit with this reason.
+  reloads and new visits for .
+- Browsers that block it (Safari/WebKit): conversations, history across reloads and answers
+  received while away work **within the same tab**; a new tab or a later visit starts a new
+  anonymous visitor. The e2e suite runs the reload tests on WebKit too.
 - A script running inside the iframe could read the token (unlike an HttpOnly cookie). The
   iframe only renders sanitized content (rule 2, strict CSP), and the token gives access only to
   that anonymous visitor's conversations.
-
-## Open question (for the product owner)
-
-Keeping the token in `sessionStorage` would restore history across reloads in the same Safari
-tab (storage is partitioned per embedding site and cleared when the tab closes). It is an
-identifier, not conversation content, but CLAUDE.md asks not to keep conversation data on the
-device. Not done until decided.

@@ -35,10 +35,6 @@ async function difyRequests(page: Page): Promise<DifyRequest[]> {
   return (await (await page.request.get(`${DIFY}/__requests`)).json()) as DifyRequest[];
 }
 
-/** WebKit blocks cookies in third-party iframes; the in-memory token does not survive a reload. */
-const NO_RELOAD_HISTORY =
-  'WebKit: no third-party cookies, history across reloads not kept (ADR 006)';
-
 test('a conversation with several questions stays one conversation (all browsers)', async ({
   page,
 }) => {
@@ -59,9 +55,7 @@ test('a conversation with several questions stays one conversation (all browsers
 
 test('history survives a page reload (from the gateway, nothing in localStorage)', async ({
   page,
-  browserName,
 }) => {
-  test.skip(browserName === 'webkit', NO_RELOAD_HISTORY);
   await openChat(page);
   await ask(page, 'Care e programul?');
   await openChat(page);
@@ -72,13 +66,16 @@ test('history survives a page reload (from the gateway, nothing in localStorage)
 
   const frame = page.frames().find((f) => f.url().startsWith(`${GATEWAY}/w/app`));
   expect(await frame?.evaluate(() => localStorage.length)).toBe(0);
+  // Only the visitor token may be kept, per tab (ADR 006): never conversation content.
+  expect(await frame?.evaluate(() => Object.keys(sessionStorage))).toEqual(
+    expect.arrayContaining(['chat-widget-visitor:e2e']),
+  );
+  expect(await frame?.evaluate(() => sessionStorage.length)).toBe(1);
 });
 
 test('an answer that finished while the visitor was away appears when they come back', async ({
   page,
-  browserName,
 }) => {
-  test.skip(browserName === 'webkit', NO_RELOAD_HISTORY);
   await openChat(page);
   await input(page).fill('întrebare absent');
   await input(page).press('Enter');
@@ -118,7 +115,7 @@ test('sources are grouped per document with the tenant title, no snippets by def
   await expect(lastAnswer(page).locator('details')).toHaveCount(0);
 });
 
-test('rating an answer reaches Dify and survives a reload', async ({ page, browserName }) => {
+test('rating an answer reaches Dify and survives a reload', async ({ page }) => {
   await openChat(page);
   await ask(page, 'Care e programul?');
   const like = lastAnswer(page).getByRole('button', { name: 'Răspuns util' });
@@ -131,7 +128,6 @@ test('rating an answer reaches Dify and survives a reload', async ({ page, brows
     )
     .toBe('like');
 
-  if (browserName === 'webkit') return; // NO_RELOAD_HISTORY
   await openChat(page);
   await expect(lastAnswer(page).getByRole('button', { name: 'Răspuns util' })).toHaveAttribute(
     'aria-pressed',
