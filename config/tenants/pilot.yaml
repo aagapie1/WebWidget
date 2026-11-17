@@ -1,0 +1,12 @@
+# Test tenant for the pilot Dify instance. No secrets here: the key is read from DIFY_API_KEY_PILOT.
+id: pilot
+name: Pilot
+difyBaseUrl: ${DIFY_BASE_URL}
+difyApiKeyEnv: DIFY_API_KEY_PILOT
+allowedOrigins:
+  - http://localhost:5173
+  - http://localhost:3000
+theme: {}
+texts:
+  ro: {}
+  en: {}
