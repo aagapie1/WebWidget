@@ -43,22 +43,37 @@ export interface ChatTransport {
   sendConversationFeedback(conversationId: string, rating: Rating, comment?: string): Promise<void>;
 }
 
+/** Response/request header carrying the signed visitor id when cookies are blocked (ADR 006). */
+const VISITOR_HEADER = 'x-visitor-token';
+
 export class GatewayTransport implements ChatTransport {
+  /** Kept in memory only (never in storage): lost on reload, like a session. */
+  #visitorToken: string | undefined;
+
   constructor(
     private readonly tenant: string,
     private readonly locale: Locale,
     private readonly internalError: ChatError,
   ) {}
 
+  /** Same-origin fetch that sends and remembers the fallback visitor token. */
+  async #fetch(path: string, init: RequestInit = {}): Promise<Response> {
+    const headers = new Headers(init.headers);
+    if (this.#visitorToken) headers.set(VISITOR_HEADER, this.#visitorToken);
+    const response = await fetch(path, { ...init, headers, credentials: 'same-origin' });
+    const issued = response.headers.get(VISITOR_HEADER);
+    if (issued) this.#visitorToken = issued;
+    return response;
+  }
+
   async stream(
     request: StreamRequest,
     signal: AbortSignal,
     onEvent: (event: ChatStreamEvent) => void,
   ): Promise<void> {
-    const response = await fetch('/api/chat', {
+    const response = await this.#fetch('/api/chat', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      credentials: 'same-origin',
       signal,
       body: JSON.stringify({
         tenant: this.tenant,
@@ -98,10 +113,9 @@ export class GatewayTransport implements ChatTransport {
   }
 
   async stop(taskId: string): Promise<void> {
-    await fetch('/api/chat/stop', {
+    await this.#fetch('/api/chat/stop', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      credentials: 'same-origin',
       body: JSON.stringify({ tenant: this.tenant, taskId }),
     });
   }
@@ -161,7 +175,7 @@ export class GatewayTransport implements ChatTransport {
   async #json(path: string, init: RequestInit = {}): Promise<unknown> {
     let response: Response;
     try {
-      response = await fetch(path, { credentials: 'same-origin', ...init });
+      response = await this.#fetch(path, init);
     } catch {
       throw new ApiError(this.internalError);
     }

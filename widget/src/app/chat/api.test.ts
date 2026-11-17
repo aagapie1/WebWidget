@@ -78,3 +78,24 @@ describe('GatewayTransport', () => {
     ]);
   });
 });
+
+describe('visitor token fallback (ADR 006)', () => {
+  it('remembers the token issued by the gateway and sends it on later requests', async () => {
+    const first = sseResponse(['data: {"type":"delta","text":"a"}\n\n']);
+    first.headers.set('x-visitor-token', 'signed-token');
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(first)
+      .mockResolvedValueOnce(Response.json({ conversations: [], hasMore: false }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const transport = new GatewayTransport('pilot', 'ro', internal);
+    await collect(transport);
+    await transport.listConversations();
+
+    const firstHeaders = (fetchMock.mock.calls[0] as [string, RequestInit])[1].headers as Headers;
+    const secondHeaders = (fetchMock.mock.calls[1] as [string, RequestInit])[1].headers as Headers;
+    expect(firstHeaders.get('x-visitor-token')).toBeNull();
+    expect(secondHeaders.get('x-visitor-token')).toBe('signed-token');
+  });
+});

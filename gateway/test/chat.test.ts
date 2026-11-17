@@ -352,3 +352,49 @@ describe('visitor cookie lifetime', () => {
     expect(response.headers.get('set-cookie')).toContain(`Max-Age=${String(30 * 24 * 60 * 60)}`);
   });
 });
+
+describe('visitor token fallback (cookies blocked in third-party iframes, ADR 006)', () => {
+  it('returns the signed token in a header and accepts it back instead of the cookie', async () => {
+    await start();
+    dify.handler = (_req, res) => {
+      sse(res);
+      res.end(fixture('dify-chat.sse'));
+    };
+    const first = await chat({ tenant: 'pilot', message: 'Bună' });
+    await first.text();
+    const token = first.headers.get('x-visitor-token') ?? '';
+    expect(token).toMatch(/^[0-9a-f-]{36}\./);
+
+    const second = await fetch(`${gatewayUrl}/api/chat`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin: ORIGIN, 'x-visitor-token': token },
+      body: JSON.stringify({ tenant: 'pilot', message: 'Din nou' }),
+    });
+    await second.text();
+    expect(second.headers.get('x-visitor-token')).toBeNull();
+    const users = dify.requests.map((request) => (request.body as { user: string }).user);
+    expect(users[0]).toBe(users[1]);
+  });
+
+  it('ignores a forged token', async () => {
+    await start();
+    dify.handler = (_req, res) => {
+      sse(res);
+      res.end(fixture('dify-chat.sse'));
+    };
+    const response = await fetch(`${gatewayUrl}/api/chat`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        origin: ORIGIN,
+        'x-visitor-token': '00000000-0000-4000-8000-000000000000.forged',
+      },
+      body: JSON.stringify({ tenant: 'pilot', message: 'x' }),
+    });
+    await response.text();
+    expect((dify.requests[0]?.body as { user: string }).user).not.toBe(
+      '00000000-0000-4000-8000-000000000000',
+    );
+    expect(response.headers.get('x-visitor-token')).toBeTruthy();
+  });
+});
