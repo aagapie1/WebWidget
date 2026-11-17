@@ -64,6 +64,19 @@ describe('DifyEventNormalizer', () => {
     expect(text).toBe('Puteți depune cererea online.');
   });
 
+  it('normalizes the pilot Chatflow stream: workflow/node events skipped, ends at message_end', () => {
+    // Captured from the pilot (advanced-chat app), ids and texts replaced (ADR 003).
+    const events = normalize(fixture('dify-chatflow-pilot.sse'));
+    const types = events.map((event) => event.type);
+    expect(types[0]).toBe('start');
+    expect(types.at(-1)).toBe('end');
+    expect(types.filter((type) => type !== 'delta')).toEqual(['start', 'end']);
+    const text = events.flatMap((event) => (event.type === 'delta' ? [event.text] : [])).join('');
+    expect(text).toBe(
+      'Centrul organizează cursuri de pregătire și perfecționare. Detalii găsiți pe site-ul instituției.',
+    );
+  });
+
   it('maps a Dify error event to a localized internal error and stops', () => {
     const events = normalize(
       data({ event: 'message', ...ids, answer: 'Parțial' }) +
