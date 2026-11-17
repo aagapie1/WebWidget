@@ -1,7 +1,8 @@
 import type { ChatStreamEvent } from 'gateway/protocol';
 import { describe, expect, it, vi } from 'vitest';
 import { ro } from '../i18n/ro.js';
-import type { ChatTransport, StreamRequest } from './api.js';
+import type { ChatTransport } from './api.js';
+import { ScriptedTransport } from './scripted-transport.test-helper.js';
 import { ChatController } from './controller.js';
 
 const CONVERSATION = 'c-1';
@@ -18,30 +19,6 @@ const end: ChatStreamEvent = {
   messageId: 'm',
   citations: [],
 };
-
-/** Transport whose streams are scripted per call. */
-class ScriptedTransport implements ChatTransport {
-  readonly requests: StreamRequest[] = [];
-  readonly stopped: string[] = [];
-  constructor(
-    private readonly scripts: ((
-      emit: (e: ChatStreamEvent) => void,
-      signal: AbortSignal,
-    ) => Promise<void>)[],
-  ) {}
-
-  async stream(request: StreamRequest, signal: AbortSignal, onEvent: (e: ChatStreamEvent) => void) {
-    this.requests.push(request);
-    const script = this.scripts.shift();
-    if (!script) throw new Error('no script');
-    await script(onEvent, signal);
-  }
-
-  stop(taskId: string): Promise<void> {
-    this.stopped.push(taskId);
-    return Promise.resolve();
-  }
-}
 
 function controller(transport: ChatTransport) {
   return new ChatController({

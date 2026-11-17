@@ -1,17 +1,29 @@
 import {
   chatStreamEventSchema,
+  conversationListSchema,
   errorResponseSchema,
+  historySchema,
   SseParser,
   widgetConfigSchema,
   type ChatError,
   type ChatStreamEvent,
+  type ConversationList,
+  type History,
   type Locale,
+  type Rating,
   type WidgetConfig,
 } from 'gateway/protocol';
 
 export interface StreamRequest {
   message: string;
   conversationId?: string | undefined;
+}
+
+/** A gateway call failed; `error` is already localized for the visitor. */
+export class ApiError extends Error {
+  constructor(readonly error: ChatError) {
+    super(error.code);
+  }
 }
 
 /** Talks to the gateway (same origin as the iframe). Mockable in tests. */
@@ -23,6 +35,12 @@ export interface ChatTransport {
     onEvent: (event: ChatStreamEvent) => void,
   ): Promise<void>;
   stop(taskId: string): Promise<void>;
+  /** The following reject with ApiError. */
+  listConversations(after?: string): Promise<ConversationList>;
+  getHistory(conversationId: string, before?: string): Promise<History>;
+  deleteConversation(conversationId: string): Promise<void>;
+  rateMessage(messageId: string, rating: Rating | null): Promise<void>;
+  sendConversationFeedback(conversationId: string, rating: Rating, comment?: string): Promise<void>;
 }
 
 export class GatewayTransport implements ChatTransport {
@@ -86,6 +104,74 @@ export class GatewayTransport implements ChatTransport {
       credentials: 'same-origin',
       body: JSON.stringify({ tenant: this.tenant, taskId }),
     });
+  }
+
+  async listConversations(after?: string): Promise<ConversationList> {
+    const query = new URLSearchParams({ tenant: this.tenant, ...(after ? { after } : {}) });
+    return conversationListSchema.parse(await this.#json(`/api/conversations?${query.toString()}`));
+  }
+
+  async getHistory(conversationId: string, before?: string): Promise<History> {
+    const query = new URLSearchParams({
+      tenant: this.tenant,
+      ...(before ? { after: before } : {}),
+    });
+    const path = `/api/conversations/${encodeURIComponent(conversationId)}/messages?${query.toString()}`;
+    return historySchema.parse(await this.#json(path));
+  }
+
+  async deleteConversation(conversationId: string): Promise<void> {
+    const query = new URLSearchParams({ tenant: this.tenant });
+    await this.#json(
+      `/api/conversations/${encodeURIComponent(conversationId)}?${query.toString()}`,
+      {
+        method: 'DELETE',
+      },
+    );
+  }
+
+  async rateMessage(messageId: string, rating: Rating | null): Promise<void> {
+    await this.#post(`/api/messages/${encodeURIComponent(messageId)}/feedback`, {
+      tenant: this.tenant,
+      rating,
+    });
+  }
+
+  async sendConversationFeedback(
+    conversationId: string,
+    rating: Rating,
+    comment?: string,
+  ): Promise<void> {
+    await this.#post(`/api/conversations/${encodeURIComponent(conversationId)}/feedback`, {
+      tenant: this.tenant,
+      rating,
+      ...(comment ? { comment } : {}),
+    });
+  }
+
+  #post(path: string, body: object): Promise<unknown> {
+    return this.#json(path, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  }
+
+  /** Same-origin request; JSON body (or nothing for 204). Rejects with ApiError. */
+  async #json(path: string, init: RequestInit = {}): Promise<unknown> {
+    let response: Response;
+    try {
+      response = await fetch(path, { credentials: 'same-origin', ...init });
+    } catch {
+      throw new ApiError(this.internalError);
+    }
+    if (!response.ok) throw new ApiError(await this.#errorFrom(response));
+    if (response.status === 204) return undefined;
+    try {
+      return (await response.json()) as unknown;
+    } catch {
+      throw new ApiError(this.internalError);
+    }
   }
 
   async #errorFrom(response: Response): Promise<ChatError> {

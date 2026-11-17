@@ -2,19 +2,18 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/preact
 import type { ChatStreamEvent } from 'gateway/protocol';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App.js';
-import type { ChatTransport } from './chat/api.js';
 import { ChatController } from './chat/controller.js';
+import { ScriptedTransport } from './chat/scripted-transport.test-helper.js';
 import { ro } from './i18n/ro.js';
 
 afterEach(cleanup);
 
 function setup(events: ChatStreamEvent[]) {
-  const transport: ChatTransport = {
-    stream: vi.fn(async (_request, _signal, onEvent: (event: ChatStreamEvent) => void) => {
-      for (const event of events) onEvent(event);
-    }),
-    stop: vi.fn(async () => undefined),
-  };
+  const transport = new ScriptedTransport([
+    async (emit) => {
+      for (const event of events) emit(event);
+    },
+  ]);
   const controller = new ChatController({
     transport,
     texts: ro,
