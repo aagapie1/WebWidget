@@ -113,7 +113,12 @@ export function mountLoader(options: LoaderOptions, doc: Document = document): L
     switch (parsed.data.type) {
       case 'ready':
         ready = true;
-        if (pendingShown && !panel.hidden) post(message({ type: 'shown' }));
+        if (pendingShown && !panel.hidden) {
+          // First open: focusing the iframe before its page loaded does not stick in every
+          // browser, so focus it again now that the app is ready, then let it focus the input.
+          iframe.focus();
+          post(message({ type: 'shown' }));
+        }
         pendingShown = false;
         break;
       case 'hide':
