@@ -1,0 +1,7 @@
+# Tenant for end-to-end tests: fake Dify on :4010, client site on :5180.
+id: e2e
+name: Asistent de test
+difyBaseUrl: ${DIFY_BASE_URL}
+difyApiKeyEnv: DIFY_API_KEY_E2E
+allowedOrigins:
+  - http://127.0.0.1:5180
