@@ -34,12 +34,17 @@ const hide = () => {
   postToParent(message({ type: 'hide' }));
 };
 
-let focusComposer: () => void = () => undefined;
+// `shown` can arrive before <App> registered its focus function (effects run after `ready` is
+// posted): remember the request and apply it on registration.
+let focusComposer: (() => void) | undefined;
+let focusRequested = false;
 window.addEventListener('message', (event: MessageEvent<unknown>) => {
   if (!parent || event.origin !== parent || event.source !== window.parent) return;
   const parsed = loaderMessageSchema.safeParse(event.data);
   // Only one loader → iframe message exists today (`shown`).
-  if (parsed.success) focusComposer();
+  if (!parsed.success) return;
+  if (focusComposer) focusComposer();
+  else focusRequested = true;
 });
 
 const root = document.getElementById('root');
@@ -79,6 +84,10 @@ async function start(): Promise<void> {
       onHide={hide}
       registerFocus={(focus) => {
         focusComposer = focus;
+        if (focusRequested) {
+          focusRequested = false;
+          focus();
+        }
       }}
     />,
     root,

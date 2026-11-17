@@ -23,8 +23,14 @@ const launcher = (page: Page) =>
 const chat = (page: Page): FrameLocator => page.frameLocator('iframe[title="Asistent virtual"]');
 const input = (page: Page) => chat(page).getByLabel('Mesajul dumneavoastră');
 
-async function openChat(page: Page): Promise<void> {
+/** Opens the client site and waits for the background preload of the chat (ADR 004). */
+async function gotoSite(page: Page): Promise<void> {
   await page.goto(`${SITE}/`);
+  await expect(page.locator('[data-chat-widget][data-ready="true"]')).toBeAttached();
+}
+
+async function openChat(page: Page): Promise<void> {
+  await gotoSite(page);
   await launcher(page).click();
   await expect(chat(page).getByText('Bună ziua! Sunt asistentul de test.')).toBeVisible();
 }
@@ -112,7 +118,7 @@ test('retry after a temporary error does not repeat the question', async ({ page
 test('keyboard: open from the launcher, Escape minimizes and returns focus; conversation kept', async ({
   page,
 }) => {
-  await page.goto(`${SITE}/`);
+  await gotoSite(page);
   await launcher(page).focus();
   await page.keyboard.press('Enter');
   await expect(input(page)).toBeFocused();
@@ -128,12 +134,29 @@ test('keyboard: open from the launcher, Escape minimizes and returns focus; conv
   await expect(chat(page).locator('.message--user')).toHaveText(/Care e programul\?/);
 });
 
-test('X and minimize only hide; "Conversație nouă" starts over', async ({ page }) => {
+test('mobile: full-screen window, the launcher does not cover the send button', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 740 });
+  await openChat(page);
+  await expect(launcher(page)).toBeHidden();
+  await input(page).fill('Bună');
+  const send = chat(page).getByRole('button', { name: 'Trimite' });
+  await expect(send).toBeInViewport();
+  await send.click(); // fails if anything covers it
+  await expect(chat(page).locator('.message--user')).toHaveCount(1);
+
+  await chat(page).getByRole('button', { name: 'Minimizează fereastra' }).click();
+  await expect(launcher(page)).toBeVisible();
+  await expect(launcher(page)).toBeFocused();
+});
+
+test('minimize only hides; "Conversație nouă" starts over', async ({ page }) => {
   await openChat(page);
   await ask(page, 'Care e programul?');
   await expect(chat(page).locator('.message--assistant').last()).toContainText('8 și 16');
 
-  await chat(page).getByRole('button', { name: 'Închide fereastra' }).click();
+  await chat(page).getByRole('button', { name: 'Minimizează fereastra' }).click();
   await expect(launcher(page)).toBeFocused();
   await launcher(page).click();
   await expect(chat(page).locator('.message--user')).toHaveCount(1);
@@ -175,16 +198,43 @@ test('a site outside allowedOrigins cannot load the chat', async ({ page }) => {
   await page.goto(`${FORBIDDEN_SITE}/`);
   await launcher(page).click();
   await expect.poll(() => responses).toContain(403);
-  await expect(input(page)).toHaveCount(0);
+  expect(await chatInputsRendered(page)).toBe(0);
 });
 
 test('frame-ancestors blocks a foreign site that spoofs an allowed parent', async ({ page }) => {
+  let csp = '';
+  page.on('response', (response) => {
+    if (response.url().startsWith(`${GATEWAY}/w/app`)) {
+      csp = response.headers()['content-security-policy'] ?? '';
+    }
+  });
   await page.goto(`${FORBIDDEN_SITE}/spoof.html`);
+  await expect.poll(() => csp).toContain('frame-ancestors');
+  expect(csp).toContain(`frame-ancestors ${SITE}`);
+  expect(csp).not.toContain(FORBIDDEN_SITE);
   await page.waitForTimeout(1000);
-  await expect(
-    page.frameLocator('iframe[title="spoof"]').getByLabel('Mesajul dumneavoastră'),
-  ).toHaveCount(0);
+  expect(await chatInputsRendered(page)).toBe(0);
 });
+
+/**
+ * Counts chat inputs rendered in any frame. A frame blocked by the browser (CSP frame-ancestors)
+ * may never finish loading, so each frame gets a short, bounded check instead of a locator wait.
+ */
+async function chatInputsRendered(page: Page): Promise<number> {
+  let total = 0;
+  for (const frame of page.frames()) {
+    const count = await Promise.race([
+      frame.evaluate(() => document.querySelectorAll('#composer-input').length).catch(() => 0),
+      new Promise<number>((resolve) => {
+        setTimeout(() => {
+          resolve(0);
+        }, 1000);
+      }),
+    ]);
+    total += count;
+  }
+  return total;
+}
 
 test('the Dify key never reaches the browser', async ({ page }) => {
   const seen: string[] = [];

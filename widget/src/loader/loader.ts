@@ -20,6 +20,8 @@ export interface LoaderOptions {
   locale: 'ro' | 'en';
   /** Origin of the host page, sent to the gateway as `parent`. */
   pageOrigin: string;
+  /** Load the chat iframe in the background once the page is idle (default true). */
+  preloadWhenIdle?: boolean;
 }
 
 export interface LoaderHandle {
@@ -80,6 +82,15 @@ export function mountLoader(options: LoaderOptions, doc: Document = document): L
     return frame;
   };
 
+  /**
+   * The chat is loaded ahead of the first click (hidden), so that opening it moves focus into a
+   * ready frame during the click itself: browsers only move focus across origins reliably inside
+   * a user gesture (ADR 004). It also makes the window open instantly.
+   */
+  const preload = (): void => {
+    iframe ??= createIframe();
+  };
+
   const open = (): void => {
     iframe ??= createIframe();
     render(true);
@@ -113,9 +124,11 @@ export function mountLoader(options: LoaderOptions, doc: Document = document): L
     switch (parsed.data.type) {
       case 'ready':
         ready = true;
+        // Observable state (tests, host page debugging); no data about the conversation.
+        host.setAttribute('data-ready', 'true');
         if (pendingShown && !panel.hidden) {
-          // First open: focusing the iframe before its page loaded does not stick in every
-          // browser, so focus it again now that the app is ready, then let it focus the input.
+          // Opened before the preload finished: best effort, focus may stay on the frame element
+          // in some browsers (the user can Tab into it).
           iframe.focus();
           post(message({ type: 'shown' }));
         }
@@ -127,8 +140,28 @@ export function mountLoader(options: LoaderOptions, doc: Document = document): L
     }
   });
 
+  // Preload on intent (pointer over, keyboard focus, touch) or when the page is idle.
+  for (const type of ['pointerenter', 'focus', 'touchstart'] as const) {
+    launcher.addEventListener(type, preload, { once: true, passive: true });
+  }
+  if (options.preloadWhenIdle !== false) whenIdle(doc, preload);
+
   render(false);
   return { open, hide, root };
+}
+
+/** Runs `task` after the page has loaded and the browser is idle (or after 2 s at most). */
+function whenIdle(doc: Document, task: () => void): void {
+  const view = doc.defaultView;
+  if (!view) return;
+  // Older Safari versions have no requestIdleCallback.
+  const idle = (view as Partial<Pick<Window, 'requestIdleCallback'>>).requestIdleCallback;
+  const schedule = () => {
+    if (idle) idle.call(view, task, { timeout: 2000 });
+    else view.setTimeout(task, 1000);
+  };
+  if (doc.readyState === 'complete') schedule();
+  else view.addEventListener('load', schedule, { once: true });
 }
 
 /** Reads options from the `<script>` tag that loaded this file. */

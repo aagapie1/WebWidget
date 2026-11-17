@@ -23,7 +23,10 @@ export function App({ controller, texts, assistantName, onHide, registerFocus }:
   useEffect(() => controller.subscribe(setState), [controller]);
 
   useEffect(() => {
-    registerFocus?.(() => input.current?.focus());
+    registerFocus?.(() => {
+      // The frame was display:none until now; focus once it has been laid out again.
+      requestAnimationFrame(() => input.current?.focus());
+    });
   }, [registerFocus]);
 
   // Escape minimizes the window; the loader returns focus to its launcher. No focus trap.

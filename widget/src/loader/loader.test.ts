@@ -13,6 +13,7 @@ beforeEach(() => {
     gatewayOrigin: GATEWAY,
     locale: 'ro',
     pageOrigin: 'https://www.primarie.ro',
+    preloadWhenIdle: false,
   });
 });
 
@@ -35,6 +36,28 @@ describe('loader', () => {
     expect(launcher()?.getAttribute('aria-controls')).toBe(panel()?.id);
     expect(panel()?.hidden).toBe(true);
     expect(iframe()).toBeNull();
+  });
+
+  it('preloads the hidden iframe on keyboard focus or pointer over the launcher', () => {
+    launcher()?.dispatchEvent(new FocusEvent('focus'));
+    expect(iframe()).not.toBeNull();
+    expect(panel()?.hidden).toBe(true);
+    launcher()?.dispatchEvent(new PointerEvent('pointerenter'));
+    expect(handle.root.querySelectorAll('iframe')).toHaveLength(1);
+  });
+
+  it('preloads the iframe when the page is idle', async () => {
+    document.body.innerHTML = '';
+    handle = mountLoader({
+      tenant: 'pilot',
+      gatewayOrigin: GATEWAY,
+      locale: 'ro',
+      pageOrigin: 'https://www.primarie.ro',
+    });
+    expect(iframe()).toBeNull();
+    await new Promise((resolve) => setTimeout(resolve, 2100));
+    expect(iframe()).not.toBeNull();
+    expect(panel()?.hidden).toBe(true);
   });
 
   it('creates the iframe on first open with tenant, parent and locale', () => {

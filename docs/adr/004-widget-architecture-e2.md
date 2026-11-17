@@ -20,9 +20,24 @@ Status: accepted (E2) · 2026-11-17
   taken from its own `src`; iframe: the validated `parent`) and validates the payload with a Zod
   schema. Messages are sent with an explicit `targetOrigin`, never `*`.
 
+## Preloading the iframe
+
+- The hidden iframe is created when the page is idle (`requestIdleCallback`, at most ~2 s after
+  load) or earlier on intent: pointer over, keyboard focus or touch on the launcher.
+- Reason: browsers reliably move focus into a cross-origin iframe only during the user's click,
+  and only if the frame is already loaded. Focusing it after an async load left the input
+  "focused but inactive" in WebKit, and extra `contentWindow.focus()` calls made Chromium flaky.
+  Preloading also makes the window open instantly.
+- Cost: every page view loads the app bundle (cached, immutable) and `/api/widget-config` (Dify
+  `/parameters` cached 5 minutes per replica). No cookie is set until the first message.
+- If the user opens the chat before the preload finishes, focus is moved on `ready` as a best
+  effort.
+
 ## Window behaviour
 
-- **Minimize** (`_`) and **close** (`X`) both only hide the window. The conversation is kept.
+- One window control: **minimize** (chevron down, “Minimizează fereastra”). It only hides the
+  window and keeps the conversation. An earlier `X` button was removed: it did the same thing and
+  suggested that it would end the conversation.
 - A new conversation starts only from an explicit **“Conversație nouă”** button in the header. In
   E3 it becomes **“Închide conversația”**, followed by the feedback form.
 - **Escape** minimizes the window and returns focus to the launcher button.
