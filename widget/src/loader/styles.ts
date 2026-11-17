@@ -78,6 +78,11 @@ export const LOADER_CSS = `
     height: 100%;
     border-radius: 0;
   }
+  /* Full-screen window: the launcher would cover the send button. The header's minimize button
+     (and Escape) close it; the launcher comes back, focused, when the window is hidden. */
+  .launcher[aria-expanded='true'] {
+    display: none;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .launcher, .launcher svg, .panel { transition: none; animation: none; }

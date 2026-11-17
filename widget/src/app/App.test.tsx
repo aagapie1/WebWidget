@@ -57,11 +57,11 @@ describe('App', () => {
     expect(live?.textContent).toBe('Programul este **8–16**.');
   });
 
-  it('hides on Escape (no focus trap) and from the header buttons', () => {
+  it('hides on Escape (no focus trap) and from the minimize button', () => {
     const { onHide } = setup([]);
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(onHide).toHaveBeenCalledOnce();
-    fireEvent.click(screen.getByRole('button', { name: 'Minimizează' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Minimizează fereastra' }));
     expect(onHide).toHaveBeenCalledTimes(2);
   });
 

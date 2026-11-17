@@ -7,10 +7,9 @@ export const en: Texts = {
   },
   frameTitle: 'Virtual assistant',
   header: {
-    minimize: 'Minimize',
-    close: 'Close window',
+    minimize: 'Minimize window',
     newConversation: 'New conversation',
-    subtitle: 'Answers right away',
+    subtitle: 'Virtual assistant',
   },
   messages: {
     label: 'Messages',

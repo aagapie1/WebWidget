@@ -1,5 +1,5 @@
 import type { Texts } from '../i18n/index.js';
-import { AssistantIcon, ChevronDownIcon, CloseIcon, NewChatIcon } from './icons.js';
+import { AssistantIcon, ChevronDownIcon, NewChatIcon } from './icons.js';
 
 export interface HeaderProps {
   assistantName: string;
@@ -8,7 +8,7 @@ export interface HeaderProps {
   onHide: () => void;
 }
 
-/** Window title and controls. Minimize and X both only hide the window (ADR 004). */
+/** Window title and controls. Minimize hides the window and keeps the conversation (ADR 004). */
 export function Header({ assistantName, texts, onNewConversation, onHide }: HeaderProps) {
   return (
     <header class="header">
@@ -41,15 +41,6 @@ export function Header({ assistantName, texts, onNewConversation, onHide }: Head
             onClick={onHide}
           >
             <ChevronDownIcon />
-          </button>
-          <button
-            type="button"
-            class="icon-button"
-            aria-label={texts.header.close}
-            title={texts.header.close}
-            onClick={onHide}
-          >
-            <CloseIcon />
           </button>
         </div>
       </div>

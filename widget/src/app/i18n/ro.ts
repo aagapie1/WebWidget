@@ -6,10 +6,9 @@ export const ro = {
   },
   frameTitle: 'Asistent virtual',
   header: {
-    minimize: 'Minimizează',
-    close: 'Închide fereastra',
+    minimize: 'Minimizează fereastra',
     newConversation: 'Conversație nouă',
-    subtitle: 'Răspunde imediat',
+    subtitle: 'Asistent virtual',
   },
   messages: {
     label: 'Mesaje',

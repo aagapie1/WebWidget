@@ -41,12 +41,6 @@ export const ChevronDownIcon = (props: IconProps) => (
   </Svg>
 );
 
-export const CloseIcon = (props: IconProps) => (
-  <Svg {...props}>
-    <path d="M18 6 6 18M6 6l12 12" />
-  </Svg>
-);
-
 export const NewChatIcon = (props: IconProps) => (
   <Svg {...props}>
     <path d="M12 20h9" />
