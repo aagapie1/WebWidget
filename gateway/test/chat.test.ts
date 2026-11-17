@@ -339,3 +339,16 @@ describe('POST /api/chat', () => {
     expect(await response.json()).toEqual({ status: 'ok' });
   });
 });
+
+describe('visitor cookie lifetime', () => {
+  it('uses the tenant visitorCookieDays (30 days by default)', async () => {
+    await start();
+    dify.handler = (_req, res) => {
+      sse(res);
+      res.end(fixture('dify-chat.sse'));
+    };
+    const response = await chat({ tenant: 'pilot', message: 'Bună' });
+    await response.text();
+    expect(response.headers.get('set-cookie')).toContain(`Max-Age=${String(30 * 24 * 60 * 60)}`);
+  });
+});

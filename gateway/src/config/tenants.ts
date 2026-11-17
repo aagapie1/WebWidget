@@ -33,6 +33,22 @@ const tenantFileSchema = z.strictObject({
   // Detailed theme schema arrives in E4 (white-label).
   theme: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).default({}),
   texts: z.strictObject({ ro: textsSchema.optional(), en: textsSchema.optional() }).default({}),
+  /** Lifetime of the anonymous visitor cookie, i.e. how long history stays reachable (ADR 005). */
+  visitorCookieDays: z.number().int().min(1).max(395).default(30),
+  feedback: z
+    .strictObject({
+      /** How long closing feedback is kept (Redis TTL). */
+      retentionDays: z.number().int().min(1).max(730).default(90),
+    })
+    .default({ retentionDays: 90 }),
+  citations: z
+    .strictObject({
+      /** Friendly titles for source documents: file name → title. */
+      documentTitles: z.record(z.string().min(1).max(300), z.string().min(1).max(300)).default({}),
+      /** Show document snippets under answers (off by default: they contain technical markers). */
+      showSnippets: z.boolean().default(false),
+    })
+    .default({ documentTitles: {}, showSnippets: false }),
 });
 
 export type TenantFile = z.infer<typeof tenantFileSchema>;

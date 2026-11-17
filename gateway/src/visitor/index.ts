@@ -3,14 +3,18 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 
 /** `__Host-` prefix: Secure, Path=/, no Domain — the browser enforces it. */
 export const VISITOR_COOKIE = '__Host-wv';
-const MAX_AGE_SECONDS = 180 * 24 * 60 * 60;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 /**
  * Returns the anonymous visitor id from the signed cookie, issuing a new one when missing or
  * tampered with. The id is sent to Dify as `user`; conversation history is bound to it (ADR 002).
  */
-export function resolveVisitor(request: FastifyRequest, reply: FastifyReply): string {
+export function resolveVisitor(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  /** Cookie lifetime, per tenant (`visitorCookieDays`, ADR 005). */
+  maxAgeDays: number,
+): string {
   const raw = request.cookies[VISITOR_COOKIE];
   if (raw !== undefined) {
     const unsigned = request.unsignCookie(raw);
@@ -32,7 +36,7 @@ export function resolveVisitor(request: FastifyRequest, reply: FastifyReply): st
     // third-party cookies are blocked (ADR 002).
     partitioned: true,
     path: '/',
-    maxAge: MAX_AGE_SECONDS,
+    maxAge: maxAgeDays * 24 * 60 * 60,
   });
   reply.header('set-cookie', cookie);
   return visitorId;

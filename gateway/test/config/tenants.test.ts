@@ -32,6 +32,31 @@ describe('parseTenant', () => {
     expect(tenant.theme).toEqual({});
   });
 
+  it('applies E3 defaults: 30-day cookie, 90-day feedback retention, no snippets', () => {
+    const tenant = parseTenant(validYaml, env, 'pilot.yaml');
+    expect(tenant.visitorCookieDays).toBe(30);
+    expect(tenant.feedback).toEqual({ retentionDays: 90 });
+    expect(tenant.citations).toEqual({ documentTitles: {}, showSnippets: false });
+  });
+
+  it('accepts citation titles, snippets and retention overrides', () => {
+    const yaml = `${validYaml}visitorCookieDays: 7
+feedback:
+  retentionDays: 30
+citations:
+  showSnippets: true
+  documentTitles:
+    Regulament_v3.pdf: Regulamentul de organizare
+`;
+    const tenant = parseTenant(yaml, env, 'pilot.yaml');
+    expect(tenant.visitorCookieDays).toBe(7);
+    expect(tenant.feedback.retentionDays).toBe(30);
+    expect(tenant.citations).toEqual({
+      showSnippets: true,
+      documentTitles: { 'Regulament_v3.pdf': 'Regulamentul de organizare' },
+    });
+  });
+
   it('strips a trailing slash from the Dify base URL', () => {
     const tenant = parseTenant(
       validYaml,

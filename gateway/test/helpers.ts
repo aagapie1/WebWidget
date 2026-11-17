@@ -10,6 +10,9 @@ export const testTenant: Tenant = {
   allowedOrigins: ['http://localhost:5173'],
   theme: {},
   texts: { ro: { 'errors.upstream_timeout': 'Text personalizat pentru timeout.' } },
+  visitorCookieDays: 30,
+  feedback: { retentionDays: 90 },
+  citations: { documentTitles: { 'Regulament.pdf': 'Regulamentul intern' }, showSnippets: false },
 };
 
 export function fixture(name: string): string {
