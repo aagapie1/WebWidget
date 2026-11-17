@@ -5,6 +5,7 @@ export default defineConfig({
   plugins: [preact()],
   test: {
     include: ['src/**/*.test.{ts,tsx}'],
-    environment: 'happy-dom',
+    // jsdom: the DOM DOMPurify officially supports.
+    environment: 'jsdom',
   },
 });
