@@ -2,12 +2,13 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { Dispatcher } from 'undici';
 import type { AppEnv } from '../config/env.js';
 import type { TenantRegistry } from '../config/tenants.js';
-import { classifyNetworkError, sendChatMessage } from '../dify/client.js';
+import { classifyNetworkError, sendChatMessage, stopTask } from '../dify/client.js';
 import { DifyEventNormalizer, type NormalizeResult } from '../dify/events.js';
 import { SseParser } from '../protocol/sse.js';
 import { chatError, HTTP_STATUS } from '../errors/index.js';
 import {
   chatRequestSchema,
+  stopRequestSchema,
   type ChatStreamEvent,
   type ErrorCode,
   type ErrorResponse,
@@ -99,17 +100,48 @@ export function chatRoute(app: FastifyInstance, options: ChatRouteOptions): void
         { ...stats, durationMs: Math.round(performance.now() - startedAt) },
         'client disconnected during stream',
       );
+      // Closing the upstream connection does not stop generation in Dify: stop it explicitly
+      // so the GPU is not busy with an answer nobody reads.
+      if (stats.taskId && stats.outcome === 'aborted') {
+        void stopTask(tenant, stats.taskId, user).then((stop) => {
+          if (!stop.ok) log.warn({ code: stop.code, difyStatus: stop.status }, 'Dify stop failed');
+        });
+      }
       return reply;
     }
     log.info({ ...stats, durationMs: Math.round(performance.now() - startedAt) }, 'chat answered');
     reply.raw.end();
     return reply;
   });
+
+  app.post('/api/chat/stop', async (request, reply) => {
+    if (request.headers.origin !== env.PUBLIC_ORIGIN) {
+      return sendError(reply, 'forbidden_origin', 'ro');
+    }
+    const parsed = stopRequestSchema.safeParse(request.body);
+    if (!parsed.success) return sendError(reply, 'invalid_request', 'ro');
+
+    const tenant = tenants.get(parsed.data.tenant);
+    if (!tenant) return sendError(reply, 'tenant_not_found', 'ro');
+
+    // Dify only stops tasks of the same `user`, so a visitor cannot stop someone else's answer.
+    const user = resolveVisitor(request, reply);
+    const result = await stopTask(tenant, parsed.data.taskId, user);
+    if (!result.ok) {
+      request.log.warn(
+        { tenant: tenant.id, code: result.code, difyStatus: result.status },
+        'Dify stop failed',
+      );
+      return sendError(reply, result.code, 'ro', tenant);
+    }
+    return reply.code(204).send();
+  });
 }
 
 interface StreamStats {
   deltas: number;
   outcome: 'end' | ErrorCode | 'aborted';
+  taskId?: string;
 }
 
 async function pipeStream(
@@ -151,6 +183,7 @@ async function pipeStream(
 }
 
 function writeEvent(reply: FastifyReply, event: ChatStreamEvent, stats: StreamStats): void {
+  if (event.type === 'start') stats.taskId = event.taskId;
   if (event.type === 'delta') stats.deltas++;
   if (event.type === 'end') stats.outcome = 'end';
   if (event.type === 'error') stats.outcome = event.error.code;

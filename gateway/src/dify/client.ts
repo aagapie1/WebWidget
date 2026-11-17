@@ -2,7 +2,7 @@ import { errors as undiciErrors, request, type Dispatcher } from 'undici';
 import type { Tenant } from '../config/tenants.js';
 import { mapDifyError } from '../errors/index.js';
 import type { ErrorCode } from '../protocol/index.js';
-import { difyErrorBodySchema } from './schemas.js';
+import { difyErrorBodySchema, difyParametersSchema, type DifyParameters } from './schemas.js';
 
 export interface DifyTimeouts {
   /** Until Dify sends response headers. */
@@ -93,4 +93,67 @@ function safeJson(text: string): unknown {
   } catch {
     return undefined;
   }
+}
+
+/** Small JSON calls (stop, parameters): bounded by one timeout, never streamed. */
+const SHORT_CALL_TIMEOUT_MS = 10_000;
+
+export type SimpleResult<T> =
+  { ok: true; value: T } | { ok: false; code: ErrorCode; status?: number; difyCode?: string };
+
+async function callJson(
+  tenant: Tenant,
+  method: 'GET' | 'POST',
+  path: string,
+  body?: object,
+): Promise<SimpleResult<unknown>> {
+  let response: Dispatcher.ResponseData;
+  try {
+    response = await request(`${tenant.difyBaseUrl}${path}`, {
+      method,
+      headers: {
+        authorization: `Bearer ${tenant.difyApiKey}`,
+        ...(body ? { 'content-type': 'application/json' } : {}),
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+      signal: AbortSignal.timeout(SHORT_CALL_TIMEOUT_MS),
+    });
+  } catch (error) {
+    return { ok: false, code: classifyNetworkError(error) };
+  }
+  const json = safeJson(await response.body.text().catch(() => ''));
+  if (response.statusCode >= 200 && response.statusCode < 300) return { ok: true, value: json };
+  const parsed = difyErrorBodySchema.safeParse(json);
+  const difyCode = parsed.success ? parsed.data.code : undefined;
+  return {
+    ok: false,
+    code: mapDifyError(response.statusCode, difyCode),
+    status: response.statusCode,
+    ...(difyCode ? { difyCode } : {}),
+  };
+}
+
+/** `POST /chat-messages/{task_id}/stop`. Only the user who started the task can stop it. */
+export async function stopTask(
+  tenant: Tenant,
+  taskId: string,
+  user: string,
+): Promise<SimpleResult<null>> {
+  const result = await callJson(
+    tenant,
+    'POST',
+    `/chat-messages/${encodeURIComponent(taskId)}/stop`,
+    {
+      user,
+    },
+  );
+  return result.ok ? { ok: true, value: null } : result;
+}
+
+/** `GET /parameters`: app features; only `opening_statement` is used (E2). */
+export async function getParameters(tenant: Tenant): Promise<SimpleResult<DifyParameters>> {
+  const result = await callJson(tenant, 'GET', '/parameters');
+  if (!result.ok) return result;
+  const parsed = difyParametersSchema.safeParse(result.value);
+  return parsed.success ? { ok: true, value: parsed.data } : { ok: false, code: 'internal_error' };
 }

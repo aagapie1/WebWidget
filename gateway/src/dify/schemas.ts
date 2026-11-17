@@ -49,3 +49,10 @@ export const difyErrorBodySchema = z.looseObject({
   message: z.string().optional(),
   status: z.number().optional(),
 });
+
+/** `GET /parameters` (only the fields the gateway uses). */
+export const difyParametersSchema = z.looseObject({
+  opening_statement: z.string().nullish(),
+  suggested_questions: z.array(z.string()).nullish(),
+});
+export type DifyParameters = z.infer<typeof difyParametersSchema>;

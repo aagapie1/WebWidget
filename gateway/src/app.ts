@@ -7,6 +7,7 @@ import type { AppEnv } from './config/env.js';
 import type { TenantRegistry } from './config/tenants.js';
 import { chatError } from './errors/index.js';
 import type { ErrorResponse } from './protocol/index.js';
+import { widgetConfigRoute } from './widget-config/route.js';
 
 export interface BuildAppOptions {
   env: AppEnv;
@@ -54,6 +55,8 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   });
 
   app.get('/healthz', () => ({ status: 'ok' }));
+
+  widgetConfigRoute(app, options.tenants);
 
   chatRoute(app, {
     env: options.env,
