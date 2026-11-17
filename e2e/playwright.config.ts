@@ -12,7 +12,8 @@ export default defineConfig({
   globalSetup: './global-setup.ts',
   fullyParallel: false,
   workers: 1,
-  reporter: 'list',
+  // In CI, failures also become GitHub annotations (readable without access to the logs).
+  reporter: process.env.CI ? [['github'], ['list']] : 'list',
   timeout: 30_000,
   use: { trace: 'retain-on-failure' },
   webServer: [
