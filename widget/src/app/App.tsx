@@ -37,7 +37,13 @@ export function App({
   const viewRef = useRef<View>('chat');
   viewRef.current = view;
 
-  useEffect(() => controller.subscribe(setState), [controller]);
+  useEffect(() => {
+    const unsubscribe = controller.subscribe(setState);
+    // Effects run late in a hidden (preloaded) iframe: the history may have arrived between the
+    // first render and this subscription. Catch up with the current state.
+    setState(controller.state);
+    return unsubscribe;
+  }, [controller]);
 
   useEffect(() => {
     registerFocus?.(() => {
