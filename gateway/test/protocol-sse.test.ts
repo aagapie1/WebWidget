@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SseParser, type SseMessage } from '../../src/dify/sse-parser.js';
+import { SseParser, type SseMessage } from '../src/protocol/sse.js';
 
 const encoder = new TextEncoder();
 

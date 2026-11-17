@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DifyEventNormalizer } from '../../src/dify/events.js';
-import { SseParser } from '../../src/dify/sse-parser.js';
+import { SseParser } from '../../src/protocol/sse.js';
 import { chatStreamEventSchema, type ChatStreamEvent } from '../../src/protocol/index.js';
 import { fixture, testTenant } from '../helpers.js';
 

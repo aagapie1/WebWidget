@@ -4,7 +4,7 @@ import type { AppEnv } from '../config/env.js';
 import type { TenantRegistry } from '../config/tenants.js';
 import { classifyNetworkError, sendChatMessage } from '../dify/client.js';
 import { DifyEventNormalizer, type NormalizeResult } from '../dify/events.js';
-import { SseParser } from '../dify/sse-parser.js';
+import { SseParser } from '../protocol/sse.js';
 import { chatError, HTTP_STATUS } from '../errors/index.js';
 import {
   chatRequestSchema,

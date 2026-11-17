@@ -2,7 +2,7 @@ import type { Tenant } from '../config/tenants.js';
 import { chatError, mapDifyError } from '../errors/index.js';
 import type { ChatStreamEvent, Citation, ErrorCode, Locale } from '../protocol/index.js';
 import { difyStreamEventSchema, type DifyStreamEvent } from './schemas.js';
-import type { SseMessage } from './sse-parser.js';
+import type { SseMessage } from '../protocol/sse.js';
 
 const SNIPPET_LENGTH = 280;
 

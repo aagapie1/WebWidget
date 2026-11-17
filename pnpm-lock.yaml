@@ -264,6 +264,9 @@ importers:
       '@testing-library/preact':
         specifier: ^3.2.6
         version: 3.2.6(preact@11.2.0)
+      gateway:
+        specifier: workspace:*
+        version: link:../gateway
       happy-dom:
         specifier: ^21.0.4
         version: 21.0.4
