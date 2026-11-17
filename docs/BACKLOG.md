@@ -2,7 +2,6 @@
 
 Ideas and deferred work, outside the current stage. Each item notes the stage it belongs to.
 
-
 - **E5** — Redis for rate limiting; `allowedOrigins` check on `/w/app` (Referer) + `frame-ancestors` CSP; masking function for message logs (CNP, phone, email).
 - **E5** — Dockerfile (non-root), docker-compose, Traefik labels.
 - **NFR** — Prometheus `/metrics`.
