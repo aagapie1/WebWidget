@@ -1,442 +1,1399 @@
 <!doctype html>
 <html lang="ro">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Machetă P2 — administrare asistent</title>
-<!--
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Machetă P2 — administrare asistent</title>
+    <!--
   Static mockup of the P2 admin frame (E4b.1 UX). Not the app: no data, no scripts beyond the
   area switch. Fictional client "Primăria Exemplu". Font: Inter where installed (the app will
   bundle it locally), otherwise the system font.
 -->
-<style>
-  :root {
-    --bg: #f4f5f7;
-    --surface: #ffffff;
-    --text: #1d2330;
-    --muted: #5b6474;
-    --border: #e3e6eb;
-    --border-strong: #cdd2da;
-    --accent: #2f54eb;        /* the admin interface's only accent */
-    --accent-soft: #eef2ff;
-    --ok: #0f7a4f;
-    --ok-soft: #e9f7f0;
-    --danger: #b42318;
-    --radius: 12px;
-    --shadow: 0 1px 2px rgb(16 24 40 / 0.05), 0 1px 3px rgb(16 24 40 / 0.06);
-    /* client colors: used ONLY inside the preview */
-    --client: #0b6e4f;
-    --client-2: #11845e;
-    font: 14px/1.5 Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-    color: var(--text);
-    background: var(--bg);
-  }
-  * { box-sizing: border-box; }
-  body { margin: 0; }
-  button, input, select, textarea { font: inherit; color: inherit; }
-  h1, h2, h3, p { margin: 0; }
+    <style>
+      :root {
+        --bg: #f4f5f7;
+        --surface: #ffffff;
+        --text: #1d2330;
+        --muted: #5b6474;
+        --border: #e3e6eb;
+        --border-strong: #cdd2da;
+        --accent: #2f54eb; /* the admin interface's only accent */
+        --accent-soft: #eef2ff;
+        --ok: #0f7a4f;
+        --ok-soft: #e9f7f0;
+        --danger: #b42318;
+        --radius: 12px;
+        --shadow: 0 1px 2px rgb(16 24 40 / 0.05), 0 1px 3px rgb(16 24 40 / 0.06);
+        /* client colors: used ONLY inside the preview */
+        --client: #0b6e4f;
+        --client-2: #11845e;
+        font:
+          14px/1.5 Inter,
+          system-ui,
+          -apple-system,
+          'Segoe UI',
+          Roboto,
+          sans-serif;
+        color: var(--text);
+        background: var(--bg);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+      }
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+        color: inherit;
+      }
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
 
-  /* ---------- Header ---------- */
-  .header {
-    position: sticky; top: 0; z-index: 30;
-    display: flex; align-items: center; gap: 12px;
-    height: 56px; padding: 0 20px;
-    background: var(--surface); border-bottom: 1px solid var(--border);
-  }
-  .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
-  .brand__logo { width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center;
-    background: #f1f5f3; border: 1px solid var(--border); }
-  .brand__name { font-weight: 650; font-size: 15px; white-space: nowrap; }
-  .brand__sub { color: var(--muted); font-size: 12px; }
-  .header__spacer { flex: 1; }
-  .lang { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 8px; overflow: hidden; }
-  .lang button { border: 0; background: var(--surface); padding: 3px 9px; font-size: 12px; font-weight: 600; color: var(--muted); cursor: pointer; }
-  .lang button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
-  .user { position: relative; }
-  .user__button { display: flex; align-items: center; gap: 8px; border: 1px solid transparent; background: none;
-    border-radius: 999px; padding: 3px 8px 3px 3px; cursor: pointer; }
-  .user__button:hover { border-color: var(--border); }
-  .avatar { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
-    background: #e8ecf6; color: #344164; font-weight: 700; font-size: 12px; }
-  .user__menu { position: absolute; right: 0; top: 42px; width: 250px; background: var(--surface);
-    border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 12px 32px rgb(16 24 40 / 0.14); padding: 6px; display: none; }
-  .user--open .user__menu { display: block; }
-  .user__menu dl { margin: 0; padding: 8px 10px 10px; border-bottom: 1px solid var(--border); }
-  .user__menu dt { color: var(--muted); font-size: 12px; margin-top: 6px; }
-  .user__menu dd { margin: 0; font-weight: 600; }
-  .user__menu a { display: block; padding: 8px 10px; border-radius: 6px; color: var(--text); text-decoration: none; }
-  .user__menu a:hover { background: var(--bg); }
+      /* ---------- Header ---------- */
+      .header {
+        position: sticky;
+        top: 0;
+        z-index: 30;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        height: 56px;
+        padding: 0 20px;
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+      }
+      .brand__logo {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        background: #f1f5f3;
+        border: 1px solid var(--border);
+      }
+      .brand__name {
+        font-weight: 650;
+        font-size: 15px;
+        white-space: nowrap;
+      }
+      .brand__sub {
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .header__spacer {
+        flex: 1;
+      }
+      .lang {
+        display: inline-flex;
+        border: 1px solid var(--border-strong);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .lang button {
+        border: 0;
+        background: var(--surface);
+        padding: 3px 9px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--muted);
+        cursor: pointer;
+      }
+      .lang button[aria-pressed='true'] {
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+      .user {
+        position: relative;
+      }
+      .user__button {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid transparent;
+        background: none;
+        border-radius: 999px;
+        padding: 3px 8px 3px 3px;
+        cursor: pointer;
+      }
+      .user__button:hover {
+        border-color: var(--border);
+      }
+      .avatar {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: #e8ecf6;
+        color: #344164;
+        font-weight: 700;
+        font-size: 12px;
+      }
+      .user__menu {
+        position: absolute;
+        right: 0;
+        top: 42px;
+        width: 250px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        box-shadow: 0 12px 32px rgb(16 24 40 / 0.14);
+        padding: 6px;
+        display: none;
+      }
+      .user--open .user__menu {
+        display: block;
+      }
+      .user__menu dl {
+        margin: 0;
+        padding: 8px 10px 10px;
+        border-bottom: 1px solid var(--border);
+      }
+      .user__menu dt {
+        color: var(--muted);
+        font-size: 12px;
+        margin-top: 6px;
+      }
+      .user__menu dd {
+        margin: 0;
+        font-weight: 600;
+      }
+      .user__menu a {
+        display: block;
+        padding: 8px 10px;
+        border-radius: 6px;
+        color: var(--text);
+        text-decoration: none;
+      }
+      .user__menu a:hover {
+        background: var(--bg);
+      }
 
-  /* ---------- Status bar ---------- */
-  .statusbar {
-    position: sticky; top: 56px; z-index: 25;
-    display: flex; align-items: center; gap: 16px;
-    padding: 8px 20px; background: var(--surface); border-bottom: 1px solid var(--border);
-  }
-  .statusbar__state { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; }
-  .statusbar__published { color: var(--muted); font-size: 13px; }
-  .statusbar__draft { font-weight: 600; font-size: 13px; }
-  .statusbar__draft::before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%;
-    background: #f79009; margin-right: 6px; vertical-align: 1px; }
-  .badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 999px;
-    font-size: 12.5px; font-weight: 600; background: var(--ok-soft); color: var(--ok); white-space: nowrap; }
-  .btn { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px; border-radius: 8px;
-    border: 1px solid var(--border-strong); background: var(--surface); font-weight: 600; cursor: pointer; white-space: nowrap; }
-  .btn:hover { background: var(--bg); }
-  .btn[aria-disabled="true"] { color: #98a1b0; border-color: var(--border); background: var(--surface); cursor: not-allowed; }
-  .btn--primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-  .btn--primary:hover { background: #2443c4; }
-  .btn--small { height: 28px; padding: 0 10px; font-size: 13px; }
+      /* ---------- Status bar ---------- */
+      .statusbar {
+        position: sticky;
+        top: 56px;
+        z-index: 25;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 8px 20px;
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+      }
+      .statusbar__state {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 16px;
+        align-items: baseline;
+      }
+      .statusbar__published {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .statusbar__draft {
+        font-weight: 600;
+        font-size: 13px;
+      }
+      .statusbar__draft::before {
+        content: '';
+        display: inline-block;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #f79009;
+        margin-right: 6px;
+        vertical-align: 1px;
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 3px 10px;
+        border-radius: 999px;
+        font-size: 12.5px;
+        font-weight: 600;
+        background: var(--ok-soft);
+        color: var(--ok);
+        white-space: nowrap;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 34px;
+        padding: 0 14px;
+        border-radius: 8px;
+        border: 1px solid var(--border-strong);
+        background: var(--surface);
+        font-weight: 600;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .btn:hover {
+        background: var(--bg);
+      }
+      .btn[aria-disabled='true'] {
+        color: #98a1b0;
+        border-color: var(--border);
+        background: var(--surface);
+        cursor: not-allowed;
+      }
+      .btn--primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+      }
+      .btn--primary:hover {
+        background: #2443c4;
+      }
+      .btn--small {
+        height: 28px;
+        padding: 0 10px;
+        font-size: 13px;
+      }
 
-  /* ---------- Workspace: sidebar | form | preview ---------- */
-  .workspace { display: grid; grid-template-columns: 216px minmax(0, 55fr) minmax(0, 45fr); }
-  @media (max-width: 1439px) { .workspace { grid-template-columns: 200px minmax(0, 58fr) minmax(0, 42fr); } }
+      /* ---------- Workspace: sidebar | form | preview ---------- */
+      .workspace {
+        display: grid;
+        grid-template-columns: 216px minmax(0, 55fr) minmax(0, 45fr);
+      }
+      @media (max-width: 1439px) {
+        .workspace {
+          grid-template-columns: 200px minmax(0, 58fr) minmax(0, 42fr);
+        }
+      }
 
-  .sidebar { position: sticky; top: 105px; align-self: start; height: calc(100vh - 105px);
-    padding: 14px 10px; border-right: 1px solid var(--border); background: var(--surface); }
-  .sidebar ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
-  .nav { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px;
-    color: var(--text); text-decoration: none; font-weight: 500; }
-  .nav:hover { background: var(--bg); }
-  .nav[aria-current="page"] { background: var(--accent-soft); color: var(--accent); font-weight: 650; }
-  .nav svg { flex: none; color: currentColor; opacity: 0.85; }
-  .nav__label { flex: 1; }
-  .dot { width: 7px; height: 7px; border-radius: 50%; background: #f79009; }
-  .count { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--danger); color: #fff;
-    font-size: 11px; font-weight: 700; display: grid; place-items: center; }
-  .sub { margin: 2px 0 6px 36px !important; }
-  .sub a { display: block; padding: 4px 8px; border-radius: 6px; color: var(--muted); text-decoration: none; font-size: 13px; }
-  .sub a.on { color: var(--accent); font-weight: 600; }
-  .sidebar__legend { position: absolute; bottom: 14px; left: 18px; right: 12px; color: var(--muted); font-size: 11.5px; display: grid; gap: 4px; }
-  .sidebar__legend span { display: inline-flex; align-items: center; gap: 6px; }
+      .sidebar {
+        position: sticky;
+        top: 105px;
+        align-self: start;
+        height: calc(100vh - 105px);
+        padding: 14px 10px;
+        border-right: 1px solid var(--border);
+        background: var(--surface);
+      }
+      .sidebar ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 2px;
+      }
+      .nav {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 10px;
+        border-radius: 8px;
+        color: var(--text);
+        text-decoration: none;
+        font-weight: 500;
+      }
+      .nav:hover {
+        background: var(--bg);
+      }
+      .nav[aria-current='page'] {
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-weight: 650;
+      }
+      .nav svg {
+        flex: none;
+        color: currentColor;
+        opacity: 0.85;
+      }
+      .nav__label {
+        flex: 1;
+      }
+      .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #f79009;
+      }
+      .count {
+        min-width: 18px;
+        height: 18px;
+        padding: 0 5px;
+        border-radius: 999px;
+        background: var(--danger);
+        color: #fff;
+        font-size: 11px;
+        font-weight: 700;
+        display: grid;
+        place-items: center;
+      }
+      .sub {
+        margin: 2px 0 6px 36px !important;
+      }
+      .sub a {
+        display: block;
+        padding: 4px 8px;
+        border-radius: 6px;
+        color: var(--muted);
+        text-decoration: none;
+        font-size: 13px;
+      }
+      .sub a.on {
+        color: var(--accent);
+        font-weight: 600;
+      }
+      .sidebar__legend {
+        position: absolute;
+        bottom: 14px;
+        left: 18px;
+        right: 12px;
+        color: var(--muted);
+        font-size: 11.5px;
+        display: grid;
+        gap: 4px;
+      }
+      .sidebar__legend span {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
 
-  .form { padding: 20px 24px 40px; display: grid; gap: 16px; align-content: start; }
-  .area-title { font-size: 20px; font-weight: 700; }
-  .area-intro { color: var(--muted); margin-top: -10px; }
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-    box-shadow: var(--shadow); padding: 18px 20px; display: grid; gap: 14px; }
-  .card h2 { font-size: 15px; font-weight: 650; }
-  .card .where { color: var(--muted); font-size: 12.5px; margin-top: -10px; }
-  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-  .field { display: grid; gap: 5px; }
-  .field > label, .field > .label { font-weight: 600; font-size: 13px; }
-  .input { height: 36px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface); width: 100%; }
-  .input[readonly] { background: var(--bg); color: var(--muted); }
-  .hint { color: var(--muted); font-size: 12.5px; }
+      .form {
+        padding: 20px 24px 40px;
+        display: grid;
+        gap: 16px;
+        align-content: start;
+      }
+      .area-title {
+        font-size: 20px;
+        font-weight: 700;
+      }
+      .area-intro {
+        color: var(--muted);
+        margin-top: -10px;
+      }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        padding: 18px 20px;
+        display: grid;
+        gap: 14px;
+      }
+      .card h2 {
+        font-size: 15px;
+        font-weight: 650;
+      }
+      .card .where {
+        color: var(--muted);
+        font-size: 12.5px;
+        margin-top: -10px;
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+      }
+      .field {
+        display: grid;
+        gap: 5px;
+      }
+      .field > label,
+      .field > .label {
+        font-weight: 600;
+        font-size: 13px;
+      }
+      .input {
+        height: 36px;
+        padding: 0 10px;
+        border: 1px solid var(--border-strong);
+        border-radius: 8px;
+        background: var(--surface);
+        width: 100%;
+      }
+      .input[readonly] {
+        background: var(--bg);
+        color: var(--muted);
+      }
+      .hint {
+        color: var(--muted);
+        font-size: 12.5px;
+      }
 
-  .image-row { display: flex; align-items: center; gap: 12px; }
-  .thumb { width: 48px; height: 48px; border-radius: 10px; border: 1px solid var(--border); display: grid; place-items: center; background: #f6f7f9; overflow: hidden; }
+      .image-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .thumb {
+        width: 48px;
+        height: 48px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        display: grid;
+        place-items: center;
+        background: #f6f7f9;
+        overflow: hidden;
+      }
 
-  .tiles { display: flex; flex-wrap: wrap; gap: 8px; }
-  .tile { width: 92px; display: grid; justify-items: center; gap: 6px; padding: 10px 6px 8px; border: 1px solid var(--border);
-    border-radius: 10px; background: var(--surface); cursor: pointer; font-size: 12.5px; text-align: center; }
-  .tile:hover { border-color: var(--border-strong); }
-  .tile--on { border: 2px solid var(--accent); background: var(--accent-soft); padding: 9px 5px 7px; color: var(--accent); font-weight: 600; }
-  .glyph { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: #eef0f4; color: #4a5468; font-weight: 700; font-size: 12px; }
-  .tile--on .glyph { background: #dfe6ff; color: var(--accent); }
+      .tiles {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .tile {
+        width: 92px;
+        display: grid;
+        justify-items: center;
+        gap: 6px;
+        padding: 10px 6px 8px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: var(--surface);
+        cursor: pointer;
+        font-size: 12.5px;
+        text-align: center;
+      }
+      .tile:hover {
+        border-color: var(--border-strong);
+      }
+      .tile--on {
+        border: 2px solid var(--accent);
+        background: var(--accent-soft);
+        padding: 9px 5px 7px;
+        color: var(--accent);
+        font-weight: 600;
+      }
+      .glyph {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: #eef0f4;
+        color: #4a5468;
+        font-weight: 700;
+        font-size: 12px;
+      }
+      .tile--on .glyph {
+        background: #dfe6ff;
+        color: var(--accent);
+      }
 
-  .switch-row { display: flex; gap: 14px; align-items: flex-start; }
-  .switch-row__icon { width: 36px; height: 36px; border-radius: 10px; background: #eef0f4; display: grid; place-items: center; color: #4a5468; flex: none; }
-  .switch-row__text { flex: 1; }
-  .switch-row__text strong { display: block; }
-  .switch { width: 38px; height: 22px; border-radius: 999px; background: #cdd2da; position: relative; flex: none; margin-top: 6px; }
-  .switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / 0.2); }
-  .switch--on { background: var(--accent); }
-  .switch--on::after { left: 19px; }
+      .switch-row {
+        display: flex;
+        gap: 14px;
+        align-items: flex-start;
+      }
+      .switch-row__icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        background: #eef0f4;
+        display: grid;
+        place-items: center;
+        color: #4a5468;
+        flex: none;
+      }
+      .switch-row__text {
+        flex: 1;
+      }
+      .switch-row__text strong {
+        display: block;
+      }
+      .switch {
+        width: 38px;
+        height: 22px;
+        border-radius: 999px;
+        background: #cdd2da;
+        position: relative;
+        flex: none;
+        margin-top: 6px;
+      }
+      .switch::after {
+        content: '';
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: #fff;
+        box-shadow: 0 1px 2px rgb(0 0 0 / 0.2);
+      }
+      .switch--on {
+        background: var(--accent);
+      }
+      .switch--on::after {
+        left: 19px;
+      }
 
-  .color { display: grid; grid-template-columns: 36px 1fr auto; gap: 8px; align-items: center; }
-  .swatch { width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--border-strong); }
-  .auto { color: var(--muted); font-size: 12.5px; }
-  .auto code { font: 12px ui-monospace, monospace; background: var(--bg); padding: 1px 5px; border-radius: 4px; }
-  details.advanced { border-top: 1px solid var(--border); padding-top: 12px; }
-  details.advanced summary { cursor: pointer; font-weight: 600; }
+      .color {
+        display: grid;
+        grid-template-columns: 36px 1fr auto;
+        gap: 8px;
+        align-items: center;
+      }
+      .swatch {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        border: 1px solid var(--border-strong);
+      }
+      .auto {
+        color: var(--muted);
+        font-size: 12.5px;
+      }
+      .auto code {
+        font:
+          12px ui-monospace,
+          monospace;
+        background: var(--bg);
+        padding: 1px 5px;
+        border-radius: 4px;
+      }
+      details.advanced {
+        border-top: 1px solid var(--border);
+        padding-top: 12px;
+      }
+      details.advanced summary {
+        cursor: pointer;
+        font-weight: 600;
+      }
 
-  pre.code { margin: 0; padding: 12px 14px; border-radius: 8px; background: #111827; color: #e5e7eb; font: 12.5px/1.6 ui-monospace, monospace; white-space: pre-wrap; word-break: break-all; }
-  .checklist { margin: 0; padding-left: 18px; display: grid; gap: 8px; }
-  .detected { display: flex; align-items: center; gap: 8px; color: var(--ok); font-weight: 600; }
+      pre.code {
+        margin: 0;
+        padding: 12px 14px;
+        border-radius: 8px;
+        background: #111827;
+        color: #e5e7eb;
+        font:
+          12.5px/1.6 ui-monospace,
+          monospace;
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
+      .checklist {
+        margin: 0;
+        padding-left: 18px;
+        display: grid;
+        gap: 8px;
+      }
+      .detected {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--ok);
+        font-weight: 600;
+      }
 
-  /* ---------- Preview column ---------- */
-  .preview { position: sticky; top: 105px; align-self: start; height: calc(100vh - 105px);
-    border-left: 1px solid var(--border); padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 10px; background: #eceef2; }
-  .segmented { align-self: center; display: inline-flex; border: 1px solid var(--border-strong); border-radius: 8px; overflow: hidden; background: var(--surface); }
-  .segmented button { border: 0; background: none; padding: 5px 14px; font-weight: 600; font-size: 13px; color: var(--muted); }
-  .segmented button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
-  .screen { flex: 1; min-height: 0; border-radius: 12px; background: #fff; border: 1px solid var(--border-strong); position: relative; overflow: hidden; box-shadow: var(--shadow); }
-  .sample-label { position: absolute; top: 10px; left: 10px; z-index: 2; font-size: 11px; font-weight: 600; color: #6b7280;
-    background: rgb(255 255 255 / 0.9); border: 1px solid var(--border); border-radius: 999px; padding: 2px 8px; }
-  /* a neutral sketched site page */
-  .site-top { height: 44px; background: #f3f4f6; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; gap: 14px; padding: 0 16px; }
-  .blk { background: #e5e7eb; border-radius: 4px; }
-  .site-body { padding: 18px 16px; display: grid; gap: 12px; }
-  .site-hero { height: 90px; border-radius: 8px; background: #eef0f3; }
-  .site-cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-  .site-cols .blk { height: 64px; }
-  .site-lines { display: grid; gap: 7px; }
-  .site-lines .blk { height: 9px; }
+      /* ---------- Preview column ---------- */
+      .preview {
+        position: sticky;
+        top: 105px;
+        align-self: start;
+        height: calc(100vh - 105px);
+        border-left: 1px solid var(--border);
+        padding: 12px 16px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        background: #eceef2;
+      }
+      .segmented {
+        align-self: center;
+        display: inline-flex;
+        border: 1px solid var(--border-strong);
+        border-radius: 8px;
+        overflow: hidden;
+        background: var(--surface);
+      }
+      .segmented button {
+        border: 0;
+        background: none;
+        padding: 5px 14px;
+        font-weight: 600;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .segmented button[aria-pressed='true'] {
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+      .screen {
+        flex: 1;
+        min-height: 0;
+        border-radius: 12px;
+        background: #fff;
+        border: 1px solid var(--border-strong);
+        position: relative;
+        overflow: hidden;
+        box-shadow: var(--shadow);
+      }
+      .sample-label {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        z-index: 2;
+        font-size: 11px;
+        font-weight: 600;
+        color: #6b7280;
+        background: rgb(255 255 255 / 0.9);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 2px 8px;
+      }
+      /* a neutral sketched site page */
+      .site-top {
+        height: 44px;
+        background: #f3f4f6;
+        border-bottom: 1px solid #e5e7eb;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 0 16px;
+      }
+      .blk {
+        background: #e5e7eb;
+        border-radius: 4px;
+      }
+      .site-body {
+        padding: 18px 16px;
+        display: grid;
+        gap: 12px;
+      }
+      .site-hero {
+        height: 90px;
+        border-radius: 8px;
+        background: #eef0f3;
+      }
+      .site-cols {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+      }
+      .site-cols .blk {
+        height: 64px;
+      }
+      .site-lines {
+        display: grid;
+        gap: 7px;
+      }
+      .site-lines .blk {
+        height: 9px;
+      }
 
-  /* the widget, drawn at its real proportions (client colors) */
-  .w-window { position: absolute; right: 16px; bottom: 84px; width: min(340px, calc(100% - 32px)); height: calc(100% - 140px); max-height: 560px;
-    background: #fff; border-radius: 16px; overflow: hidden; display: flex; flex-direction: column;
-    box-shadow: 0 20px 50px rgb(16 24 40 / 0.22), 0 4px 14px rgb(16 24 40 / 0.1); font-size: 12.5px; }
-  .w-head { background: linear-gradient(135deg, var(--client), var(--client-2)); color: #fff; padding: 12px 14px 18px; display: flex; gap: 10px; align-items: center; }
-  .w-head .glyph { background: rgb(255 255 255 / 0.2); color: #fff; width: 32px; height: 32px; box-shadow: inset 0 0 0 2px rgb(255 255 255 / 0.4); }
-  .w-head strong { display: block; font-size: 13.5px; }
-  .w-head small { opacity: 0.9; }
-  .w-body { flex: 1; padding: 12px; display: grid; gap: 8px; align-content: start; overflow: hidden; background: #fff; }
-  .msg { max-width: 82%; padding: 8px 11px; border-radius: 12px; line-height: 1.45; }
-  .msg--bot { background: #eef3f0; border-top-left-radius: 4px; }
-  .msg--me { justify-self: end; background: linear-gradient(135deg, var(--client), var(--client-2)); color: #fff; border-top-right-radius: 4px; }
-  .msg a { color: #0a5c42; font-weight: 600; }
-  .src { margin-top: 6px; padding-top: 6px; border-top: 1px solid #d9e3de; font-size: 11px; color: #4b5563; }
-  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-  .chip { border: 1px solid var(--client); color: var(--client); border-radius: 999px; padding: 3px 10px; font-size: 11.5px; background: #fff; }
-  .w-input { border-top: 1px solid #e5e7eb; padding: 9px 10px; }
-  .w-input div { border: 1px solid #cfd6dc; border-radius: 999px; padding: 6px 12px; color: #6b7280; }
-  .w-launcher { position: absolute; right: 16px; bottom: 16px; width: 52px; height: 52px; border-radius: 50%;
-    background: linear-gradient(135deg, var(--client), var(--client-2)); color: #fff; display: grid; place-items: center;
-    box-shadow: 0 8px 20px rgb(16 24 40 / 0.25); }
+      /* the widget, drawn at its real proportions (client colors) */
+      .w-window {
+        position: absolute;
+        right: 16px;
+        bottom: 84px;
+        width: min(340px, calc(100% - 32px));
+        height: calc(100% - 140px);
+        max-height: 560px;
+        background: #fff;
+        border-radius: 16px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        box-shadow:
+          0 20px 50px rgb(16 24 40 / 0.22),
+          0 4px 14px rgb(16 24 40 / 0.1);
+        font-size: 12.5px;
+      }
+      .w-head {
+        background: linear-gradient(135deg, var(--client), var(--client-2));
+        color: #fff;
+        padding: 12px 14px 18px;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .w-head .glyph {
+        background: rgb(255 255 255 / 0.2);
+        color: #fff;
+        width: 32px;
+        height: 32px;
+        box-shadow: inset 0 0 0 2px rgb(255 255 255 / 0.4);
+      }
+      .w-head strong {
+        display: block;
+        font-size: 13.5px;
+      }
+      .w-head small {
+        opacity: 0.9;
+      }
+      .w-body {
+        flex: 1;
+        padding: 12px;
+        display: grid;
+        gap: 8px;
+        align-content: start;
+        overflow: hidden;
+        background: #fff;
+      }
+      .msg {
+        max-width: 82%;
+        padding: 8px 11px;
+        border-radius: 12px;
+        line-height: 1.45;
+      }
+      .msg--bot {
+        background: #eef3f0;
+        border-top-left-radius: 4px;
+      }
+      .msg--me {
+        justify-self: end;
+        background: linear-gradient(135deg, var(--client), var(--client-2));
+        color: #fff;
+        border-top-right-radius: 4px;
+      }
+      .msg a {
+        color: #0a5c42;
+        font-weight: 600;
+      }
+      .src {
+        margin-top: 6px;
+        padding-top: 6px;
+        border-top: 1px solid #d9e3de;
+        font-size: 11px;
+        color: #4b5563;
+      }
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .chip {
+        border: 1px solid var(--client);
+        color: var(--client);
+        border-radius: 999px;
+        padding: 3px 10px;
+        font-size: 11.5px;
+        background: #fff;
+      }
+      .w-input {
+        border-top: 1px solid #e5e7eb;
+        padding: 9px 10px;
+      }
+      .w-input div {
+        border: 1px solid #cfd6dc;
+        border-radius: 999px;
+        padding: 6px 12px;
+        color: #6b7280;
+      }
+      .w-launcher {
+        position: absolute;
+        right: 16px;
+        bottom: 16px;
+        width: 52px;
+        height: 52px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--client), var(--client-2));
+        color: #fff;
+        display: grid;
+        place-items: center;
+        box-shadow: 0 8px 20px rgb(16 24 40 / 0.25);
+      }
 
-  /* areas */
-  [data-area] { display: none; }
-  body[data-show="identitate"] [data-area="identitate"],
-  body[data-show="culori"] [data-area="culori"],
-  body[data-show="integrare"] [data-area="integrare"] { display: grid; }
-</style>
-</head>
-<body data-show="identitate">
+      /* areas */
+      [data-area] {
+        display: none;
+      }
+      body[data-show='identitate'] [data-area='identitate'],
+      body[data-show='culori'] [data-area='culori'],
+      body[data-show='integrare'] [data-area='integrare'] {
+        display: grid;
+      }
+    </style>
+  </head>
+  <body data-show="identitate">
+    <!-- Header: the client's assistant on the left; compact language switch and user menu on the right -->
+    <header class="header">
+      <div class="brand">
+        <div class="brand__logo" aria-hidden="true">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#0b6e4f"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M3 22h18M6 18v-7M10 18v-7M14 18v-7M18 18v-7M12 2l9 5H3l9-5z" />
+          </svg>
+        </div>
+        <div>
+          <div class="brand__name">Asistentul Primăriei</div>
+          <div class="brand__sub">Primăria Exemplu · administrare</div>
+        </div>
+      </div>
+      <div class="header__spacer"></div>
+      <div class="lang" role="group" aria-label="Limba interfeței">
+        <button aria-pressed="true">RO</button><button aria-pressed="false">EN</button>
+      </div>
+      <div class="user" id="user">
+        <button
+          class="user__button"
+          aria-haspopup="menu"
+          aria-expanded="false"
+          onclick="document.getElementById('user').classList.toggle('user--open')"
+        >
+          <span class="avatar">AA</span>
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </button>
+        <div class="user__menu" role="menu">
+          <dl>
+            <dt>Utilizator</dt>
+            <dd>Ana Admin</dd>
+            <dt>Rol</dt>
+            <dd>Administrator</dd>
+            <dt>Organizație</dt>
+            <dd>Primăria Exemplu</dd>
+          </dl>
+          <a href="#" role="menuitem">Deconectare</a>
+        </div>
+      </div>
+    </header>
 
-<!-- Header: the client's assistant on the left; compact language switch and user menu on the right -->
-<header class="header">
-  <div class="brand">
-    <div class="brand__logo" aria-hidden="true">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0b6e4f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 22h18M6 18v-7M10 18v-7M14 18v-7M18 18v-7M12 2l9 5H3l9-5z"/></svg>
+    <!-- Status bar: one primary action -->
+    <div class="statusbar">
+      <div class="statusbar__state">
+        <span class="statusbar__published"
+          >Publicat ultima dată: 18 noiembrie 2026, 17:13 · configurația inițială</span
+        >
+        <span class="statusbar__draft">Ciornă: salvată la 17:42</span>
+      </div>
+      <span class="badge">✓ Contrast OK</span>
+      <button class="btn">Renunță la modificări</button>
+      <button class="btn btn--primary">Publică</button>
     </div>
-    <div>
-      <div class="brand__name">Asistentul Primăriei</div>
-      <div class="brand__sub">Primăria Exemplu · administrare</div>
+
+    <div class="workspace">
+      <!-- Sidebar: one area at a time; dot = unpublished changes, red = errors -->
+      <nav class="sidebar" aria-label="Zone de configurare">
+        <ul>
+          <li>
+            <a class="nav" href="#identitate" data-go="identitate" aria-current="page">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              >
+                <circle cx="13.5" cy="6.5" r="2.5" />
+                <path d="M3 21c0-4 3-7 7-7h1M17 14l4 4-4 4" />
+                <rect x="3" y="3" width="7" height="7" rx="2" />
+              </svg>
+              <span class="nav__label">Aspect</span
+              ><span class="dot" title="Modificări nepublicate"></span
+            ></a>
+          </li>
+          <li class="sub">
+            <a href="#identitate" data-go="identitate" class="on">Identitate</a
+            ><a href="#">Buton de pornire</a><a href="#">Fereastră</a
+            ><a href="#culori" data-go="culori">Culori</a>
+          </li>
+          <li>
+            <a class="nav" href="#">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              >
+                <path d="M4 6h16M4 12h10M4 18h7" />
+              </svg>
+              <span class="nav__label">Texte și întrebări</span></a
+            >
+          </li>
+          <li>
+            <a class="nav" href="#">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              >
+                <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" />
+              </svg>
+              <span class="nav__label">Mesaj proactiv</span></a
+            >
+          </li>
+          <li>
+            <a class="nav" href="#">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              >
+                <path d="M6 4h9l3 3v13H6z" />
+                <path d="M9 11h6M9 15h6" />
+              </svg>
+              <span class="nav__label">Citări</span></a
+            >
+          </li>
+          <li>
+            <a class="nav" href="#">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              >
+                <circle cx="12" cy="12" r="3" />
+                <path
+                  d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"
+                />
+              </svg>
+              <span class="nav__label">Comportament</span></a
+            >
+          </li>
+          <li>
+            <a class="nav" href="#">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              >
+                <circle cx="12" cy="12" r="9" />
+                <path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
+              </svg>
+              <span class="nav__label">Domenii permise</span
+              ><span class="count" title="1 eroare">1</span></a
+            >
+          </li>
+          <li>
+            <a class="nav" href="#integrare" data-go="integrare">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              >
+                <path d="m8 7-5 5 5 5M16 7l5 5-5 5" />
+              </svg>
+              <span class="nav__label">Integrare pe site</span></a
+            >
+          </li>
+        </ul>
+        <div class="sidebar__legend">
+          <span><span class="dot"></span> modificări nepublicate</span>
+          <span><span class="count">1</span> erori de corectat</span>
+        </div>
+      </nav>
+
+      <main class="form">
+        <!-- ===== Aspect → Identitate ===== -->
+        <section data-area="identitate" style="gap: 16px">
+          <h1 class="area-title">Identitate</h1>
+          <p class="area-intro">Cum se prezintă asistentul pe site.</p>
+          <div class="card">
+            <div class="row">
+              <div class="field">
+                <label>Numele clientului</label
+                ><input class="input" value="Primăria Exemplu" readonly /><span class="hint"
+                  >Se modifică de echipa platformei.</span
+                >
+              </div>
+              <div class="field">
+                <label>Numele asistentului</label
+                ><input class="input" value="Asistentul Primăriei" /><span class="hint"
+                  >Apare în antetul ferestrei.</span
+                >
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <h2>Logo</h2>
+            <p class="where">Unde apare: în antetul ferestrei.</p>
+            <div class="image-row">
+              <div class="thumb">
+                <svg
+                  width="26"
+                  height="26"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#0b6e4f"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                >
+                  <path d="M3 22h18M6 18v-7M10 18v-7M14 18v-7M18 18v-7M12 2l9 5H3l9-5z" />
+                </svg>
+              </div>
+              <button class="btn btn--small">Înlocuiește</button
+              ><button class="btn btn--small">Elimină</button>
+              <span class="hint">PNG, JPEG sau WebP, maximum 512 KB.</span>
+            </div>
+          </div>
+          <div class="card">
+            <h2>Avatarul asistentului</h2>
+            <p class="where">
+              Unde apare: lângă răspunsuri. Previzualizarea din dreapta îl arată în culorile
+              clientului.
+            </p>
+            <div class="tiles" role="radiogroup">
+              <div class="tile"><span class="glyph">AP</span>Inițiale</div>
+              <div class="tile">
+                <span class="glyph"
+                  ><svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <rect x="4" y="8" width="16" height="12" rx="3" />
+                    <path d="M12 4v4M9 14h.01M15 14h.01" /></svg></span
+                >Robot
+              </div>
+              <div class="tile"><span class="glyph">✦</span>Scânteie</div>
+              <div class="tile">
+                <span class="glyph"
+                  ><svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path
+                      d="M3 22h18M6 18v-7M10 18v-7M14 18v-7M18 18v-7M12 2l9 5H3l9-5z"
+                    /></svg></span
+                >Instituție
+              </div>
+              <div class="tile">
+                <span class="glyph"
+                  ><svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path d="M3 14v-2a9 9 0 0 1 18 0v2M3 14h3v6H3zM18 14h3v6h-3z" /></svg></span
+                >Căști
+              </div>
+              <div class="tile tile--on">
+                <span class="glyph"
+                  ><svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path d="M12 16V4M7 9l5-5 5 5M4 20h16" /></svg></span
+                >Imagine
+              </div>
+              <div class="tile"><span class="glyph">∅</span>Fără</div>
+            </div>
+            <!-- the image appears once, here -->
+            <div class="image-row">
+              <div class="thumb" style="border-radius: 50%">
+                <span
+                  class="glyph"
+                  style="background: #0b6e4f; color: #fff; width: 46px; height: 46px"
+                  >PE</span
+                >
+              </div>
+              <button class="btn btn--small">Înlocuiește</button
+              ><button class="btn btn--small">Elimină</button>
+            </div>
+          </div>
+          <div class="card">
+            <h2>Avatarul vizitatorului</h2>
+            <p class="where">Unde apare: lângă întrebările vizitatorului.</p>
+            <div class="tiles">
+              <div class="tile tile--on"><span class="glyph">∅</span>Fără</div>
+              <div class="tile"><span class="glyph">Tu</span>„Tu”</div>
+              <div class="tile">
+                <span class="glyph"
+                  ><svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <circle cx="12" cy="8" r="4" />
+                    <path d="M4 21a8 8 0 0 1 16 0" /></svg></span
+                >Siluetă
+              </div>
+              <div class="tile"><span class="glyph">↑</span>Imagine</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===== Aspect → Culori ===== -->
+        <section data-area="culori" style="gap: 16px">
+          <h1 class="area-title">Culori</h1>
+          <p class="area-intro">
+            Alegeți culoarea principală; restul se calculează automat, cu contrast suficient.
+          </p>
+          <div class="card">
+            <div class="row">
+              <div class="field">
+                <span class="label">Culoarea principală</span>
+                <div class="color">
+                  <span class="swatch" style="background: #0b6e4f"></span
+                  ><input class="input" value="#0b6e4f" /><span></span>
+                </div>
+                <span class="hint">Antetul ferestrei și mesajele vizitatorului.</span>
+              </div>
+              <div class="field">
+                <span class="label">A doua culoare a antetului (gradient)</span>
+                <div class="color">
+                  <span class="swatch" style="background: #11845e"></span
+                  ><input class="input" value="" placeholder="" /><button class="btn btn--small">
+                    Fixează valoarea
+                  </button>
+                </div>
+                <span class="auto"
+                  >automat: <code>#11845e</code> — puțin mai deschisă decât cea principală</span
+                >
+              </div>
+            </div>
+            <div class="row">
+              <div class="field">
+                <span class="label">Text pe culoarea principală</span>
+                <div class="color">
+                  <span class="swatch" style="background: #ffffff"></span
+                  ><input class="input" value="" /><button class="btn btn--small">
+                    Fixează valoarea
+                  </button>
+                </div>
+                <span class="auto">automat: <code>#ffffff</code> — alb, contrast 6,4:1</span>
+              </div>
+              <div class="field">
+                <span class="label">Linkuri</span>
+                <div class="color">
+                  <span class="swatch" style="background: #0a5c42"></span
+                  ><input class="input" value="#0a5c42" /><button class="btn btn--small">
+                    Resetează
+                  </button>
+                </div>
+                <span class="auto">valoare fixată (automat ar fi <code>#0b6e4f</code>)</span>
+              </div>
+            </div>
+            <details class="advanced">
+              <summary>Culori avansate (8)</summary>
+              <p class="hint" style="margin-top: 8px">
+                Text, text secundar, fundal, mesajele asistentului, mesajele vizitatorului, butoane…
+              </p>
+            </details>
+          </div>
+          <div class="card">
+            <div class="switch-row">
+              <div class="switch-row__icon">
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M12 3v18M3 12h18" />
+                </svg>
+              </div>
+              <div class="switch-row__text">
+                <strong>Fereastra pe aceeași parte cu butonul</strong
+                ><span class="hint">Altfel o puteți așeza separat.</span>
+              </div>
+              <span class="switch switch--on" role="switch" aria-checked="true"></span>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===== Integrare pe site ===== -->
+        <section data-area="integrare" style="gap: 16px">
+          <h1 class="area-title">Integrare pe site</h1>
+          <p class="area-intro">
+            Puneți codul înainte de &lt;/body&gt;, pe toate paginile pe care vreți asistentul.
+          </p>
+          <div class="card">
+            <div class="field">
+              <span class="label">Codul de integrare</span>
+              <pre class="code">
+&lt;script src="https://asistent.exemplu.ro/w/loader.js" data-tenant="primaria-exemplu" async&gt;&lt;/script&gt;</pre>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center">
+              <button class="btn btn--primary">Copiază</button>
+              <span class="hint">Limba implicită:</span>
+              <div class="lang" role="group">
+                <button aria-pressed="true">RO</button><button aria-pressed="false">EN</button>
+              </div>
+            </div>
+            <span class="hint"
+              >Nu e nevoie de CSS separat: aspectul vine din configurația de aici.</span
+            >
+          </div>
+          <div class="card">
+            <h2>Înainte de publicarea pe site</h2>
+            <ol class="checklist">
+              <li>
+                Domeniul site-ului este în <a href="#">Domenii permise</a>. Acum:
+                https://www.exemplu.ro
+              </li>
+              <li>
+                Dacă site-ul are Content-Security-Policy, adăugați adresa asistentului la
+                script-src, frame-src, connect-src, img-src și style-src.
+              </li>
+            </ol>
+          </div>
+          <div class="card">
+            <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap">
+              <button class="btn">Verifică instalarea</button>
+              <span class="detected"
+                >✓ Widget detectat pe https://www.exemplu.ro la 18 noiembrie, 17:40</span
+              >
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <!-- Preview: switch centered, the screen fills the column, a neutral sketched site page -->
+      <aside class="preview" aria-label="Previzualizare">
+        <div class="segmented" role="group" aria-label="Previzualizare">
+          <button aria-pressed="true">Desktop</button><button aria-pressed="false">Telefon</button>
+        </div>
+        <div class="screen">
+          <span class="sample-label">Exemplu de pagină</span>
+          <div class="site-top">
+            <span class="blk" style="width: 28px; height: 20px"></span
+            ><span class="blk" style="width: 90px; height: 10px"></span><span style="flex: 1"></span
+            ><span class="blk" style="width: 40px; height: 8px"></span
+            ><span class="blk" style="width: 40px; height: 8px"></span
+            ><span class="blk" style="width: 40px; height: 8px"></span>
+          </div>
+          <div class="site-body">
+            <div class="site-hero"></div>
+            <div class="site-lines">
+              <span class="blk" style="width: 70%"></span
+              ><span class="blk" style="width: 55%"></span>
+            </div>
+            <div class="site-cols">
+              <span class="blk"></span><span class="blk"></span><span class="blk"></span>
+            </div>
+            <div class="site-lines">
+              <span class="blk" style="width: 80%"></span
+              ><span class="blk" style="width: 65%"></span
+              ><span class="blk" style="width: 72%"></span>
+            </div>
+          </div>
+          <div class="w-window">
+            <div class="w-head">
+              <span class="glyph">AP</span>
+              <div><strong>Asistentul Primăriei</strong><small>● Asistent virtual</small></div>
+            </div>
+            <div class="w-body">
+              <div class="msg msg--bot">
+                Bună ziua! Sunt asistentul virtual al Primăriei Exemplu. Cu ce vă pot ajuta?
+              </div>
+              <div class="msg msg--me">Care este programul cu publicul?</div>
+              <div class="msg msg--bot">
+                Programul cu publicul este <b>luni–vineri, între 8:30 și 16:30</b>. Puteți depune
+                actele și online, pe <a>pagina de servicii</a>.
+                <div class="src">Surse · Regulamentul de organizare</div>
+              </div>
+              <div class="chips">
+                <span class="chip">Ce acte îmi trebuie?</span
+                ><span class="chip">Unde depun cererea?</span>
+              </div>
+            </div>
+            <div class="w-input"><div>Scrieți întrebarea dumneavoastră…</div></div>
+          </div>
+          <div class="w-launcher">
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.2"
+            >
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </div>
+        </div>
+      </aside>
     </div>
-  </div>
-  <div class="header__spacer"></div>
-  <div class="lang" role="group" aria-label="Limba interfeței">
-    <button aria-pressed="true">RO</button><button aria-pressed="false">EN</button>
-  </div>
-  <div class="user" id="user">
-    <button class="user__button" aria-haspopup="menu" aria-expanded="false" onclick="document.getElementById('user').classList.toggle('user--open')">
-      <span class="avatar">AA</span>
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
-    </button>
-    <div class="user__menu" role="menu">
-      <dl>
-        <dt>Utilizator</dt><dd>Ana Admin</dd>
-        <dt>Rol</dt><dd>Administrator</dd>
-        <dt>Organizație</dt><dd>Primăria Exemplu</dd>
-      </dl>
-      <a href="#" role="menuitem">Deconectare</a>
-    </div>
-  </div>
-</header>
 
-<!-- Status bar: one primary action -->
-<div class="statusbar">
-  <div class="statusbar__state">
-    <span class="statusbar__published">Publicat ultima dată: 18 noiembrie 2026, 17:13 · configurația inițială</span>
-    <span class="statusbar__draft">Ciornă: salvată la 17:42</span>
-  </div>
-  <span class="badge">✓ Contrast OK</span>
-  <button class="btn">Renunță la modificări</button>
-  <button class="btn btn--primary">Publică</button>
-</div>
-
-<div class="workspace">
-  <!-- Sidebar: one area at a time; dot = unpublished changes, red = errors -->
-  <nav class="sidebar" aria-label="Zone de configurare">
-    <ul>
-      <li><a class="nav" href="#identitate" data-go="identitate" aria-current="page">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="13.5" cy="6.5" r="2.5"/><path d="M3 21c0-4 3-7 7-7h1M17 14l4 4-4 4"/><rect x="3" y="3" width="7" height="7" rx="2"/></svg>
-        <span class="nav__label">Aspect</span><span class="dot" title="Modificări nepublicate"></span></a></li>
-      <li class="sub"><a href="#identitate" data-go="identitate" class="on">Identitate</a><a href="#">Buton de pornire</a><a href="#">Fereastră</a><a href="#culori" data-go="culori">Culori</a></li>
-      <li><a class="nav" href="#">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h10M4 18h7"/></svg>
-        <span class="nav__label">Texte și întrebări</span></a></li>
-      <li><a class="nav" href="#">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>
-        <span class="nav__label">Mesaj proactiv</span></a></li>
-      <li><a class="nav" href="#">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 4h9l3 3v13H6z"/><path d="M9 11h6M9 15h6"/></svg>
-        <span class="nav__label">Citări</span></a></li>
-      <li><a class="nav" href="#">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg>
-        <span class="nav__label">Comportament</span></a></li>
-      <li><a class="nav" href="#">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
-        <span class="nav__label">Domenii permise</span><span class="count" title="1 eroare">1</span></a></li>
-      <li><a class="nav" href="#integrare" data-go="integrare">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m8 7-5 5 5 5M16 7l5 5-5 5"/></svg>
-        <span class="nav__label">Integrare pe site</span></a></li>
-    </ul>
-    <div class="sidebar__legend">
-      <span><span class="dot"></span> modificări nepublicate</span>
-      <span><span class="count">1</span> erori de corectat</span>
-    </div>
-  </nav>
-
-  <main class="form">
-    <!-- ===== Aspect → Identitate ===== -->
-    <section data-area="identitate" style="gap:16px">
-      <h1 class="area-title">Identitate</h1>
-      <p class="area-intro">Cum se prezintă asistentul pe site.</p>
-      <div class="card">
-        <div class="row">
-          <div class="field"><label>Numele clientului</label><input class="input" value="Primăria Exemplu" readonly /><span class="hint">Se modifică de echipa platformei.</span></div>
-          <div class="field"><label>Numele asistentului</label><input class="input" value="Asistentul Primăriei" /><span class="hint">Apare în antetul ferestrei.</span></div>
-        </div>
-      </div>
-      <div class="card">
-        <h2>Logo</h2>
-        <p class="where">Unde apare: în antetul ferestrei.</p>
-        <div class="image-row">
-          <div class="thumb"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#0b6e4f" stroke-width="2" stroke-linecap="round"><path d="M3 22h18M6 18v-7M10 18v-7M14 18v-7M18 18v-7M12 2l9 5H3l9-5z"/></svg></div>
-          <button class="btn btn--small">Înlocuiește</button><button class="btn btn--small">Elimină</button>
-          <span class="hint">PNG, JPEG sau WebP, maximum 512 KB.</span>
-        </div>
-      </div>
-      <div class="card">
-        <h2>Avatarul asistentului</h2>
-        <p class="where">Unde apare: lângă răspunsuri. Previzualizarea din dreapta îl arată în culorile clientului.</p>
-        <div class="tiles" role="radiogroup">
-          <div class="tile"><span class="glyph">AP</span>Inițiale</div>
-          <div class="tile"><span class="glyph"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 4v4M9 14h.01M15 14h.01"/></svg></span>Robot</div>
-          <div class="tile"><span class="glyph">✦</span>Scânteie</div>
-          <div class="tile"><span class="glyph"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 22h18M6 18v-7M10 18v-7M14 18v-7M18 18v-7M12 2l9 5H3l9-5z"/></svg></span>Instituție</div>
-          <div class="tile"><span class="glyph"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 14v-2a9 9 0 0 1 18 0v2M3 14h3v6H3zM18 14h3v6h-3z"/></svg></span>Căști</div>
-          <div class="tile tile--on"><span class="glyph"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg></span>Imagine</div>
-          <div class="tile"><span class="glyph">∅</span>Fără</div>
-        </div>
-        <!-- the image appears once, here -->
-        <div class="image-row">
-          <div class="thumb" style="border-radius:50%"><span class="glyph" style="background:#0b6e4f;color:#fff;width:46px;height:46px">PE</span></div>
-          <button class="btn btn--small">Înlocuiește</button><button class="btn btn--small">Elimină</button>
-        </div>
-      </div>
-      <div class="card">
-        <h2>Avatarul vizitatorului</h2>
-        <p class="where">Unde apare: lângă întrebările vizitatorului.</p>
-        <div class="tiles">
-          <div class="tile tile--on"><span class="glyph">∅</span>Fără</div>
-          <div class="tile"><span class="glyph">Tu</span>„Tu”</div>
-          <div class="tile"><span class="glyph"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span>Siluetă</div>
-          <div class="tile"><span class="glyph">↑</span>Imagine</div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ===== Aspect → Culori ===== -->
-    <section data-area="culori" style="gap:16px">
-      <h1 class="area-title">Culori</h1>
-      <p class="area-intro">Alegeți culoarea principală; restul se calculează automat, cu contrast suficient.</p>
-      <div class="card">
-        <div class="row">
-          <div class="field"><span class="label">Culoarea principală</span>
-            <div class="color"><span class="swatch" style="background:#0b6e4f"></span><input class="input" value="#0b6e4f" /><span></span></div>
-            <span class="hint">Antetul ferestrei și mesajele vizitatorului.</span></div>
-          <div class="field"><span class="label">A doua culoare a antetului (gradient)</span>
-            <div class="color"><span class="swatch" style="background:#11845e"></span><input class="input" value="" placeholder="" /><button class="btn btn--small">Fixează valoarea</button></div>
-            <span class="auto">automat: <code>#11845e</code> — puțin mai deschisă decât cea principală</span></div>
-        </div>
-        <div class="row">
-          <div class="field"><span class="label">Text pe culoarea principală</span>
-            <div class="color"><span class="swatch" style="background:#ffffff"></span><input class="input" value="" /><button class="btn btn--small">Fixează valoarea</button></div>
-            <span class="auto">automat: <code>#ffffff</code> — alb, contrast 6,4:1</span></div>
-          <div class="field"><span class="label">Linkuri</span>
-            <div class="color"><span class="swatch" style="background:#0a5c42"></span><input class="input" value="#0a5c42" /><button class="btn btn--small">Resetează</button></div>
-            <span class="auto">valoare fixată (automat ar fi <code>#0b6e4f</code>)</span></div>
-        </div>
-        <details class="advanced">
-          <summary>Culori avansate (8)</summary>
-          <p class="hint" style="margin-top:8px">Text, text secundar, fundal, mesajele asistentului, mesajele vizitatorului, butoane…</p>
-        </details>
-      </div>
-      <div class="card">
-        <div class="switch-row">
-          <div class="switch-row__icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/></svg></div>
-          <div class="switch-row__text"><strong>Fereastra pe aceeași parte cu butonul</strong><span class="hint">Altfel o puteți așeza separat.</span></div>
-          <span class="switch switch--on" role="switch" aria-checked="true"></span>
-        </div>
-      </div>
-    </section>
-
-    <!-- ===== Integrare pe site ===== -->
-    <section data-area="integrare" style="gap:16px">
-      <h1 class="area-title">Integrare pe site</h1>
-      <p class="area-intro">Puneți codul înainte de &lt;/body&gt;, pe toate paginile pe care vreți asistentul.</p>
-      <div class="card">
-        <div class="field"><span class="label">Codul de integrare</span>
-          <pre class="code">&lt;script src="https://asistent.exemplu.ro/w/loader.js" data-tenant="primaria-exemplu" async&gt;&lt;/script&gt;</pre>
-        </div>
-        <div style="display:flex;gap:10px;align-items:center">
-          <button class="btn btn--primary">Copiază</button>
-          <span class="hint">Limba implicită:</span>
-          <div class="lang" role="group"><button aria-pressed="true">RO</button><button aria-pressed="false">EN</button></div>
-        </div>
-        <span class="hint">Nu e nevoie de CSS separat: aspectul vine din configurația de aici.</span>
-      </div>
-      <div class="card">
-        <h2>Înainte de publicarea pe site</h2>
-        <ol class="checklist">
-          <li>Domeniul site-ului este în <a href="#">Domenii permise</a>. Acum: https://www.exemplu.ro</li>
-          <li>Dacă site-ul are Content-Security-Policy, adăugați adresa asistentului la script-src, frame-src, connect-src, img-src și style-src.</li>
-        </ol>
-      </div>
-      <div class="card">
-        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-          <button class="btn">Verifică instalarea</button>
-          <span class="detected">✓ Widget detectat pe https://www.exemplu.ro la 18 noiembrie, 17:40</span>
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <!-- Preview: switch centered, the screen fills the column, a neutral sketched site page -->
-  <aside class="preview" aria-label="Previzualizare">
-    <div class="segmented" role="group" aria-label="Previzualizare"><button aria-pressed="true">Desktop</button><button aria-pressed="false">Telefon</button></div>
-    <div class="screen">
-      <span class="sample-label">Exemplu de pagină</span>
-      <div class="site-top"><span class="blk" style="width:28px;height:20px"></span><span class="blk" style="width:90px;height:10px"></span><span style="flex:1"></span><span class="blk" style="width:40px;height:8px"></span><span class="blk" style="width:40px;height:8px"></span><span class="blk" style="width:40px;height:8px"></span></div>
-      <div class="site-body">
-        <div class="site-hero"></div>
-        <div class="site-lines"><span class="blk" style="width:70%"></span><span class="blk" style="width:55%"></span></div>
-        <div class="site-cols"><span class="blk"></span><span class="blk"></span><span class="blk"></span></div>
-        <div class="site-lines"><span class="blk" style="width:80%"></span><span class="blk" style="width:65%"></span><span class="blk" style="width:72%"></span></div>
-      </div>
-      <div class="w-window">
-        <div class="w-head"><span class="glyph">AP</span><div><strong>Asistentul Primăriei</strong><small>● Asistent virtual</small></div></div>
-        <div class="w-body">
-          <div class="msg msg--bot">Bună ziua! Sunt asistentul virtual al Primăriei Exemplu. Cu ce vă pot ajuta?</div>
-          <div class="msg msg--me">Care este programul cu publicul?</div>
-          <div class="msg msg--bot">Programul cu publicul este <b>luni–vineri, între 8:30 și 16:30</b>. Puteți depune actele și online, pe <a>pagina de servicii</a>.<div class="src">Surse · Regulamentul de organizare</div></div>
-          <div class="chips"><span class="chip">Ce acte îmi trebuie?</span><span class="chip">Unde depun cererea?</span></div>
-        </div>
-        <div class="w-input"><div>Scrieți întrebarea dumneavoastră…</div></div>
-      </div>
-      <div class="w-launcher"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m6 9 6 6 6-6"/></svg></div>
-    </div>
-  </aside>
-</div>
-
-<script>
-  // Area switch for the mockup only (#identitate, #culori, #integrare).
-  function show() {
-    const area = (location.hash || '#identitate').slice(1);
-    if (['identitate', 'culori', 'integrare'].includes(area)) document.body.dataset.show = area;
-    document.querySelectorAll('[data-go]').forEach((link) => {
-      const on = link.dataset.go === area || (link.classList.contains('nav') && ['identitate', 'culori'].includes(area) && link.dataset.go === 'identitate');
-      if (link.classList.contains('nav')) { if (on) link.setAttribute('aria-current', 'page'); else link.removeAttribute('aria-current'); }
-      else link.classList.toggle('on', link.dataset.go === area);
-    });
-    if (new URLSearchParams(location.search).get('menu') === '1') document.getElementById('user').classList.add('user--open');
-  }
-  addEventListener('hashchange', show);
-  show();
-</script>
-</body>
+    <script>
+      // Area switch for the mockup only (#identitate, #culori, #integrare).
+      function show() {
+        const area = (location.hash || '#identitate').slice(1);
+        if (['identitate', 'culori', 'integrare'].includes(area)) document.body.dataset.show = area;
+        document.querySelectorAll('[data-go]').forEach((link) => {
+          const on =
+            link.dataset.go === area ||
+            (link.classList.contains('nav') &&
+              ['identitate', 'culori'].includes(area) &&
+              link.dataset.go === 'identitate');
+          if (link.classList.contains('nav')) {
+            if (on) link.setAttribute('aria-current', 'page');
+            else link.removeAttribute('aria-current');
+          } else link.classList.toggle('on', link.dataset.go === area);
+        });
+        if (new URLSearchParams(location.search).get('menu') === '1')
+          document.getElementById('user').classList.add('user--open');
+      }
+      addEventListener('hashchange', show);
+      show();
+    </script>
+  </body>
 </html>

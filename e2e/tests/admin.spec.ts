@@ -87,13 +87,29 @@ const publicAccent = async (page: Page, tenant: string) =>
 const status = (page: Page) => page.locator('.save-status').getByRole('status');
 const saved = (page: Page) => expect(status(page)).toHaveText(/^Ciornă: salvată la/);
 const color = (page: Page, label: string) => page.getByLabel(label, { exact: true });
+const area = (page: Page, name: string) =>
+  page
+    .getByRole('navigation', { name: 'Zone de configurare' })
+    .getByRole('link', { name, exact: true })
+    .click();
+const publishButton = (page: Page) => page.getByRole('button', { name: /^Publică/ });
+/** The user menu (header): name, role and organisation. */
+async function userMenu(page: Page) {
+  await page.getByRole('button', { name: /^Meniul utilizatorului/ }).click();
+  return page.locator('#user-menu-panel');
+}
 
 test('a client administrator signs in to their own tenant and cannot reach another', async ({
   page,
 }) => {
   await openEditor(page, PILOT_ADMIN);
-  await expect(page.getByText('Client: pilot')).toBeVisible();
-  await expect(page.getByText('(Administrator)')).toBeVisible();
+  // Header: the client's assistant, not the tenant code; the role is in the user menu.
+  await expect(page.locator('.brand__name')).toHaveText('Pilot e2e');
+  const menu = await userMenu(page);
+  await expect(menu).toContainText('Administrator');
+  await expect(menu).toContainText('pilot');
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
   expect((await api(page, 'GET', '/admin/api/tenants/demo-primarie/config')).status).toBe(403);
   expect(
     (await api(page, 'PUT', '/admin/api/tenants/demo-primarie/config/draft', { config: {} }))
@@ -103,7 +119,7 @@ test('a client administrator signs in to their own tenant and cannot reach anoth
 
 test('a user of another client realm only reaches their own tenant', async ({ page }) => {
   await openEditor(page, DEMO_ADMIN);
-  await expect(page.getByText('Client: demo-primarie')).toBeVisible();
+  await expect(page.locator('.brand__name')).toHaveText('Primăria e2e');
   expect((await api(page, 'GET', '/admin/api/tenants/pilot/config')).status).toBe(403);
   expect((await api(page, 'POST', '/admin/api/tenants/pilot/config/publish', {})).status).toBe(403);
   // A bearer token (from any realm) is never accepted: only the admin session cookie.
@@ -122,7 +138,7 @@ test('users without a chatbot group are refused, with an explanation', async ({ 
 
 test('groups of the brokered identity provider map to roles', async ({ page, browser }) => {
   await openEditor(page, ALICE);
-  await expect(page.getByText('(Administrator)')).toBeVisible();
+  await expect(await userMenu(page)).toContainText('Administrator');
   const other = await browser.newPage();
   try {
     await signIn(other, CAROL);
@@ -136,22 +152,26 @@ test('the platform super-admin sees every tenant', async ({ page }) => {
   await openEditor(page, PLATFORM);
   const tenants = page.getByLabel('Client', { exact: true });
   await expect(tenants.locator('option')).toHaveText(['demo-primarie', 'pilot']);
-  await tenants.selectOption('pilot');
-  await expect(page.getByRole('heading', { level: 1, name: 'pilot' })).toBeVisible();
+  await tenants.selectOption('demo-primarie');
+  await expect(page.locator('.brand__name')).toHaveText('Primăria e2e');
 });
 
 test('an editor saves the draft but cannot publish (visible reason)', async ({ page }) => {
   await openEditor(page, PILOT_EDITOR);
   await page.getByLabel('Numele clientului').fill('Pilot de la editor');
   await saved(page);
-  const publish = page.getByRole('button', { name: 'Publică' });
+  const publish = publishButton(page);
   await expect(publish).toHaveAttribute('aria-disabled', 'true');
-  await expect(
-    page.getByText(/^Doar administratorii \(rolul widget-admin\) pot publica/),
-  ).toBeVisible();
+  // The reason shows on hover and on focus.
+  const reason = page.locator('#publish-blocker');
+  await expect(reason).toBeHidden();
+  await publish.hover();
+  await expect(reason).toBeVisible();
+  await expect(reason).toHaveText(/^Doar administratorii \(rolul widget-admin\) pot publica/);
   expect((await api(page, 'POST', '/admin/api/tenants/pilot/config/publish', {})).status).toBe(403);
   // Images and allowed domains are for administrators too.
   await expect(page.getByText('Doar administratorii pot încărca imagini.').first()).toBeVisible();
+  await area(page, 'Domenii permise');
   await expect(page.getByLabel('Domenii pe care funcționează widget-ul')).toHaveAttribute(
     'readonly',
     '',
@@ -176,7 +196,8 @@ test('changes show in the preview at once and publicly only after publishing', a
   // Public widget: unchanged until publishing.
   expect(await publicAccent(page, 'pilot')).toBe('#3a36d0');
 
-  await page.getByRole('button', { name: 'Publică' }).click();
+  await expect(publishButton(page)).toHaveText('Publică (2)');
+  await publishButton(page).click();
   const dialog = page.getByRole('dialog', { name: 'Publicați modificările?' });
   await expect(dialog.getByRole('listitem')).toHaveText([
     'Buton de pornire',
@@ -195,11 +216,9 @@ test('a color pair below the AA contrast blocks publishing', async ({ page }) =>
   await text.fill('#eeeeee');
   await expect(text).toHaveAttribute('aria-invalid', 'true');
   await expect(page.getByText(/Contrast 1\.\d+:1 față de „Fundal”/).first()).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Publică' })).toHaveAttribute(
-    'aria-disabled',
-    'true',
-  );
-  await expect(page.getByText(/^Corectați/)).toBeVisible();
+  await expect(publishButton(page)).toHaveAttribute('aria-disabled', 'true');
+  await expect(page.locator('#publish-blocker')).toHaveText(/^Corectați/);
+  await expect(page.locator('.statusbar')).toContainText(/probleme? de contrast/);
   await saved(page);
   // The server refuses it as well.
   const refused = await api(page, 'POST', '/admin/api/tenants/pilot/config/publish', {});
@@ -359,8 +378,15 @@ test('the preview opens on a sample conversation and follows the edited section'
   await expect(launcher).toHaveAttribute('aria-expanded', 'false');
   await expect(launcher).toBeInViewport();
 
-  // Editing the proactive message: the bubble shows at once, with the new text.
-  await page.getByLabel('Afișează mesajul proactiv').check();
+  // Back to Identitate: the window is open again, with the sample conversation.
+  await page.getByRole('link', { name: 'Identitate', exact: true }).click();
+  await page.getByLabel('Numele asistentului').focus();
+  await expect(launcher).toHaveAttribute('aria-expanded', 'true');
+  await expect(chat.getByText('Care este programul cu publicul?')).toBeVisible();
+
+  // "Mesaj proactiv": the bubble shows at once, with the new text.
+  await area(page, 'Mesaj proactiv');
+  await page.getByRole('switch', { name: 'Afișează mesajul proactiv' }).click();
   await page.getByLabel('Textul mesajului (română)').fill('Vă putem ajuta cu actele?');
   await saved(page);
   await expect(previewWidget(page).locator('.proactive')).toContainText(
@@ -373,6 +399,7 @@ test("starter questions: take the assistant's, reorder, see them in the preview"
   page,
 }) => {
   await openEditor(page, PILOT_ADMIN);
+  await area(page, 'Texte și întrebări');
   const romanian = page.getByRole('group', { name: 'Română' });
   await expect(romanian.getByText('Care e programul?')).toBeVisible();
   await romanian.getByRole('button', { name: 'Preia și editează' }).click();
@@ -392,7 +419,9 @@ test("starter questions: take the assistant's, reorder, see them in the preview"
 
 test('site integration: the code to copy, and the installation check', async ({ page }) => {
   await openEditor(page, PILOT_ADMIN);
+  await area(page, 'Integrare pe site');
   const section = page.locator('section').filter({ has: page.locator('#section-integration') });
+  await expect(section.locator('.checklist__item--ok')).toContainText('Domenii permise');
   await expect(section.locator('pre').first()).toHaveText(
     `<script src="${ADMIN}/w/loader.js" data-tenant="pilot" async></script>`,
   );
@@ -411,34 +440,61 @@ test('site integration: the code to copy, and the installation check', async ({ 
   ).toBeVisible();
 });
 
+test('validation errors show in the status bar, link to the field and block publishing', async ({
+  page,
+}) => {
+  await openEditor(page, PILOT_ADMIN);
+  await area(page, 'Domenii permise');
+  const domains = page.getByLabel('Domenii pe care funcționează widget-ul');
+  await domains.fill('http://127.0.0.1:5180\nhttps://www.exemplu.ro/pagina');
+  const badge = page.locator('.statusbar').getByRole('link', { name: /1 eroare/ });
+  await expect(badge).toBeVisible();
+  await expect(publishButton(page)).toHaveAttribute('aria-disabled', 'true');
+  await publishButton(page).focus();
+  await expect(page.locator('#publish-blocker')).toBeVisible();
+  await expect(page.locator('#publish-blocker')).toHaveText(/^Corectați eroarea/);
+  // The sidebar marks the area; the badge leads to the field.
+  await expect(
+    page.getByRole('navigation', { name: 'Zone de configurare' }).getByText('1', { exact: true }),
+  ).toBeVisible();
+  await area(page, 'Aspect');
+  await badge.click();
+  await expect(domains).toBeFocused();
+  await saved(page);
+  expect((await discardDraft(page, 'pilot')).status).toBe(204);
+});
+
 // The editor is scanned region by region, each in a fresh page of the same session: a scan of
 // the whole editor at once crashed Firefox in CI ("Page crashed"), even without frames. The
 // preview frame holds the public widget, axe-tested in its own specs, and is left out.
-const EDITOR_REGIONS = [
-  '.topbar',
-  '#section-identity',
-  '#section-launcher',
-  '#section-window',
-  '#section-texts',
-  '#section-proactive',
-  '#section-citations',
-  '#section-behavior',
-  '#section-allowedOrigins',
-  '#section-integration',
-  '.statusbar',
-  '.preview__head',
+const EDITOR_REGIONS: { area: string; selector: string }[] = [
+  { area: 'Aspect', selector: '.app-header' },
+  { area: 'Aspect', selector: '.statusbar' },
+  { area: 'Aspect', selector: '.sidebar' },
+  { area: 'Aspect', selector: '#section-identity' },
+  { area: 'Aspect', selector: '#section-launcher' },
+  { area: 'Aspect', selector: '#section-window' },
+  { area: 'Aspect', selector: '#section-colors' },
+  { area: 'Texte și întrebări', selector: '#section-texts' },
+  { area: 'Mesaj proactiv', selector: '#section-proactive' },
+  { area: 'Citări', selector: '#section-citations' },
+  { area: 'Comportament', selector: '#section-behavior' },
+  { area: 'Domenii permise', selector: '#section-allowedOrigins' },
+  { area: 'Integrare pe site', selector: '#section-integration' },
+  { area: 'Aspect', selector: '.preview__head' },
 ];
 
 test('no serious or critical axe violations in the editor', async ({ page, context }) => {
   test.setTimeout(120_000);
   await openEditor(page, PILOT_ADMIN);
   await page.close();
-  for (const region of EDITOR_REGIONS) {
-    await test.step(`axe: ${region}`, async () => {
+  for (const { area: name, selector: region } of EDITOR_REGIONS) {
+    await test.step(`axe: ${name} ${region}`, async () => {
       const tab = await context.newPage();
       try {
         await tab.goto(`${ADMIN}/admin/`);
         await expect(tab.getByLabel('Numele clientului')).toBeVisible();
+        if (name !== 'Aspect') await area(tab, name);
         await tab.locator('.preview__frame').evaluate((frame) => {
           frame.remove();
         });

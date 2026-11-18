@@ -138,9 +138,17 @@ export function PreviewPanel({
     };
   }, [keepAlive]);
 
-  const canvas = mode === 'mobile' ? PHONE : desktopCanvas(widget);
-  const scale = fitScale(canvas, area);
-  const percent = Math.round(scale * 100);
+  // Desktop: the scale makes the window and launcher fit; the canvas then takes the whole column
+  // (no empty space). Phone: a 390x844 frame, scaled to fit.
+  const needed = mode === 'mobile' ? PHONE : desktopCanvas(widget);
+  const scale = fitScale(needed, area);
+  const canvas =
+    mode === 'mobile' || area.width <= 0 || area.height <= 0
+      ? needed
+      : {
+          width: Math.max(needed.width, Math.floor(area.width / scale)),
+          height: Math.max(needed.height, Math.floor(area.height / scale)),
+        };
 
   return (
     <section class="preview" aria-labelledby="preview-title">
@@ -163,11 +171,6 @@ export function PreviewPanel({
             </button>
           ))}
         </div>
-        {percent < 100 && (
-          <span class="preview__scale" aria-live="polite">
-            {t.ux.scaledTo(percent)}
-          </span>
-        )}
       </div>
       <div class="preview__stage" ref={stage}>
         {failed ? (

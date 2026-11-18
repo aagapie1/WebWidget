@@ -38,7 +38,7 @@ describe('IntegrationSection', () => {
     });
     expect(screen.getByText(/Acum: https:\/\/www\.pilot\.ro/)).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Domenii permise' }).getAttribute('href')).toBe(
-      '#section-allowedOrigins',
+      '#domains',
     );
   });
 

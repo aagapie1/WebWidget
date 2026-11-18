@@ -8,3 +8,8 @@ configure({ asyncUtilTimeout: 3000 });
 afterEach(() => {
   cleanup();
 });
+
+// jsdom does not implement scrolling: the editor scrolls to the area or field it opens.
+Element.prototype.scrollIntoView = function scrollIntoView() {
+  // no layout in jsdom
+};

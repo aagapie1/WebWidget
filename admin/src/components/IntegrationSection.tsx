@@ -9,6 +9,10 @@ interface IntegrationSectionProps {
   /** The published allowed domains. */
   origins: readonly string[];
   checkInstallations: () => Promise<{ installations: Installation[] }>;
+  /** Allowed domains of the draft: valid, missing or with errors (checklist state). */
+  domainsStatus?: 'ok' | 'missing' | 'invalid';
+  /** Opens "Domenii permise". */
+  onDomains?: () => void;
   /** Writes to the clipboard; tests pass a stub. */
   copy?: (text: string) => Promise<void>;
 }
@@ -52,6 +56,7 @@ export function IntegrationSection(props: IntegrationSectionProps) {
       return navigator.clipboard.writeText(text);
     });
   const text = t.ux.integration;
+  const domainsOk = (props.domainsStatus ?? (props.origins.length > 0 ? 'ok' : 'missing')) === 'ok';
 
   return (
     <section class="card" aria-labelledby="section-integration">
@@ -108,16 +113,43 @@ export function IntegrationSection(props: IntegrationSectionProps) {
 
       <h3>{text.checklist}</h3>
       <ul class="checklist">
-        <li>
-          {text.domains} <a href="#section-allowedOrigins">{text.domainsLink}</a>.{' '}
-          {props.origins.length > 0 ? text.domainsNow(props.origins.join(', ')) : text.noOrigins}
+        <li class={`checklist__item checklist__item--${domainsOk ? 'ok' : 'warn'}`}>
+          <span class="checklist__state" aria-hidden="true">
+            {domainsOk ? '✓' : '⚠'}
+          </span>
+          <span class="visually-hidden">{domainsOk ? t.ux.checkOk : t.ux.checkWarn}: </span>
+          <span>
+            {text.domains}{' '}
+            <a
+              href="#domains"
+              onClick={(event) => {
+                if (props.onDomains) {
+                  event.preventDefault();
+                  props.onDomains();
+                }
+              }}
+            >
+              {text.domainsLink}
+            </a>
+            .{' '}
+            {props.domainsStatus === 'missing'
+              ? t.ux.domainsMissing
+              : props.domainsStatus === 'invalid'
+                ? t.ux.domainsInvalid
+                : text.domainsNow(props.origins.join(', '))}
+          </span>
         </li>
-        <li>
-          {text.csp}
-          <pre class="code" tabIndex={0}>
-            <code>{cspFor(props.gatewayOrigin).join(';\n')}</code>
-          </pre>
-          <p class="field__hint">{text.cspNote}</p>
+        <li class="checklist__item checklist__item--info">
+          <span class="checklist__state" aria-hidden="true">
+            i
+          </span>
+          <span>
+            {text.csp}
+            <pre class="code" tabIndex={0}>
+              <code>{cspFor(props.gatewayOrigin).join(';\n')}</code>
+            </pre>
+            <p class="field__hint">{text.cspNote}</p>
+          </span>
         </li>
       </ul>
 

@@ -2,12 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import type { PreviewState } from 'widget/messages';
 import {
   ApiError,
+  type Role,
   type AdminApi,
   type Config,
   type ConfigState,
   type DraftConflict,
 } from '../api.js';
-import { formatDateTime, formatTime, useI18n } from '../i18n.js';
+import { formatDateTime, formatTime, useI18n, type Locale } from '../i18n.js';
 import {
   changedSections,
   contrastResults,
@@ -20,7 +21,9 @@ import {
   type FieldErrors,
   type Path,
 } from '../model.js';
-import { ConfigForm } from './ConfigForm.js';
+import { AppHeader } from './AppHeader.js';
+import { ConfigForm, type Area } from './ConfigForm.js';
+import { AREAS, Sidebar } from './Sidebar.js';
 import { ConfirmDialog } from './ConfirmDialog.js';
 import { useFitToViewport, useMediaQuery } from '../fit-viewport.js';
 import { PreviewPanel } from './PreviewPanel.js';
@@ -37,6 +40,32 @@ interface EditorProps {
   onSessionExpired: () => void;
   /** Public gateway address, for the integration snippet. */
   gatewayOrigin?: string | undefined;
+  /** Header data and actions (user menu, language, client switch). */
+  frame?: EditorFrame | undefined;
+}
+
+export interface EditorFrame {
+  user: { name: string; role: Role; org: string };
+  tenants: readonly string[];
+  onTenant: (tenant: string) => void;
+  onLocale: (locale: Locale) => void;
+  onLogout: () => void;
+}
+
+/** Which sidebar area a field (error path) or a changed section belongs to. */
+export function areaOf(path: string): Area {
+  const key = path.split('.')[0] ?? '';
+  if (key === 'texts') return 'texts';
+  if (key === 'proactive') return 'proactive';
+  if (key === 'citations') return 'citations';
+  if (key === 'behavior' || key === 'feedback') return 'behavior';
+  if (key === 'allowedOrigins') return 'domains';
+  return 'aspect';
+}
+
+function initialArea(): Area {
+  const hash = typeof location === 'undefined' ? '' : location.hash.slice(1);
+  return (AREAS as readonly string[]).includes(hash) ? (hash as Area) : 'aspect';
 }
 
 interface Base {
@@ -46,7 +75,7 @@ interface Base {
   revision: number | null;
 }
 
-export function Editor({ api, tenant, onSessionExpired, gatewayOrigin }: EditorProps) {
+export function Editor({ api, tenant, onSessionExpired, gatewayOrigin, frame }: EditorProps) {
   const { t, locale } = useI18n();
   const [state, setState] = useState<ConfigState | undefined>();
   const [loadFailed, setLoadFailed] = useState(false);
@@ -67,15 +96,65 @@ export function Editor({ api, tenant, onSessionExpired, gatewayOrigin }: EditorP
   // Below 1280 px the preview is a side panel opened from the status bar (never squeezed).
   const narrow = useMediaQuery('(max-width: 1279px)');
   const [previewOpen, setPreviewOpen] = useState(false);
-  // The preview follows the section being edited (launcher, proactive bubble, open window).
-  const [previewShow, setPreviewShow] = useState<PreviewState>('window');
+  // One area at a time (sidebar). The preview shows the open window everywhere, except while
+  // the launcher is edited (closed launcher) and in "Mesaj proactiv" (the bubble).
+  const [area, setAreaState] = useState<Area>(initialArea);
+  const [editingLauncher, setEditingLauncher] = useState(false);
+  /** After an area change: the section to scroll to, the area title, or the first invalid field. */
+  const pendingFocus = useRef<string | undefined>(undefined);
+  // Bumped on every navigation, so that a link inside the current area still scrolls.
+  const [navigation, setNavigation] = useState(0);
+  const setArea = useCallback((next: Area, subsection?: string, focus?: 'invalid') => {
+    setAreaState(next);
+    setEditingLauncher(false);
+    setNavigation((value) => value + 1);
+    pendingFocus.current = focus ?? (subsection ? `section-${subsection}` : 'area-title');
+    try {
+      history.replaceState(null, '', `#${next}`);
+    } catch {
+      // ignore (sandboxed documents)
+    }
+  }, []);
+  useEffect(() => {
+    const target = pendingFocus.current;
+    if (!target) return;
+    pendingFocus.current = undefined;
+    if (target === 'invalid') {
+      const field = document.querySelector<HTMLElement>('.workspace__form [aria-invalid="true"]');
+      field?.scrollIntoView({ block: 'center' });
+      field?.focus();
+      return;
+    }
+    const element = document.getElementById(target);
+    if (target === 'area-title') {
+      // A new area starts at the top of the page, header included.
+      window.scrollTo({ top: 0 });
+      element?.focus({ preventScroll: true });
+    } else {
+      element?.scrollIntoView({ block: 'start' });
+    }
+  }, [navigation]);
   const followSection = (event: FocusEvent) => {
     const section = (event.target as Element | null)?.closest('section[aria-labelledby]');
-    const id = section?.getAttribute('aria-labelledby');
-    setPreviewShow(
-      id === 'section-launcher' ? 'launcher' : id === 'section-proactive' ? 'proactive' : 'window',
-    );
+    setEditingLauncher(section?.getAttribute('aria-labelledby') === 'section-launcher');
   };
+  const previewShow: PreviewState =
+    area === 'proactive' ? 'proactive' : editingLauncher ? 'launcher' : 'window';
+  // The sticky bar's height places the sidebar and the preview column under it.
+  useEffect(() => {
+    const element = bar.current;
+    if (!element || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => {
+      document.documentElement.style.setProperty(
+        '--bar-height',
+        `${String(element.offsetHeight)}px`,
+      );
+    });
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+    };
+  });
   const [publishing, setPublishing] = useState<{ busy: boolean; error?: string } | undefined>();
   const base = useRef<Base>({ version: 0, revision: null });
   const latest = useRef(config);
@@ -254,31 +333,65 @@ export function Editor({ api, tenant, onSessionExpired, gatewayOrigin }: EditorP
   const num = (value: unknown, fallback: number) => (typeof value === 'number' ? value : fallback);
   const windowConfig = (config.window ?? {}) as Record<string, unknown>;
   const launcherConfig = (config.launcher ?? {}) as Record<string, unknown>;
+  const identityConfig = (config.identity ?? {}) as Record<string, unknown>;
   const widget = {
     width: num(windowConfig.width, 380),
     height: num(windowConfig.height, 640),
     offsetX: num(launcherConfig.offsetX, 24),
     offsetY: num(launcherConfig.offsetY, 24),
   };
-  const showContrastProblem = (event: Event) => {
+  const clientName = typeof config.name === 'string' ? config.name : tenant;
+  const assistantName =
+    typeof identityConfig.assistantName === 'string' ? identityConfig.assistantName : clientName;
+  const logoUrl =
+    typeof identityConfig.logo === 'string'
+      ? `/admin/api/tenants/${encodeURIComponent(tenant)}/assets/${encodeURIComponent(identityConfig.logo)}`
+      : undefined;
+
+  // Errors per area (sidebar) and in the status bar; contrast has its own indicator.
+  const errorPaths = Object.entries(errors).filter(([, list]) => list.length > 0);
+  const areaErrors: Partial<Record<Area, number>> = {};
+  for (const [path, list] of errorPaths) {
+    const key = areaOf(path);
+    areaErrors[key] = (areaErrors[key] ?? 0) + list.length;
+  }
+  const otherErrors = errorPaths.filter(([path]) => !path.startsWith('theme.'));
+  const otherCount = otherErrors.reduce((sum, [, list]) => sum + list.length, 0);
+  const changedAreas = new Set(
+    sections.map((section) => areaOf(section === 'identity' ? 'identity' : section)),
+  );
+  const goToField = (path: string | undefined, subsection?: string) => (event: Event) => {
     event.preventDefault();
-    const section = document.getElementById('section-window')?.closest('section');
-    const field = section?.querySelector<HTMLElement>('[aria-invalid="true"]');
-    (field ?? section)?.scrollIntoView({ block: 'center' });
-    field?.focus();
+    const target = path ? areaOf(path) : 'aspect';
+    setArea(target, subsection, 'invalid');
   };
+  const published = state.published;
+  const publishedText =
+    published.createdBy === 'seed:yaml'
+      ? `${t.ux.publishedAt(formatDateTime(published.createdAt, locale), '').replace(/ de $/, '')} · ${t.ux.initialConfig}`
+      : t.ux.publishedAt(formatDateTime(published.createdAt, locale), published.createdBy);
+  const canDiscard = base.current.revision !== null;
+  const draftOrigins = Array.isArray(config.allowedOrigins)
+    ? (config.allowedOrigins as string[])
+    : [];
 
   return (
-    <div class="workspace">
-      {/* Always visible while editing (sticky): state, checks and the actions, like Dify. */}
+    <div class="shell">
+      <AppHeader
+        assistantName={assistantName}
+        clientName={clientName}
+        logoUrl={logoUrl}
+        user={frame?.user}
+        tenants={frame?.tenants}
+        tenant={tenant}
+        onTenant={frame?.onTenant}
+        onLocale={frame?.onLocale ?? (() => undefined)}
+        onLogout={frame?.onLogout}
+      />
+      {/* Always visible while editing (sticky): state, checks and the one primary action. */}
       <div class="statusbar" ref={bar}>
         <div class="statusbar__state">
-          <p class="status__published">
-            {t.ux.publishedAt(
-              formatDateTime(state.published.createdAt, locale),
-              state.published.createdBy,
-            )}
-          </p>
+          <p class="status__published">{publishedText}</p>
           <SaveStatus
             state={save}
             onRetry={() => {
@@ -287,10 +400,19 @@ export function Editor({ api, tenant, onSessionExpired, gatewayOrigin }: EditorP
           />
         </div>
         <div class="statusbar__checks">
+          {otherCount > 0 && (
+            <a class="badge badge--error" href="#" onClick={goToField(otherErrors[0]?.[0])}>
+              ⚠ {t.ux.errorsCount(otherCount)}
+            </a>
+          )}
           {failing.length === 0 ? (
             <span class="badge badge--ok">✓ {t.ux.contrastOk}</span>
           ) : (
-            <a class="badge badge--error" href="#section-window" onClick={showContrastProblem}>
+            <a
+              class="badge badge--error"
+              href="#section-colors"
+              onClick={goToField('theme', 'colors')}
+            >
               ⚠ {t.ux.contrastProblems(failing.length)}
             </a>
           )}
@@ -309,23 +431,31 @@ export function Editor({ api, tenant, onSessionExpired, gatewayOrigin }: EditorP
               {t.ux.previewButton}
             </button>
           )}
-          {base.current.revision !== null && (
+          <div class="publish-bar">
             <button
               type="button"
-              class="button button--danger-quiet"
+              class="button"
+              aria-disabled={canDiscard ? undefined : 'true'}
+              aria-describedby={canDiscard ? undefined : 'discard-blocker'}
               onClick={() => {
-                setDiscarding({ busy: false });
+                if (canDiscard) setDiscarding({ busy: false });
               }}
             >
               {t.ux.discard}
             </button>
-          )}
+            {!canDiscard && (
+              <span id="discard-blocker" role="tooltip" class="tooltip">
+                {t.ux.discardNothing}
+              </span>
+            )}
+          </div>
           <PublishBar
             canPublish={state.permissions.publish}
             errorCount={count}
             hasChanges={hasChanges}
             saving={pendingSave}
             conflict={conflict !== undefined}
+            changeCount={sections.length}
             onPublish={() => {
               setPublishing({ busy: false });
             }}
@@ -333,8 +463,12 @@ export function Editor({ api, tenant, onSessionExpired, gatewayOrigin }: EditorP
         </div>
       </div>
 
-      <div class="editor">
-        <div class="editor__form" onFocusIn={followSection}>
+      <div class="workspace">
+        <Sidebar area={area} changed={changedAreas} errors={areaErrors} onArea={setArea} />
+        <main class="workspace__form" onFocusIn={followSection}>
+          <h1 class="area-title" id="area-title" tabIndex={-1}>
+            {t.ux.areas[area]}
+          </h1>
           {restored && (
             <p class="notice" role="status">
               {t.save.restored}
@@ -363,22 +497,9 @@ export function Editor({ api, tenant, onSessionExpired, gatewayOrigin }: EditorP
               </button>
             </div>
           )}
-          {count > 0 && (
-            <div class="notice notice--error">
-              <h2>{t.errors.summary(count)}</h2>
-              <ul>
-                {Object.entries(errors).flatMap(([path, list]) =>
-                  list.map((message) => (
-                    <li key={`${path}:${message}`}>
-                      <code>{path}</code> — {message}
-                    </li>
-                  )),
-                )}
-              </ul>
-            </div>
-          )}
           <ConfigForm
             key={formKey}
+            area={area}
             tenant={tenant}
             config={config}
             errors={errors}
@@ -392,15 +513,22 @@ export function Editor({ api, tenant, onSessionExpired, gatewayOrigin }: EditorP
               gatewayOrigin
                 ? {
                     gatewayOrigin,
-                    origins: Array.isArray(state.published.config.allowedOrigins)
-                      ? (state.published.config.allowedOrigins as string[])
-                      : [],
+                    origins: draftOrigins,
+                    domainsStatus:
+                      (areaErrors.domains ?? 0) > 0
+                        ? 'invalid'
+                        : draftOrigins.length === 0
+                          ? 'missing'
+                          : 'ok',
+                    onDomains: () => {
+                      setArea('domains');
+                    },
                     checkInstallations,
                   }
                 : undefined
             }
           />
-        </div>
+        </main>
         <aside
           id="preview-column"
           ref={side}

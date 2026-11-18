@@ -70,7 +70,7 @@ describe('Editor', () => {
     await rename('Al meu, din nou');
     await new Promise((resolve) => setTimeout(resolve, 1500));
     expect(saveDraft).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole('button', { name: 'Publică' }).getAttribute('aria-disabled')).toBe(
+    expect(screen.getByRole('button', { name: /^Publică/ }).getAttribute('aria-disabled')).toBe(
       'true',
     );
   });
@@ -163,7 +163,7 @@ describe('Editor', () => {
       publish,
     });
     renderWithI18n(<Editor api={api} tenant="pilot" onSessionExpired={vi.fn()} />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Publică' }));
+    fireEvent.click(await screen.findByRole('button', { name: /^Publică/ }));
     expect(screen.getByRole('dialog').textContent).toContain('Identitate');
     fireEvent.click(screen.getByRole('button', { name: 'Publică acum' }));
     await waitFor(() => {
@@ -202,7 +202,9 @@ describe('Editor', () => {
       expect(screen.getByLabelText<HTMLInputElement>('Numele clientului').value).toBe('Pilot');
     });
     expect(screen.getByRole('status').textContent).toMatch(/au fost anulate/);
-    expect(screen.queryByRole('button', { name: 'Renunță la modificări' })).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Renunță la modificări' }).getAttribute('aria-disabled'),
+    ).toBe('true');
   });
 
   it('shows values (not grey placeholders) and only the fields that make sense', async () => {
@@ -216,16 +218,18 @@ describe('Editor', () => {
 
     // Proactive message: its settings appear only once it is on.
     expect(screen.queryByLabelText('Textul mesajului (română)')).toBeNull();
-    fireEvent.click(screen.getByLabelText('Afișează mesajul proactiv'));
+    fireEvent.click(screen.getByRole('link', { name: 'Mesaj proactiv' }));
+    fireEvent.click(await screen.findByRole('switch', { name: 'Afișează mesajul proactiv' }));
     expect(await screen.findByLabelText('Textul mesajului (română)')).toBeTruthy();
 
-    // Launcher icon: the upload appears only for "Imagine încărcată".
-    const launcherIcons = screen.getByRole('group', { name: 'Iconul butonului' });
+    // Launcher icon (back in "Aspect"): the upload appears only for "Imagine încărcată".
+    fireEvent.click(screen.getByRole('link', { name: 'Aspect' }));
+    const launcherIcons = await screen.findByRole('group', { name: 'Iconul butonului' });
     expect(within(launcherIcons).getAllByRole('radio')).toHaveLength(8);
     expect(screen.queryByRole('group', { name: 'Imagine încărcată' })).toBeNull();
-    fireEvent.click(within(launcherIcons).getByRole('radio', { name: 'Imagine încărcată' }));
+    fireEvent.click(within(launcherIcons).getByRole('radio', { name: 'Imagine' }));
     expect(await screen.findByRole('group', { name: 'Imagine încărcată' })).toBeTruthy();
-    fireEvent.click(within(launcherIcons).getByRole('radio', { name: 'Căști de suport' }));
+    fireEvent.click(within(launcherIcons).getByRole('radio', { name: 'Căști' }));
     expect(screen.queryByRole('group', { name: 'Imagine încărcată' })).toBeNull();
   });
 });

@@ -6,6 +6,8 @@ export interface PublishBarProps {
   hasChanges: boolean;
   saving: boolean;
   conflict: boolean;
+  /** Changed sections: shown on the button ("Publică (3)"). */
+  changeCount?: number;
   onPublish: () => void;
 }
 
@@ -23,12 +25,13 @@ export function publishBlocker(
 }
 
 /**
- * The publish button. When publishing is not possible it stays focusable (`aria-disabled`)
- * and the reason is visible and linked to it (request 2).
+ * The only primary action. When publishing is not possible it stays focusable (`aria-disabled`)
+ * and the reason shows as a tooltip on hover and focus, linked with `aria-describedby`.
  */
 export function PublishBar(props: PublishBarProps) {
   const { t } = useI18n();
   const blocker = publishBlocker(props, t);
+  const count = props.hasChanges ? (props.changeCount ?? 0) : 0;
   return (
     <div class="publish-bar">
       <button
@@ -40,12 +43,12 @@ export function PublishBar(props: PublishBarProps) {
           if (!blocker) props.onPublish();
         }}
       >
-        {t.publish.button}
+        {t.ux.publishCount(count)}
       </button>
       {blocker && (
-        <p id="publish-blocker" class="publish-bar__reason">
+        <span id="publish-blocker" role="tooltip" class="tooltip">
           {blocker}
-        </p>
+        </span>
       )}
     </div>
   );

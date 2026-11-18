@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
 import { ApiError, createApi, loginUrl, type AdminApi, type Session } from './api.js';
+import { AppHeader } from './components/AppHeader.js';
 import { Editor } from './components/Editor.js';
 import { Login } from './components/Login.js';
 import { dictionaries, I18n, type Locale } from './i18n.js';
@@ -75,72 +76,12 @@ export function App({
     }
   };
 
-  const languageSwitch = (
-    <div class="segmented" role="group" aria-label={t.language}>
-      {(['ro', 'en'] as const).map((value) => (
-        <button
-          key={value}
-          type="button"
-          class="segmented__item"
-          lang={value}
-          aria-pressed={locale === value}
-          onClick={() => {
-            chooseLocale(value);
-          }}
-        >
-          {value === 'ro' ? 'Română' : 'English'}
-        </button>
-      ))}
-    </div>
-  );
-
   return (
     <I18n.Provider value={{ locale, t }}>
       <a class="skip-link" href="#main">
         {t.appTitle}
       </a>
-      <header class="topbar">
-        <p class="topbar__title">{t.appTitle}</p>
-        {session && (
-          <div class="topbar__session">
-            {session.tenants.length > 1 ? (
-              <span class="topbar__tenant">
-                <label for="tenant-select">{t.tenant}</label>{' '}
-                <select
-                  id="tenant-select"
-                  value={tenant}
-                  onChange={(event) => {
-                    setTenant(event.currentTarget.value);
-                  }}
-                >
-                  {session.tenants.map((id) => (
-                    <option key={id} value={id}>
-                      {id}
-                    </option>
-                  ))}
-                </select>
-              </span>
-            ) : (
-              <span>
-                {t.tenant}: <strong>{tenant}</strong>
-              </span>
-            )}
-            <span>
-              {session.user.name} ({t.role[session.user.role]})
-            </span>
-            <button
-              type="button"
-              class="button button--quiet"
-              onClick={() => {
-                void logout();
-              }}
-            >
-              {t.logout}
-            </button>
-          </div>
-        )}
-        {languageSwitch}
-      </header>
+      {!session && <AppHeader assistantName={t.appTitle} clientName="" onLocale={chooseLocale} />}
       <div id="main" tabIndex={-1}>
         {session === undefined && <p class="page">{t.loading}</p>}
         {session === null && (
@@ -151,16 +92,22 @@ export function App({
           />
         )}
         {session && tenant && (
-          <main class="page">
-            <h1>{tenant}</h1>
-            <Editor
-              key={tenant}
-              api={api}
-              tenant={tenant}
-              onSessionExpired={onSessionExpired}
-              gatewayOrigin={session.gatewayOrigin}
-            />
-          </main>
+          <Editor
+            key={tenant}
+            api={api}
+            tenant={tenant}
+            onSessionExpired={onSessionExpired}
+            gatewayOrigin={session.gatewayOrigin}
+            frame={{
+              user: { name: session.user.name, role: session.user.role, org: session.org },
+              tenants: session.tenants,
+              onTenant: setTenant,
+              onLocale: chooseLocale,
+              onLogout: () => {
+                void logout();
+              },
+            }}
+          />
         )}
       </div>
     </I18n.Provider>

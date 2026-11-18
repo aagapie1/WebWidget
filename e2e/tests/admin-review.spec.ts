@@ -29,8 +29,29 @@ async function ready(page: Page): Promise<void> {
   await page.waitForTimeout(500); // the window's opening animation
 }
 
+const nav = (page: Page) => page.getByRole('navigation', { name: 'Zone de configurare' });
+
+/** The three review views of the P2 frame: Identitate, Culori, Integrare pe site. */
+const VIEWS: { file: string; open: (page: Page) => Promise<void> }[] = [
+  { file: 'identitate', open: () => Promise.resolve() },
+  {
+    file: 'culori',
+    open: async (page) => {
+      await nav(page).getByRole('link', { name: 'Culori', exact: true }).click();
+      await page.waitForTimeout(400);
+    },
+  },
+  {
+    file: 'integrare',
+    open: async (page) => {
+      await nav(page).getByRole('link', { name: 'Integrare pe site', exact: true }).click();
+      await expect(page.locator('#section-integration')).toBeVisible();
+    },
+  },
+];
+
 test('admin interface at 1280x720, 1440x900 and 1920x1080', async ({ page }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(180_000);
   mkdirSync(OUT, { recursive: true });
   await signIn(page);
   for (const [width, height] of [
@@ -39,22 +60,25 @@ test('admin interface at 1280x720, 1440x900 and 1920x1080', async ({ page }) => 
     [1920, 1080],
   ] as const) {
     await page.setViewportSize({ width, height });
-    await page.goto(`${ADMIN}/admin/`);
-    await ready(page);
-    await page.screenshot({ path: `${OUT}/${String(width)}x${String(height)}.png` });
-    // The preview always fits the window, below the sticky status bar.
-    const canvas = await page.locator('.preview__canvas').boundingBox();
-    expect((canvas?.y ?? 0) + (canvas?.height ?? 0)).toBeLessThanOrEqual(height);
+    for (const view of VIEWS) {
+      await page.goto(`${ADMIN}/admin/`);
+      await ready(page);
+      await view.open(page);
+      await page.screenshot({ path: `${OUT}/${String(width)}x${String(height)}-${view.file}.png` });
+      // The preview always fits the window, below the sticky status bar.
+      const canvas = await page.locator('.preview__canvas').boundingBox();
+      expect((canvas?.y ?? 0) + (canvas?.height ?? 0)).toBeLessThanOrEqual(height);
+    }
   }
 
-  // Scrolled into the form: the status bar and the preview stay in view.
+  // Editing the launcher: the window closes, the launcher stays in view.
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto(`${ADMIN}/admin/`);
   await ready(page);
+  await nav(page).getByRole('link', { name: 'Buton de pornire', exact: true }).click();
   await page.getByLabel('Poziție', { exact: true }).focus();
-  await page.mouse.wheel(0, 900);
   await page.waitForTimeout(600);
-  await page.screenshot({ path: `${OUT}/1280x720-scrolled-launcher.png` });
+  await page.screenshot({ path: `${OUT}/1280x720-launcher.png` });
 
   // Phone frame (390x844), scaled to fit.
   await page.getByRole('button', { name: 'Telefon' }).click();

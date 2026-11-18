@@ -9,7 +9,7 @@ describe('PublishBar (request 2)', () => {
   it('is disabled for widget-editor with a visible, linked explanation', () => {
     const onPublish = vi.fn();
     renderWithI18n(<PublishBar {...ready} canPublish={false} onPublish={onPublish} />);
-    const button = screen.getByRole('button', { name: 'Publică' });
+    const button = screen.getByRole('button', { name: /^Publică/ });
     expect(button.getAttribute('aria-disabled')).toBe('true');
     const reason = document.getElementById(button.getAttribute('aria-describedby') ?? '');
     expect(reason?.textContent).toMatch(/^Doar administratorii \(rolul widget-admin\) pot publica/);
@@ -33,7 +33,7 @@ describe('PublishBar (request 2)', () => {
   it('publishes when nothing blocks it', () => {
     const onPublish = vi.fn();
     renderWithI18n(<PublishBar {...ready} onPublish={onPublish} />);
-    const button = screen.getByRole('button', { name: 'Publică' });
+    const button = screen.getByRole('button', { name: /^Publică/ });
     expect(button.hasAttribute('aria-disabled')).toBe(false);
     fireEvent.click(button);
     expect(onPublish).toHaveBeenCalled();

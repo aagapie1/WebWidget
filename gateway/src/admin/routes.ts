@@ -53,41 +53,46 @@ const previewQuery = z.object({
   show: z.enum(['launcher', 'proactive', 'window']).default('window'),
 });
 
-/** The neutral demo page of the preview. The id is validated (letters, digits, dashes). */
+/**
+ * The page under the preview: a neutral, sketched site (header, a few grey blocks) labelled
+ * "Exemplu de pagină", with the real loader on it. The id is validated (letters, digits, dashes).
+ */
 function previewPage(
   id: string,
   locale: 'ro' | 'en',
   show: 'launcher' | 'proactive' | 'window',
 ): string {
-  const text =
-    locale === 'en'
-      ? {
-          title: 'Preview',
-          heading: 'Sample page',
-          body: 'The widget below uses the draft configuration. Visitors do not see it until it is published.',
-        }
-      : {
-          title: 'Previzualizare',
-          heading: 'Pagină demonstrativă',
-          body: 'Widget-ul de mai jos folosește configurația-ciornă. Vizitatorii nu o văd până la publicare.',
-        };
+  const label = locale === 'en' ? 'Sample page' : 'Exemplu de pagină';
+  const title = locale === 'en' ? 'Preview' : 'Previzualizare';
   return `<!doctype html>
 <html lang="${locale}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${text.title}</title>
+<title>${title}</title>
 <style>
-  body { margin: 0; min-height: 100vh; background: #f4f5f7; color: #1f2328; font: 16px/1.5 system-ui, sans-serif; }
-  main { max-width: 40rem; padding: 2rem 1.5rem; }
-  .bar { height: 0.75rem; margin: 0.75rem 0; border-radius: 0.375rem; background: #dfe3e8; }
+  body { margin: 0; min-height: 100vh; background: #fff; color: #1f2328; font: 15px/1.5 system-ui, sans-serif; }
+  .label { position: fixed; top: 10px; left: 10px; z-index: 1; font-size: 12px; font-weight: 600; color: #5b6474;
+    background: rgb(255 255 255 / 0.92); border: 1px solid #e3e6eb; border-radius: 999px; padding: 2px 10px; }
+  .top { height: 56px; display: flex; align-items: center; gap: 16px; padding: 0 24px; background: #f3f4f6; border-bottom: 1px solid #e5e7eb; }
+  .b { display: block; background: #e5e7eb; border-radius: 5px; }
+  .spacer { flex: 1; }
+  main { max-width: 960px; padding: 28px 24px; display: grid; gap: 18px; }
+  .hero { height: 160px; border-radius: 10px; background: #eef0f3; }
+  .lines { display: grid; gap: 10px; }
+  .lines .b { height: 12px; }
+  .cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .cols .b { height: 110px; border-radius: 8px; }
 </style>
 </head>
 <body>
-<main>
-<h1>${text.heading}</h1>
-<p>${text.body}</p>
-<div class="bar" style="width: 90%"></div><div class="bar" style="width: 75%"></div><div class="bar" style="width: 82%"></div>
+<span class="label">${label}</span>
+<div class="top" aria-hidden="true"><span class="b" style="width:36px;height:26px"></span><span class="b" style="width:140px;height:12px"></span><span class="spacer"></span><span class="b" style="width:60px;height:10px"></span><span class="b" style="width:60px;height:10px"></span><span class="b" style="width:60px;height:10px"></span></div>
+<main aria-hidden="true">
+<div class="hero"></div>
+<div class="lines"><span class="b" style="width:72%"></span><span class="b" style="width:58%"></span></div>
+<div class="cols"><span class="b"></span><span class="b"></span><span class="b"></span></div>
+<div class="lines"><span class="b" style="width:84%"></span><span class="b" style="width:66%"></span><span class="b" style="width:75%"></span></div>
 </main>
 <script src="/w/loader.js" data-tenant="${id}" data-locale="${locale}" data-preview="${show}" async></script>
 </body>
