@@ -537,18 +537,22 @@ const EDITOR_REGIONS: { area: string; selector: string }[] = [
   { area: 'Aspect', selector: '.preview__head' },
 ];
 
-type AxeVariant = 'default' | 'no-contrast' | 'contrast-only' | 'static-bars' | 'moved-to-top';
+interface AxeScan {
+  /** Only these rules (default: all). */
+  rules?: readonly string[];
+  /** One field of the region (index among PART_SELECTOR matches). */
+  part?: number;
+  /** Collect the rule ids of axe (after the scan). */
+  listRules?: boolean;
+}
 
-/**
- * Scans one region in a fresh page. A variant changes one thing, to find what crashes Firefox
- * under axe in CI on the lower Aspect sections (diagnostic, temporary).
- */
+/** Scans one region in a fresh page; returns the problem, or undefined. */
 async function scanRegion(
   context: BrowserContext,
   name: string,
   region: string,
-  variant: AxeVariant,
-): Promise<string | undefined> {
+  scan: AxeScan = {},
+): Promise<{ problem?: string; rules?: string[] }> {
   const tab = await context.newPage();
   try {
     await tab.goto(`${ADMIN}/admin/`);
@@ -564,60 +568,127 @@ async function scanRegion(
         column.remove();
       });
     }
-    const selector = region.startsWith('#section-')
+    const base = region.startsWith('#section-')
       ? `section[aria-labelledby="${region.slice(1)}"]`
       : region;
-    await expect(tab.locator(selector).first()).toBeVisible();
-    if (variant === 'static-bars') {
-      await tab.addStyleTag({
-        content: '.statusbar, .sidebar, .app-header { position: static !important; }',
-      });
+    let selector = base;
+    if (scan.part !== undefined) {
+      await tab.evaluate(
+        ({ base, part, parts }) => {
+          const found = document.querySelectorAll(parts.map((item) => `${base} ${item}`).join(','));
+          const target: Element | null = found.item(part);
+          target?.setAttribute('data-axe-part', '');
+        },
+        { base, part: scan.part, parts: PART_SELECTORS },
+      );
+      selector = '[data-axe-part]';
     }
-    if (variant === 'moved-to-top') {
-      await tab
-        .locator(selector)
-        .first()
-        .evaluate((section) => {
-          section.parentElement?.prepend(section);
-        });
-    }
-    await tab.locator(selector).first().scrollIntoViewIfNeeded();
+    await expect(tab.locator(selector).first()).toBeAttached();
+    await tab.locator(base).first().scrollIntoViewIfNeeded();
     let builder = new AxeBuilder({ page: tab }).include(selector);
-    if (variant === 'no-contrast') builder = builder.disableRules(['color-contrast']);
-    if (variant === 'contrast-only') builder = builder.withRules(['color-contrast']);
+    if (scan.rules) builder = builder.withRules([...scan.rules]);
     const results = await builder.analyze();
+    const rules = scan.listRules
+      ? await tab.evaluate(() =>
+          (window as unknown as { axe: { getRules: () => { ruleId: string }[] } }).axe
+            .getRules()
+            .map((rule) => rule.ruleId),
+        )
+      : undefined;
     const serious = results.violations.filter(
       (violation) => violation.impact === 'serious' || violation.impact === 'critical',
     );
-    return serious.length > 0 ? serious.map((violation) => violation.id).join(', ') : undefined;
+    return {
+      ...(serious.length > 0
+        ? { problem: serious.map((violation) => violation.id).join(', ') }
+        : {}),
+      ...(rules ? { rules } : {}),
+    };
   } catch (error) {
-    return String(error).split('\n')[0] ?? 'error';
+    return { problem: String(error).split('\n')[0] ?? 'error' };
   } finally {
     await tab.close().catch(() => undefined);
   }
 }
 
+/** The fields of a section, scanned one by one when it crashes. */
+const PART_SELECTORS = ['.field', 'fieldset', '.switch-row', '.contrast'];
+
+const crashed = (problem: string | undefined) => Boolean(problem?.includes('crashed'));
+
+/**
+ * Diagnostic for the Firefox crash under axe (CI only; temporary): which part of the region and
+ * which axe rule trigger it.
+ */
+async function diagnoseCrash(
+  context: BrowserContext,
+  name: string,
+  region: string,
+): Promise<string[]> {
+  const notes: string[] = [];
+  const childCount = await (async () => {
+    const tab = await context.newPage();
+    try {
+      await tab.goto(`${ADMIN}/admin/`);
+      await expect(tab.getByLabel('Numele clientului')).toBeVisible();
+      return await tab
+        .locator(
+          PART_SELECTORS.map(
+            (item) => `section[aria-labelledby="${region.slice(1)}"] ${item}`,
+          ).join(','),
+        )
+        .evaluateAll((children) =>
+          children.map(
+            (child) => `${child.tagName.toLowerCase()}.${child.getAttribute('class') ?? ''}`,
+          ),
+        );
+    } finally {
+      await tab.close().catch(() => undefined);
+    }
+  })();
+  for (const [index, child] of childCount.entries()) {
+    const { problem } = await scanRegion(context, name, region, { part: index });
+    notes.push(
+      `  part ${String(index + 1)} ${child}: ${crashed(problem) ? 'CRASH' : (problem ?? 'ok')}`,
+    );
+  }
+  const { rules = [] } = await scanRegion(context, name, region, {
+    rules: ['color-contrast'],
+    listRules: true,
+  });
+  let candidates = rules;
+  while (candidates.length > 1) {
+    const half = candidates.slice(0, Math.ceil(candidates.length / 2));
+    const rest = candidates.slice(half.length);
+    if (crashed((await scanRegion(context, name, region, { rules: half })).problem)) {
+      candidates = half;
+    } else if (crashed((await scanRegion(context, name, region, { rules: rest })).problem)) {
+      candidates = rest;
+    } else {
+      notes.push(`  rules: only a combination crashes (${candidates.join(' ')})`);
+      return notes;
+    }
+  }
+  notes.push(`  rule: ${candidates[0] ?? '(none found)'}`);
+  return notes;
+}
+
 test('no serious or critical axe violations in the editor', async ({ page, context }) => {
-  test.setTimeout(240_000);
+  test.setTimeout(600_000);
   await openEditor(page, PILOT_ADMIN);
   await page.close();
-  // Every region is scanned even if one fails, so that one run names all the problems. A crash
-  // is retried with variants, which say what triggers it.
+  // Every region is scanned even if one fails, so that one run names all the problems. The
+  // first crash is diagnosed (part and rule).
   const failures: string[] = [];
+  let diagnosed = false;
   for (const { area: name, selector: region } of EDITOR_REGIONS) {
     await test.step(`axe: ${name} ${region}`, async () => {
-      const problem = await scanRegion(context, name, region, 'default');
+      const { problem } = await scanRegion(context, name, region);
       if (!problem) return;
       failures.push(`${region}: ${problem}`);
-      if (!problem.includes('crashed')) return;
-      for (const variant of [
-        'no-contrast',
-        'contrast-only',
-        'static-bars',
-        'moved-to-top',
-      ] as const) {
-        const outcome = await scanRegion(context, name, region, variant);
-        failures.push(`  ${variant}: ${outcome ?? 'ok'}`);
+      if (crashed(problem) && !diagnosed && region.startsWith('#section-')) {
+        diagnosed = true;
+        failures.push(...(await diagnoseCrash(context, name, region)));
       }
     });
   }
