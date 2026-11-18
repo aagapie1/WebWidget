@@ -37,8 +37,8 @@ export interface AdminRouteOptions {
 }
 
 const LIMITS = {
-  /** Login starts and callbacks per client address. */
-  login: { limit: 30, windowSeconds: 600 },
+  /** Login starts and callbacks per client address (limit: ADMIN_LOGIN_LIMIT). */
+  login: { windowSeconds: 600 },
   /** Admin API calls per session. */
   api: { limit: 600, windowSeconds: 60 },
 };
@@ -163,13 +163,20 @@ export function adminRoutes(app: FastifyInstance, options: AdminRouteOptions): v
           .send(html);
       });
 
+      // Development and test only: the organisations to choose from on the login page. In
+      // production this list is not public (it would reveal which clients exist).
+      admin.get('/auth/orgs', (_request, reply) => {
+        if (env.NODE_ENV === 'production') return adminError(reply, 'not_found');
+        return { orgs: [...auth.realms.keys()] };
+      });
+
       admin.get('/auth/login', async (request, reply) => {
         if (
           !(await withinLimit(
             store,
             'login',
             request.ip,
-            LIMITS.login.limit,
+            env.ADMIN_LOGIN_LIMIT,
             LIMITS.login.windowSeconds,
           ))
         ) {
@@ -214,7 +221,7 @@ export function adminRoutes(app: FastifyInstance, options: AdminRouteOptions): v
             store,
             'login',
             request.ip,
-            LIMITS.login.limit,
+            env.ADMIN_LOGIN_LIMIT,
             LIMITS.login.windowSeconds,
           ))
         ) {

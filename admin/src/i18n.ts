@@ -20,6 +20,7 @@ const ro = {
     org: 'Codul organizației',
     orgHint: 'Primit de la echipa care v-a configurat asistentul, de exemplu „primaria-exemplu”.',
     submit: 'Continuă spre autentificare',
+    devOrgs: 'Organizații de test (doar în dezvoltare)',
     errors: {
       no_role:
         'Contul nu face parte din grupurile care administrează asistentul. Cereți accesul administratorului IT.',
@@ -207,6 +208,7 @@ const en: Dictionary = {
     org: 'Organisation code',
     orgHint: 'Given by the team that set up your assistant, for example “example-city”.',
     submit: 'Continue to sign in',
+    devOrgs: 'Test organisations (development only)',
     errors: {
       no_role:
         'Your account is not in the groups that manage the assistant. Ask your IT administrator for access.',

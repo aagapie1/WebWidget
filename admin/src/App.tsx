@@ -104,9 +104,10 @@ export function App({
         {session && (
           <div class="topbar__session">
             {session.tenants.length > 1 ? (
-              <label class="topbar__tenant">
-                {t.tenant}{' '}
+              <span class="topbar__tenant">
+                <label for="tenant-select">{t.tenant}</label>{' '}
                 <select
+                  id="tenant-select"
                   value={tenant}
                   onChange={(event) => {
                     setTenant(event.currentTarget.value);
@@ -118,7 +119,7 @@ export function App({
                     </option>
                   ))}
                 </select>
-              </label>
+              </span>
             ) : (
               <span>
                 {t.tenant}: <strong>{tenant}</strong>

@@ -380,6 +380,24 @@ describe('admin login, session and guard', () => {
     expect((await app.inject({ url: '/admin/api/session', cookies })).statusCode).toBe(401);
   });
 
+  it('lists the organisations for the login page outside production only', async () => {
+    expect((await app.inject({ url: '/admin/auth/orgs' })).json()).toEqual({
+      orgs: ['pilot', 'demo-primarie', 'platform'],
+    });
+    const production = await buildApp({
+      env: loadEnv({
+        PUBLIC_ORIGIN: ORIGIN,
+        VISITOR_COOKIE_SECRET: 's'.repeat(40),
+        LOG_LEVEL: 'silent',
+        NODE_ENV: 'production',
+      }),
+      tenants: new Map(),
+      admin: { auth, store, oidc },
+    });
+    expect((await production.inject({ url: '/admin/auth/orgs' })).statusCode).toBe(404);
+    await production.close();
+  });
+
   it('rate-limits login attempts per client address', async () => {
     const statuses: number[] = [];
     for (let i = 0; i < 31; i++) {

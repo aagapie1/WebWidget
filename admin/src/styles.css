@@ -451,3 +451,11 @@ summary {
   max-inline-size: 28rem;
   margin: 3rem auto;
 }
+.login__orgs ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}

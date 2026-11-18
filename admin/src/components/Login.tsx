@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import { useI18n } from '../i18n.js';
 import { loginUrl } from '../api.js';
 
@@ -7,6 +7,14 @@ interface LoginProps {
   error: string | undefined;
   returnTo: string;
   navigate?: (url: string) => void;
+  loadOrgs?: () => Promise<string[]>;
+}
+
+async function fetchDevOrgs(): Promise<string[]> {
+  const response = await fetch('/admin/auth/orgs');
+  if (!response.ok) return [];
+  const body = (await response.json()) as { orgs?: unknown };
+  return Array.isArray(body.orgs) ? body.orgs.filter((id) => typeof id === 'string') : [];
 }
 
 /**
@@ -20,9 +28,24 @@ export function Login({
   navigate = (url) => {
     window.location.assign(url);
   },
+  loadOrgs = fetchDevOrgs,
 }: LoginProps) {
   const { t } = useI18n();
   const [value, setValue] = useState(org);
+  const [orgs, setOrgs] = useState<string[]>([]);
+
+  // Development and test gateways list their organisations; production answers 404.
+  useEffect(() => {
+    let cancelled = false;
+    loadOrgs()
+      .then((list) => {
+        if (!cancelled) setOrgs(list);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [loadOrgs]);
   const message = error ? (t.login.errors[error] ?? t.login.errors.default) : undefined;
   return (
     <main class="login card" aria-labelledby="login-title">
@@ -63,6 +86,28 @@ export function Login({
           {t.login.submit}
         </button>
       </form>
+      {orgs.length > 0 && (
+        <section class="login__orgs" aria-labelledby="orgs-title">
+          <h2 id="orgs-title" class="small-heading">
+            {t.login.devOrgs}
+          </h2>
+          <ul>
+            {orgs.map((id) => (
+              <li key={id}>
+                <button
+                  type="button"
+                  class="button"
+                  onClick={() => {
+                    navigate(loginUrl(id, returnTo));
+                  }}
+                >
+                  {id}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </main>
   );
 }

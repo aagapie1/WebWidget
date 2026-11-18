@@ -30,4 +30,27 @@ describe('Login', () => {
     );
     expect(screen.getByLabelText<HTMLInputElement>('Organisation code').value).toBe('pilot');
   });
+
+  it('offers the test organisations as buttons when the gateway lists them (development)', async () => {
+    const navigate = vi.fn();
+    renderWithI18n(
+      <Login
+        org=""
+        error={undefined}
+        returnTo="/admin/"
+        navigate={navigate}
+        loadOrgs={() => Promise.resolve(['pilot', 'platform'])}
+      />,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'platform' }));
+    expect(navigate).toHaveBeenCalledWith('/admin/auth/login?org=platform&returnTo=%2Fadmin%2F');
+  });
+
+  it('shows no list in production (the gateway does not answer it)', async () => {
+    renderWithI18n(
+      <Login org="" error={undefined} returnTo="/admin/" loadOrgs={() => Promise.resolve([])} />,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(screen.queryByText('Organizații de test (doar în dezvoltare)')).toBeNull();
+  });
 });
