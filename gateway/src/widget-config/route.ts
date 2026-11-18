@@ -11,6 +11,10 @@ import {
   type WidgetConfig,
 } from '../protocol/index.js';
 import type { TextKey } from '../protocol/texts.js';
+import { assetUrl, textOverrides } from '../tenant-assets/route.js';
+
+const optional = <K extends string>(key: K, value: string | undefined) =>
+  (value ? { [key]: value } : {}) as Partial<Record<K, string>>;
 
 const querySchema = z.object({
   tenant: tenantIdSchema,
@@ -79,6 +83,14 @@ export function widgetConfigRoute(app: FastifyInstance, tenants: TenantRegistry)
       assistantName: tenant.identity.assistantName ?? tenant.name,
       welcomeMessage: text(tenant, locale, 'welcome') ?? defaults.welcome,
       suggestedQuestions: defaults.suggestedQuestions,
+      theme: tenant.theme,
+      identity: {
+        ...optional('logoUrl', assetUrl(tenant, tenant.identity.logo)),
+        ...optional('assistantAvatarUrl', assetUrl(tenant, tenant.identity.assistantAvatar)),
+        ...optional('userAvatarUrl', assetUrl(tenant, tenant.identity.userAvatar)),
+      },
+      texts: textOverrides(tenant, locale),
+      suggestionsAfterAnswer: tenant.behavior.suggestionsAfterAnswer,
     };
     return reply.header('cache-control', 'no-store').send(config);
   });

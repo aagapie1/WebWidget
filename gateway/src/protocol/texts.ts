@@ -6,6 +6,7 @@ export const WIDGET_TEXT_KEYS = [
   'launcher.open',
   'launcher.close',
   'frameTitle',
+  'proactive.close',
   'header.minimize',
   'header.newConversation',
   'header.closeConversation',

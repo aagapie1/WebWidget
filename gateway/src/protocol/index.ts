@@ -95,6 +95,23 @@ export const errorResponseSchema = z.object({ error: chatErrorSchema });
 export type ErrorResponse = z.infer<typeof errorResponseSchema>;
 
 /** `GET /api/widget-config?tenant=&locale=`: public, non-secret data the chat UI needs. */
+const hexColorSchema = z.string().check(z.regex(/^#[0-9a-fA-F]{6}$/));
+/** Gateway-relative URL of a tenant image (`/w/t/<tenant>/<hash>-<file>`). */
+const assetUrlSchema = z.string().check(z.regex(/^\/w\/t\/[a-z0-9-]+\/[0-9a-f]{10}-[\w.-]+$/));
+
+/** Colors already validated for WCAG AA by the gateway (ADR 007). */
+export const themeSchema = z.object({
+  accent: hexColorSchema,
+  accentEnd: hexColorSchema,
+  onAccent: hexColorSchema,
+  text: hexColorSchema,
+  textMuted: hexColorSchema,
+  background: hexColorSchema,
+  assistantBubble: hexColorSchema,
+  link: hexColorSchema,
+});
+export type WidgetTheme = z.infer<typeof themeSchema>;
+
 export const widgetConfigSchema = z.object({
   tenant: tenantIdSchema,
   locale: localeSchema,
@@ -103,7 +120,40 @@ export const widgetConfigSchema = z.object({
   welcomeMessage: z.string(),
   /** Initial suggested questions (Dify `/parameters`, no model call). */
   suggestedQuestions: z.array(z.string()),
+  theme: themeSchema,
+  identity: z.object({
+    logoUrl: z.optional(assetUrlSchema),
+    assistantAvatarUrl: z.optional(assetUrlSchema),
+    userAvatarUrl: z.optional(assetUrlSchema),
+  }),
+  /** Tenant overrides of UI texts for this locale (known keys only). */
+  texts: z.record(z.string(), z.string()),
+  /** Ask Dify for suggested questions after each answer (extra model call, off by default). */
+  suggestionsAfterAnswer: z.boolean(),
 });
+
+/** `GET /api/loader-config`: what the host-page loader needs before the iframe exists. */
+export const loaderConfigSchema = z.object({
+  theme: z.object({ accent: hexColorSchema, accentEnd: hexColorSchema, onAccent: hexColorSchema }),
+  launcher: z.object({
+    position: z.enum(['bottom-right', 'bottom-left']),
+    offsetX: z.number(),
+    offsetY: z.number(),
+    iconUrl: z.optional(assetUrlSchema),
+  }),
+  window: z.object({ width: z.number(), height: z.number() }),
+  proactive: z.nullable(
+    z.object({
+      text: z.string(),
+      delaySeconds: z.number(),
+      frequency: z.enum(['session', 'day']),
+      showOnMobile: z.boolean(),
+    }),
+  ),
+  /** Tenant overrides of the loader's texts (`launcher.*`, `frameTitle`, `proactive.close`). */
+  texts: z.record(z.string(), z.string()),
+});
+export type LoaderConfig = z.infer<typeof loaderConfigSchema>;
 
 export const ratingSchema = z.enum(['like', 'dislike']);
 export type Rating = z.infer<typeof ratingSchema>;

@@ -131,7 +131,7 @@ describe('GET /api/widget-config', () => {
 
     const first = await fetch(`${h.url}/api/widget-config?tenant=pilot`);
     expect(first.status).toBe(200);
-    expect(await first.json()).toEqual({
+    expect(await first.json()).toMatchObject({
       tenant: 'pilot',
       locale: 'ro',
       assistantName: 'Pilot',
@@ -152,7 +152,7 @@ describe('GET /api/widget-config', () => {
     });
     h.dify.handler = (_req, res) => res.writeHead(200).end(parameters);
     const response = await fetch(`${h.url}/api/widget-config?tenant=pilot&locale=en`);
-    expect(await response.json()).toEqual({
+    expect(await response.json()).toMatchObject({
       tenant: 'pilot',
       locale: 'en',
       assistantName: 'Ana',

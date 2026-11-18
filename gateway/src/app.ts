@@ -9,6 +9,7 @@ import { conversationRoutes } from './conversations/route.js';
 import { chatError, replyError } from './errors/index.js';
 import { MemoryFeedbackStore, type FeedbackStore } from './feedback/store.js';
 import type { ErrorResponse } from './protocol/index.js';
+import { tenantAssetRoutes } from './tenant-assets/route.js';
 import { widgetConfigRoute } from './widget-config/route.js';
 import { widgetRoute } from './widget/route.js';
 
@@ -48,7 +49,14 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     // served from this origin, may call the API. Requests without the header are not rejected
     // here; the signed visitor cookie and rate limiting (E5) are the main protections.
     const site = request.headers['sec-fetch-site'];
-    if (request.url.startsWith('/api/') && site !== undefined && site !== 'same-origin') {
+    // /api/loader-config is read cross-site by loader.js (CORS restricted to allowedOrigins).
+    const crossSiteAllowed = request.url.startsWith('/api/loader-config');
+    if (
+      request.url.startsWith('/api/') &&
+      !crossSiteAllowed &&
+      site !== undefined &&
+      site !== 'same-origin'
+    ) {
       return replyError(reply, 'forbidden_origin', 'ro');
     }
   });
@@ -69,6 +77,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   app.get('/healthz', () => ({ status: 'ok' }));
 
   widgetConfigRoute(app, options.tenants);
+  tenantAssetRoutes(app, options.tenants);
   await widgetRoute(app, { tenants: options.tenants, distDir: options.env.WIDGET_DIST_DIR });
 
   conversationRoutes(app, {
