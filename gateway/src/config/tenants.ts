@@ -24,11 +24,11 @@ const CONTENT_TYPES: Readonly<Record<string, string>> = {
   '.svg': 'image/svg+xml',
 };
 
-/** A tenant image from `config/tenants/<id>/assets/`, served by the gateway (ADR 007). */
+/** A tenant image (repository files or Postgres), served by the gateway (ADR 007, ADR 008). */
 export interface TenantAsset {
   name: string;
-  /** Absolute path on disk. */
-  file: string;
+  /** The image bytes. */
+  read(): Promise<Buffer>;
   contentType: string;
   /** Short content hash: part of the URL, so the file can be cached as immutable. */
   hash: string;
@@ -52,11 +52,42 @@ export interface TenantValidation {
   errors: string[];
 }
 
+/** Where tenant images come from: repository files (E4) or Postgres (E4b). */
+export interface AssetSource {
+  get(tenantId: string, name: string): Promise<Buffer | undefined>;
+  /** Human hint for error messages. */
+  describe(tenantId: string): string;
+}
+
+export class FileAssetSource implements AssetSource {
+  constructor(private readonly tenantsDir: string) {}
+
+  async get(tenantId: string, name: string): Promise<Buffer | undefined> {
+    const file = join(this.tenantsDir, tenantId, 'assets', name);
+    try {
+      const info = await stat(file);
+      if (!info.isFile()) return undefined;
+      if (info.size > MAX_ASSET_BYTES) return Buffer.alloc(MAX_ASSET_BYTES + 1);
+      return await readFile(file);
+    } catch {
+      return undefined;
+    }
+  }
+
+  describe(tenantId: string): string {
+    return `config/tenants/${tenantId}/assets/`;
+  }
+}
+
 export interface ValidateOptions {
   env: Env;
   fileName: string;
   /** Directory holding `<id>/assets/`; assets are only checked when given. */
   tenantsDir?: string;
+  /** Asset source (takes precedence over `tenantsDir`). */
+  assets?: AssetSource;
+  /** Expected tenant id; defaults to the file name without extension. */
+  expectedId?: string;
   /**
    * `config:check` mode: does not need secrets. Missing `${VAR}` values get a placeholder and the
    * Dify key variable is not read.
@@ -103,16 +134,24 @@ export async function validateTenant(
   text: string,
   options: ValidateOptions,
 ): Promise<TenantValidation> {
-  const { env, fileName, checkOnly = false } = options;
-  const errors: string[] = [];
   let raw: unknown;
   try {
     raw = parseYaml(text);
   } catch (error) {
     return { errors: [`invalid YAML (${String(error)})`] };
   }
+  return validateTenantObject(raw, options);
+}
+
+/** Same validation for a configuration object (Postgres stores the YAML object as JSON). */
+export async function validateTenantObject(
+  raw: unknown,
+  options: ValidateOptions,
+): Promise<TenantValidation> {
+  const { env, fileName, checkOnly = false } = options;
+  const errors: string[] = [];
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
-    return { errors: ['the file must contain a YAML object'] };
+    return { errors: ['the configuration must be an object'] };
   }
 
   const input = interpolate(raw, env, errors, checkOnly) as Record<string, unknown>;
@@ -135,7 +174,7 @@ export async function validateTenant(
   }
 
   const { difyApiKeyEnv, ...config } = result.data;
-  const expectedId = basename(fileName, extname(fileName));
+  const expectedId = options.expectedId ?? basename(fileName, extname(fileName));
   if (config.id !== expectedId) {
     errors.push(`id "${config.id}" must match the file name`);
     return { errors };
@@ -150,8 +189,10 @@ export async function validateTenant(
     }
   }
 
-  const assets = options.tenantsDir
-    ? await resolveAssets(config, join(options.tenantsDir, config.id, 'assets'), errors)
+  const source =
+    options.assets ?? (options.tenantsDir ? new FileAssetSource(options.tenantsDir) : undefined);
+  const assets = source
+    ? await resolveAssets(config, source, errors)
     : new Map<string, TenantAsset>();
   return { tenant: { ...config, difyApiKey, assets }, errors };
 }
@@ -159,7 +200,7 @@ export async function validateTenant(
 /** Checks referenced asset files; a missing or invalid one is dropped (and reported). */
 async function resolveAssets(
   config: Omit<TenantConfig, 'difyApiKeyEnv'>,
-  dir: string,
+  source: AssetSource,
   errors: string[],
 ): Promise<Map<string, TenantAsset>> {
   const references: [string, string | undefined][] = [
@@ -177,26 +218,23 @@ async function resolveAssets(
   const assets = new Map<string, TenantAsset>();
   for (const [path, name] of references) {
     if (!name || assets.has(name)) continue;
-    const file = join(dir, name);
-    try {
-      const info = await stat(file);
-      if (!info.isFile()) throw new Error('not a file');
-      if (info.size > MAX_ASSET_BYTES) {
-        errors.push(`${path}: ${name} is larger than ${String(MAX_ASSET_BYTES / 1024)} KB`);
-        continue;
-      }
-      const content = await readFile(file);
-      const hash = createHash('sha256').update(content).digest('hex').slice(0, 10);
-      assets.set(name, {
-        name,
-        file,
-        contentType: CONTENT_TYPES[extname(name).toLowerCase()] ?? 'application/octet-stream',
-        hash,
-        url: `/w/t/${config.id}/${hash}-${name}`,
-      });
-    } catch {
-      errors.push(`${path}: ${name} not found in config/tenants/${config.id}/assets/`);
+    const content = await source.get(config.id, name);
+    if (!content) {
+      errors.push(`${path}: ${name} not found in ${source.describe(config.id)}`);
+      continue;
     }
+    if (content.length > MAX_ASSET_BYTES) {
+      errors.push(`${path}: ${name} is larger than ${String(MAX_ASSET_BYTES / 1024)} KB`);
+      continue;
+    }
+    const hash = createHash('sha256').update(content).digest('hex').slice(0, 10);
+    assets.set(name, {
+      name,
+      read: () => Promise.resolve(content),
+      contentType: CONTENT_TYPES[extname(name).toLowerCase()] ?? 'application/octet-stream',
+      hash,
+      url: `/w/t/${config.id}/${hash}-${name}`,
+    });
   }
   return assets;
 }

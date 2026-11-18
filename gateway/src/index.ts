@@ -1,16 +1,28 @@
 import { resolve } from 'node:path';
 import { buildApp } from './app.js';
 import { loadEnv } from './config/env.js';
-import { FileTenantSource } from './config/tenants.js';
+import pg from 'pg';
 import pino from 'pino';
+import { FileTenantSource, type TenantSource } from './config/tenants.js';
+import { PostgresTenantSource } from './db/postgres-source.js';
 import { MemoryFeedbackStore, RedisFeedbackStore, type FeedbackStore } from './feedback/store.js';
 
 const env = loadEnv(process.env);
-// Tenant configuration: per-tenant validation, fallback and hot reload (ADR 007).
+// Tenant configuration: per-tenant validation, fallback and hot reload (ADR 007), from YAML files
+// or Postgres (ADR 008, TENANT_SOURCE).
 const configLog = pino({ level: env.LOG_LEVEL, name: 'tenant-config' });
-const tenantSource = new FileTenantSource(resolve(env.TENANTS_DIR), process.env, configLog);
+let database: pg.Pool | undefined;
+let tenantSource: TenantSource;
+if (env.TENANT_SOURCE === 'postgres') {
+  if (!env.DATABASE_URL) throw new Error('TENANT_SOURCE=postgres requires DATABASE_URL');
+  database = new pg.Pool({ connectionString: env.DATABASE_URL });
+  tenantSource = new PostgresTenantSource(database, env.DATABASE_URL, process.env, configLog);
+} else {
+  tenantSource = new FileTenantSource(resolve(env.TENANTS_DIR), process.env, configLog);
+}
 const tenants = await tenantSource.load();
 const stopWatching = tenantSource.watch(tenants);
+configLog.info({ source: env.TENANT_SOURCE }, 'tenant configuration source');
 let feedbackStore: FeedbackStore;
 if (env.REDIS_URL) {
   feedbackStore = await RedisFeedbackStore.connect(env.REDIS_URL);
@@ -27,6 +39,7 @@ if (!env.REDIS_URL) {
 app.addHook('onClose', async () => {
   stopWatching();
   await feedbackStore.close();
+  await database?.end();
 });
 
 app.log.info({ tenants: [...tenants.keys()] }, 'tenants loaded');

@@ -8,3 +8,11 @@ CREATE DATABASE widget OWNER widget_owner;
 REVOKE ALL ON SCHEMA public FROM PUBLIC;
 GRANT USAGE, CREATE ON SCHEMA public TO widget_owner;
 GRANT USAGE ON SCHEMA public TO widget_app;
+
+-- Separate database for the integration tests: they truncate tables (never the dev data).
+\connect postgres
+CREATE DATABASE widget_test OWNER widget_owner;
+\connect widget_test
+REVOKE ALL ON SCHEMA public FROM PUBLIC;
+GRANT USAGE, CREATE ON SCHEMA public TO widget_owner;
+GRANT USAGE ON SCHEMA public TO widget_app;

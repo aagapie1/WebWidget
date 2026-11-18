@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
 import type { FastifyInstance } from 'fastify';
 import * as z from 'zod/mini';
 import type { Tenant, TenantRegistry } from '../config/tenants.js';
@@ -127,6 +126,6 @@ export function tenantAssetRoutes(app: FastifyInstance, tenants: TenantRegistry)
         "default-src 'none'; style-src 'unsafe-inline'; sandbox",
       );
     }
-    return reply.send(await readFile(asset.file));
+    return reply.send(await asset.read());
   });
 }

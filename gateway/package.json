@@ -11,12 +11,15 @@
     "start": "node --env-file-if-exists=.env dist/index.js",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "config:check": "tsx src/cli/config-check.ts ../config/tenants ../e2e/tenants"
+    "config:check": "tsx src/cli/config-check.ts ../config/tenants ../e2e/tenants",
+    "db:migrate": "tsx --env-file-if-exists=.env src/cli/db.ts migrate",
+    "db:seed": "tsx --env-file-if-exists=.env src/cli/db.ts seed"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.5",
     "@fastify/static": "^10.1.11",
     "fastify": "^5.12.8",
+    "pg": "^8.23.1",
     "pino": "^10.4.0",
     "redis": "^6.3.1",
     "undici": "^8.12.4",
@@ -25,6 +28,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
+    "@types/pg": "^8.23.1",
     "tsx": "^4.23.15",
     "vitest": "^5.1.0"
   }

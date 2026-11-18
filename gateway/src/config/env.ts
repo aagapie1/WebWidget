@@ -11,6 +11,10 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   /** Redis for closing feedback (and rate limiting in E5). Required in production. */
   REDIS_URL: z.url({ protocol: /^rediss?$/ }).optional(),
+  /** Where tenant configurations come from (ADR 008): YAML files or Postgres. */
+  TENANT_SOURCE: z.enum(['file', 'postgres']).default('file'),
+  /** Application role connection (Postgres source, admin interface). */
+  DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }).optional(),
   VISITOR_COOKIE_SECRET: z.string().min(32, 'must be at least 32 characters'),
   /** Time allowed for Dify to answer with response headers. */
   DIFY_CONNECT_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),

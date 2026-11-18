@@ -16,7 +16,9 @@
     "e2e": "pnpm --filter e2e e2e",
     "config:check": "pnpm --filter gateway config:check",
     "services:up": "docker compose -f deploy/docker-compose.dev.yml up -d",
-    "services:down": "docker compose -f deploy/docker-compose.dev.yml down"
+    "services:down": "docker compose -f deploy/docker-compose.dev.yml down",
+    "db:migrate": "pnpm --filter gateway db:migrate",
+    "db:seed": "pnpm --filter gateway db:seed"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
