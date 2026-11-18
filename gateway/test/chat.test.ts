@@ -270,8 +270,9 @@ describe('POST /api/chat', () => {
         res.write(
           'data: {"event":"message","task_id":"t","message_id":"m","conversation_id":"c","answer":"Încep"}\n\n',
         );
-        await delay(1000);
-        res.end();
+        // Silent far longer than the idle timeout, so the result does not depend on load.
+        await delay(5000);
+        if (!res.destroyed) res.end();
       };
       const events = parseEvents(await (await chat({ tenant: 'pilot', message: 'x' })).text());
       expect(events.map((event) => event.type)).toEqual(['start', 'delta', 'error']);

@@ -14,8 +14,12 @@ const parsed = tenantSchema.parse({
   citations: { documentTitles: { 'Regulament.pdf': 'Regulamentul intern' } },
 });
 
+// The runtime tenant has the resolved key instead of the variable name.
+const config: Partial<typeof parsed> = { ...parsed };
+delete config.difyApiKeyEnv;
+
 export const testTenant: Tenant = {
-  ...config,
+  ...(config as Omit<typeof parsed, 'difyApiKeyEnv'>),
   difyApiKey: 'app-test-secret-key',
   assets: new Map(),
 };
