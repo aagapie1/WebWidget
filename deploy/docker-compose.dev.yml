@@ -1,0 +1,54 @@
+# Local development and CI services for the admin interface (E4b, ADR 008).
+# Plain Compose specification: works with Rancher Desktop (dockerd), Podman and Docker.
+#   docker compose -f deploy/docker-compose.dev.yml up -d
+# All credentials here are development-only test values.
+name: chat-widget-dev
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: dev-postgres-superuser
+      POSTGRES_DB: postgres
+    ports:
+      - '55432:5432'
+    volumes:
+      # Creates the migration owner and the application role (no UPDATE/DELETE on audit).
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.3
+    # Imports the test realms: pilot, demo-primarie, platform, idp-sim (deploy/keycloak/*.json).
+    command: ['start-dev', '--import-realm']
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: dev-keycloak-admin
+      # Issuer as seen by the browser and the gateway (both on the host): http://localhost:8081.
+      KC_HOSTNAME: http://localhost:8081
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: 'true'
+      KC_HEALTH_ENABLED: 'true'
+    ports:
+      # 8080 on the host is taken by the SSH tunnel to the pilot Dify.
+      - '8081:8080'
+    volumes:
+      - ./keycloak:/opt/keycloak/data/import:ro
+
+volumes:
+  postgres-data:

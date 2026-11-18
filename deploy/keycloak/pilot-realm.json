@@ -1,0 +1,178 @@
+{
+  "realm": "pilot",
+  "displayName": "Pilot",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "bruteForceProtected": true,
+  "ssoSessionMaxLifespan": 28800,
+  "ssoSessionIdleTimeout": 28800,
+  "accessTokenLifespan": 300,
+  "internationalizationEnabled": true,
+  "supportedLocales": ["ro", "en"],
+  "defaultLocale": "ro",
+  "roles": {
+    "realm": [
+      {
+        "name": "widget-admin",
+        "description": "Edits, publishes, manages images"
+      },
+      {
+        "name": "widget-editor",
+        "description": "Edits the draft, uses the preview"
+      }
+    ]
+  },
+  "groups": [
+    {
+      "name": "Chatbot-Administratori",
+      "realmRoles": ["widget-admin"]
+    },
+    {
+      "name": "Chatbot-Editori",
+      "realmRoles": ["widget-editor"]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "widget-admin-ui",
+      "name": "Widget admin interface",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "dev-secret-pilot-admin-ui",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:3000/admin/auth/callback",
+        "http://localhost:3100/admin/auth/callback"
+      ],
+      "webOrigins": ["http://localhost:3000", "http://localhost:3100"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:3000/admin/*##http://localhost:3100/admin/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "realm roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "pilot-admin",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "pilot-admin@example.test",
+      "firstName": "Ana",
+      "lastName": "Admin",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev-pilot-admin-Pass1",
+          "temporary": false
+        }
+      ],
+      "groups": ["/Chatbot-Administratori"]
+    },
+    {
+      "username": "pilot-editor",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "pilot-editor@example.test",
+      "firstName": "Eugen",
+      "lastName": "Editor",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev-pilot-editor-Pass1",
+          "temporary": false
+        }
+      ],
+      "groups": ["/Chatbot-Editori"]
+    },
+    {
+      "username": "pilot-viewer",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "pilot-viewer@example.test",
+      "firstName": "Victor",
+      "lastName": "FaraRol",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev-pilot-viewer-Pass1",
+          "temporary": false
+        }
+      ],
+      "groups": []
+    }
+  ],
+  "identityProviders": [
+    {
+      "alias": "idp-sim",
+      "displayName": "Contul de serviciu (IdP simulat)",
+      "providerId": "oidc",
+      "enabled": true,
+      "trustEmail": true,
+      "storeToken": false,
+      "firstBrokerLoginFlowAlias": "first broker login",
+      "config": {
+        "authorizationUrl": "http://localhost:8081/realms/idp-sim/protocol/openid-connect/auth",
+        "tokenUrl": "http://localhost:8080/realms/idp-sim/protocol/openid-connect/token",
+        "userInfoUrl": "http://localhost:8080/realms/idp-sim/protocol/openid-connect/userinfo",
+        "jwksUrl": "http://localhost:8080/realms/idp-sim/protocol/openid-connect/certs",
+        "logoutUrl": "http://localhost:8081/realms/idp-sim/protocol/openid-connect/logout",
+        "issuer": "http://localhost:8081/realms/idp-sim",
+        "clientId": "pilot-broker",
+        "clientSecret": "dev-secret-idp-sim-pilot-broker",
+        "clientAuthMethod": "client_secret_post",
+        "defaultScope": "openid profile email",
+        "syncMode": "FORCE",
+        "validateSignature": "true",
+        "useJwksUrl": "true",
+        "pkceEnabled": "true",
+        "pkceMethod": "S256"
+      }
+    }
+  ],
+  "identityProviderMappers": [
+    {
+      "name": "Chatbot-Administratori → widget-admin",
+      "identityProviderAlias": "idp-sim",
+      "identityProviderMapper": "oidc-role-idp-mapper",
+      "config": {
+        "syncMode": "FORCE",
+        "claim": "groups",
+        "claim.value": "Chatbot-Administratori",
+        "role": "widget-admin"
+      }
+    },
+    {
+      "name": "Chatbot-Editori → widget-editor",
+      "identityProviderAlias": "idp-sim",
+      "identityProviderMapper": "oidc-role-idp-mapper",
+      "config": {
+        "syncMode": "FORCE",
+        "claim": "groups",
+        "claim.value": "Chatbot-Editori",
+        "role": "widget-editor"
+      }
+    }
+  ]
+}

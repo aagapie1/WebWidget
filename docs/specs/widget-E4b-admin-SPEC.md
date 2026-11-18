@@ -1,6 +1,6 @@
 # Specificație E4b — Interfață de administrare a widget-ului
 
-Versiune 0.1 · 17.11.2026 · Completare la `widget-SPEC.md` (v0.2). Se implementează după E1–E10, ca ultimă etapă.
+Versiune 0.3 · 18.11.2026 · Completare la `widget-SPEC.md` (v0.2). Se implementează **imediat după E4**, înaintea E5–E10, în două tranșe (vezi §11).
 
 ## 1. Scop
 
@@ -42,17 +42,38 @@ Decizii:
 
 ## 4. Autentificare și roluri
 
-- **OIDC cu Keycloak** (Authorization Code + PKCE). Același cont poate fi folosit și pentru consola Dify, prin SSO-ul planificat.
-- **Fără conturi locale** în gateway. Pentru dezvoltare și teste: Keycloak în `docker-compose` cu un realm de test.
-- Roluri, verificate pe server la fiecare cerere:
+### 4.1 Principiu
+- **OIDC cu Keycloak** (Authorization Code + PKCE). Keycloak e **intermediar (identity broker)** între interfața de administrare și sistemul de identitate al clientului: administratorul se loghează cu contul lui de la serviciu, iar noi nu gestionăm parole.
+- **Un realm per client**, într-un singur Keycloak. Fiecare realm are conexiunea la SSO-ul clientului, rolurile și politicile lui (MFA, durata sesiunii). Același realm protejează și consola Dify a clientului (prin oauth2-proxy), deci utilizatorul are o singură logare pentru ambele.
+- **Clientul se deduce din realm-ul care a emis token-ul** (claim-ul `iss`), nu dintr-un parametru sau din URL. Gateway-ul are o mapare fixă `issuer → tenant`, în configurația de server (nu în configurația editabilă a clientului).
+- **Fără conturi locale** în gateway.
+- Pentru dezvoltare și teste: Keycloak în `docker-compose` cu un realm de test per client demonstrativ.
+
+### 4.2 Conectarea la sistemul de identitate al clientului
+
+| Ce are clientul | Configurare în realm-ul lui | Observații |
+|---|---|---|
+| Entra ID (Azure AD), ADFS, Keycloak propriu, Okta sau alt IdP OIDC/SAML | **Identity Brokering** (OIDC sau SAML) | Varianta preferată: nu cere acces la rețeaua clientului, doar schimb de metadate (redirect URI, client ID, certificat). |
+| Active Directory sau LDAP on-prem, fără IdP federat | **User Federation (LDAP)**, doar citire, LDAPS pe 636 | Cere conexiune de rețea (VPN site-to-site sau IPsec) și aprobări de securitate. Parolele se verifică în AD, nu se copiază. |
+| Niciun sistem | Conturi locale în realm, **MFA obligatoriu** (TOTP) | Administratorul clientului poate primi rolul de a-și gestiona singur utilizatorii realm-ului. |
+
+### 4.3 Roluri și mapare
 
 | Rol | Ce poate face |
 |---|---|
 | `widget-editor` (per client) | editează ciorna, folosește previzualizarea |
 | `widget-admin` (per client) | tot ce face editorul + publică, revine la o versiune anterioară, gestionează imaginile |
-| `super-admin` (Smartbytesoft) | toți clienții; creează clienți; vede jurnalul de audit global |
+| `super-admin` (Smartbytesoft, realm separat) | toți clienții; creează clienți; vede jurnalul de audit global |
 
-- Clientul la care are acces un utilizator vine din token (claim, de exemplu `tenant` sau grup Keycloak), nu din URL. Un utilizator nu poate vedea sau modifica alt client.
+- Rolurile per client vin din **grupurile clientului** (de exemplu „Chatbot-Administratori” → `widget-admin`, „Chatbot-Editori” → `widget-editor`), prin mapper-e în Keycloak: claim de grup OIDC, atribut SAML sau grup LDAP.
+- Contul se creează automat la prima logare (just-in-time). Accesul se dă și se retrage din directorul clientului, fără intervenția noastră.
+- Rolurile se verifică pe server la fiecare cerere. Sesiunea de administrare are durată limitată (implicit 8 ore, configurabil per realm), ca un utilizator scos din grup să piardă accesul la următoarea logare.
+
+### 4.4 De aflat de la fiecare client (analiza tehnică)
+1. Ce sistem de identitate folosiți (AD on-prem, Entra ID, ADFS, altul)?
+2. Acceptați OIDC sau SAML către o aplicație externă, sau doar LDAP?
+3. Ce grupuri vor avea acces la administrarea asistentului și cu ce rol?
+4. Se cere MFA? Există politici de durată a sesiunii?
 
 ## 5. Cerințe funcționale
 
@@ -127,7 +148,8 @@ Validare în timp real, cu mesajele de eroare lângă câmp.
 
 ## 9. Criterii de acceptanță
 
-- [ ] Un `widget-admin` al clientului A se autentifică prin Keycloak și nu poate vedea sau modifica clientul B (verificat și prin cereri directe la API).
+- [ ] Un `widget-admin` al clientului A se autentifică prin Keycloak și nu poate vedea sau modifica clientul B (verificat și prin cereri directe la API, inclusiv cu un token emis de realm-ul altui client).
+- [ ] Un realm de test legat prin Identity Brokering de un al doilea Keycloak (care simulează IdP-ul clientului) mapează grupurile la roluri corect.
 - [ ] Un `widget-editor` poate salva ciorna, dar nu poate publica.
 - [ ] Modificarea culorii, a poziției și a icon-ului butonului se vede în previzualizare imediat și în widget-ul public doar după publicare, fără repornirea gateway-ului.
 - [ ] Mesajul proactiv apare deasupra butonului după intervalul configurat, fără deschiderea ferestrei.
@@ -144,3 +166,21 @@ Validare în timp real, cu mesajele de eroare lângă câmp.
 - Administrarea conținutului asistentului (baze de cunoștințe, prompturi, fluxuri): rămâne în Dify.
 - Vizualizarea istoricului conversațiilor și rapoartele: rămân în Dify și în monitorizare.
 - Modulul de întrebări și răspunsuri cu import/export xlsx și editorul de arbori de dialog din matrice: module separate.
+
+## 11. Livrare în două tranșe
+
+**E4b.1 — demonstrabil (prioritar)**
+- Autentificare OIDC pe Keycloak de dezvoltare (`docker-compose`, realm de test cu un utilizator per rol) și roluri verificate pe server.
+- Formularul de editare din §5.1, cu validare și verificarea de contrast care blochează publicarea.
+- Previzualizare live (§5.2), desktop și mobil.
+- Ciornă și publicare cu reîncărcare la cald (§5.3), fără vizualizarea diferențelor.
+- Stocare în Postgres (sursa `TenantSource` pentru Postgres), cu seed din fișierele YAML existente.
+- Încărcarea imaginilor (§5.4).
+- Înregistrarea în jurnalul de audit (§5.5), fără ecran de vizualizare.
+- Securitatea din §6.
+
+**E4b.2 — completare**
+- Istoric versiuni cu diferențe și revenire, export/import JSON (§5.3).
+- Ecranul jurnalului de audit.
+- Administrarea clienților de către `super-admin` (§5.6).
+- Keycloak pe server, comun cu SSO-ul consolei Dify.

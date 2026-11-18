@@ -1,0 +1,86 @@
+{
+  "realm": "platform",
+  "displayName": "Smartbytesoft",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "bruteForceProtected": true,
+  "ssoSessionMaxLifespan": 28800,
+  "ssoSessionIdleTimeout": 28800,
+  "accessTokenLifespan": 300,
+  "internationalizationEnabled": true,
+  "supportedLocales": ["ro", "en"],
+  "defaultLocale": "ro",
+  "roles": {
+    "realm": [
+      {
+        "name": "super-admin",
+        "description": "All tenants (platform operators)"
+      }
+    ]
+  },
+  "groups": [
+    {
+      "name": "Platform-Administratori",
+      "realmRoles": ["super-admin"]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "widget-admin-ui",
+      "name": "Widget admin interface",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "dev-secret-platform-admin-ui",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:3000/admin/auth/callback",
+        "http://localhost:3100/admin/auth/callback"
+      ],
+      "webOrigins": ["http://localhost:3000", "http://localhost:3100"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:3000/admin/*##http://localhost:3100/admin/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "realm roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "platform-admin",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "platform-admin@example.test",
+      "firstName": "Sorin",
+      "lastName": "Super",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev-platform-admin-Pass1",
+          "temporary": false
+        }
+      ],
+      "groups": ["/Platform-Administratori"]
+    }
+  ]
+}
