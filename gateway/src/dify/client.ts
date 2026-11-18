@@ -7,6 +7,7 @@ import {
   difyErrorBodySchema,
   difyMessageListSchema,
   difyParametersSchema,
+  difySuggestedSchema,
   type DifyConversationList,
   type DifyMessageList,
   type DifyParameters,
@@ -253,4 +254,29 @@ export async function sendMessageFeedback(
     },
   );
   return result.ok ? { ok: true, value: null } : result;
+}
+
+/** `GET /messages/{id}/suggested`: Dify generates them with a model call (opt-in, ADR 007). */
+export async function getSuggestedQuestions(
+  tenant: Tenant,
+  user: string,
+  messageId: string,
+): Promise<SimpleResult<string[]>> {
+  const query = pageQuery({ user });
+  const result = await callJson(
+    tenant,
+    'GET',
+    `/messages/${encodeURIComponent(messageId)}/suggested?${query}`,
+  );
+  if (!result.ok) return result;
+  const parsed = difySuggestedSchema.safeParse(result.value);
+  return parsed.success
+    ? {
+        ok: true,
+        value: parsed.data.data
+          .map((item) => item.trim())
+          .filter(Boolean)
+          .slice(0, 3),
+      }
+    : { ok: false, code: 'internal_error' };
 }

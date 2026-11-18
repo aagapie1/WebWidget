@@ -2,6 +2,7 @@ import type { Rating } from 'gateway/protocol';
 import { useEffect, useRef } from 'preact/hooks';
 import type { ChatMessage } from '../chat/controller.js';
 import type { Texts } from '../i18n/index.js';
+import type { Identity } from './Avatar.js';
 import { Message } from './Message.js';
 import { SuggestedQuestions } from './SuggestedQuestions.js';
 
@@ -18,6 +19,9 @@ export interface MessageListProps {
   hasOlder?: boolean;
   loading?: boolean;
   onLoadOlder?: () => void;
+  identity?: Identity;
+  /** Follow-up questions under the last answer (opt-in per tenant). */
+  followUps?: readonly string[];
 }
 
 /**
@@ -79,9 +83,18 @@ export function MessageList(props: MessageListProps) {
             canRetry={message === last}
             onRetry={onRetry}
             {...(props.onRate ? { onRate: props.onRate } : {})}
+            {...(props.identity ? { identity: props.identity } : {})}
           />
         ))}
       </ol>
+      {hasQuestion && !props.busy && props.followUps && props.onAsk && (
+        <SuggestedQuestions
+          questions={props.followUps}
+          texts={texts}
+          disabled={false}
+          onAsk={props.onAsk}
+        />
+      )}
       {!hasQuestion && props.suggestions && props.onAsk && (
         <SuggestedQuestions
           questions={props.suggestions}

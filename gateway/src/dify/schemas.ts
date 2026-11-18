@@ -92,3 +92,5 @@ export const difyMessageListSchema = z.looseObject({
   ),
 });
 export type DifyMessageList = z.infer<typeof difyMessageListSchema>;
+
+export const difySuggestedSchema = z.looseObject({ data: z.array(z.string()) });

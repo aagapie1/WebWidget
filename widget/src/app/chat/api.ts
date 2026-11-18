@@ -4,6 +4,7 @@ import {
   errorResponseSchema,
   historySchema,
   SseParser,
+  suggestedQuestionsSchema,
   widgetConfigSchema,
   type ChatError,
   type ChatStreamEvent,
@@ -41,6 +42,8 @@ export interface ChatTransport {
   deleteConversation(conversationId: string): Promise<void>;
   rateMessage(messageId: string, rating: Rating | null): Promise<void>;
   sendConversationFeedback(conversationId: string, rating: Rating, comment?: string): Promise<void>;
+  /** Follow-up questions after an answer (tenants that enable them). */
+  suggested(messageId: string): Promise<string[]>;
 }
 
 /** Response/request header carrying the signed visitor id when cookies are blocked (ADR 006). */
@@ -189,6 +192,12 @@ export class GatewayTransport implements ChatTransport {
       rating,
       ...(comment ? { comment } : {}),
     });
+  }
+
+  async suggested(messageId: string): Promise<string[]> {
+    const query = new URLSearchParams({ tenant: this.tenant });
+    const path = `/api/messages/${encodeURIComponent(messageId)}/suggested?${query.toString()}`;
+    return suggestedQuestionsSchema.parse(await this.#json(path)).questions;
   }
 
   #post(path: string, body: object): Promise<unknown> {

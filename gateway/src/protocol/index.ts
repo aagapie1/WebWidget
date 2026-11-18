@@ -6,6 +6,14 @@
 import * as z from 'zod/mini';
 
 export { SseParser, type SseMessage } from './sse.js';
+export {
+  GATEWAY_TEXT_KEYS,
+  TEXT_KEYS,
+  WIDGET_TEXT_KEYS,
+  type TextKey,
+  type TextOverrides,
+  type WidgetTextKey,
+} from './texts.js';
 
 export const LOCALES = ['ro', 'en'] as const;
 export const localeSchema = z.enum(LOCALES);
@@ -217,3 +225,6 @@ export const conversationFeedbackSchema = z.strictObject({
 });
 export type ConversationFeedback = z.infer<typeof conversationFeedbackSchema>;
 export type WidgetConfig = z.infer<typeof widgetConfigSchema>;
+
+/** `GET /api/messages/:id/suggested` (tenants with `behavior.suggestionsAfterAnswer`). */
+export const suggestedQuestionsSchema = z.object({ questions: z.array(z.string()) });

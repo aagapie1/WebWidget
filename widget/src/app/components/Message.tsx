@@ -4,7 +4,7 @@ import type { ChatMessage } from '../chat/controller.js';
 import type { Texts } from '../i18n/index.js';
 import { renderMarkdown } from '../markdown.js';
 import { Citations } from './Citations.js';
-import { AssistantIcon } from './icons.js';
+import { Avatar, type Identity } from './Avatar.js';
 import { MessageRating } from './MessageRating.js';
 import { TypingIndicator } from './TypingIndicator.js';
 
@@ -16,6 +16,7 @@ export interface MessageProps {
   canRetry: boolean;
   onRetry: () => void;
   onRate?: (id: string, rating: Rating) => void;
+  identity?: Identity;
 }
 
 export function Message({
@@ -25,6 +26,7 @@ export function Message({
   canRetry,
   onRetry,
   onRate,
+  identity,
 }: MessageProps) {
   const busy = message.status === 'waiting' || message.status === 'streaming';
   const authorLabel =
@@ -46,9 +48,7 @@ export function Message({
   return (
     <li class={`message message--${message.author} message--${message.status}`} aria-busy={busy}>
       {(message.author === 'assistant' || message.author === 'operator') && (
-        <span class="avatar avatar--small" aria-hidden="true">
-          <AssistantIcon size={16} />
-        </span>
+        <Avatar url={identity?.assistantAvatarUrl} size="small" />
       )}
       <div class="message__body">
         <div class="message__bubble">
@@ -82,6 +82,9 @@ export function Message({
           />
         )}
       </div>
+      {message.author === 'user' && identity?.userAvatarUrl && (
+        <Avatar url={identity.userAvatarUrl} size="small" />
+      )}
     </li>
   );
 }

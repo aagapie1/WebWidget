@@ -19,6 +19,9 @@
   --cw-error-text: #8f1d1d; /* on its background: 8.2:1 */
   --cw-focus: #2c2aa8;
   --cw-radius-bubble: 18px;
+  /* Light tints of the link color for hover and pressed states. */
+  --cw-tint: color-mix(in srgb, var(--cw-link) 8%, var(--cw-bg));
+  --cw-tint-strong: color-mix(in srgb, var(--cw-link) 14%, var(--cw-bg));
   --cw-shadow-soft: 0 1px 2px rgb(16 24 40 / 0.06), 0 1px 3px rgb(16 24 40 / 0.1);
   color-scheme: light;
   font-family:
@@ -155,6 +158,16 @@ button {
   background: rgb(255 255 255 / 0.18);
   box-shadow: inset 0 0 0 2px rgb(255 255 255 / 0.45);
 }
+.avatar--image {
+  overflow: hidden;
+  background: var(--cw-bg);
+}
+.avatar__image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
 .avatar--small {
   width: 28px;
   height: 28px;
@@ -187,7 +200,7 @@ button {
   border-radius: 50%;
   color: var(--cw-on-accent);
   background: var(--cw-gradient);
-  box-shadow: 0 4px 12px rgb(58 54 208 / 0.35);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--cw-accent) 35%, transparent);
   cursor: pointer;
   transition:
     transform 0.15s ease,
@@ -195,7 +208,7 @@ button {
 }
 .round-button:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgb(58 54 208 / 0.45);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--cw-accent) 45%, transparent);
 }
 .round-button:disabled {
   background: #c9cedb;
@@ -218,7 +231,7 @@ button {
   cursor: pointer;
 }
 .pill-button:hover {
-  background: #eeeefb;
+  background: var(--cw-tint);
 }
 
 /* ---------- Messages ---------- */
@@ -282,7 +295,7 @@ button {
   color: var(--cw-on-accent);
   background: var(--cw-gradient);
   border-bottom-right-radius: 6px;
-  box-shadow: 0 2px 8px rgb(58 54 208 / 0.25);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--cw-accent) 25%, transparent);
 }
 .message--system {
   justify-content: center;
@@ -429,7 +442,7 @@ p.message__text {
 }
 .rating-buttons__button[aria-pressed='true'] {
   color: var(--cw-link);
-  background: #e8e8fb;
+  background: var(--cw-tint-strong);
 }
 
 /* ---------- Suggested questions ---------- */
@@ -452,7 +465,7 @@ p.message__text {
   cursor: pointer;
 }
 .suggestions__button:hover:not(:disabled) {
-  background: #eeeefb;
+  background: var(--cw-tint);
 }
 .suggestions__button:disabled {
   opacity: 0.55;
@@ -512,7 +525,7 @@ p.message__text {
 }
 .pill-button--primary:hover:not(:disabled) {
   background: var(--cw-gradient);
-  box-shadow: 0 4px 12px rgb(58 54 208 / 0.35);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--cw-accent) 35%, transparent);
 }
 .pill-button--primary:disabled {
   color: var(--cw-text);
@@ -566,7 +579,7 @@ p.message__text {
   cursor: pointer;
 }
 .conversation-list__open:hover {
-  background: #e6e9f2;
+  background: color-mix(in srgb, var(--cw-text) 6%, var(--cw-bubble));
 }
 .conversation-list__open[aria-current='true'] {
   box-shadow: inset 3px 0 0 var(--cw-accent);
@@ -630,7 +643,7 @@ p.message__text {
 .rating__option.is-selected {
   color: var(--cw-link);
   border-color: var(--cw-link);
-  background: #eeeefb;
+  background: var(--cw-tint);
 }
 .closing__label {
   font-weight: 600;
@@ -722,7 +735,7 @@ p.message__text {
 }
 .composer__field:focus-within {
   border-color: var(--cw-focus);
-  box-shadow: 0 0 0 3px rgb(44 42 168 / 0.18);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--cw-focus) 18%, transparent);
 }
 .composer__input {
   flex: 1;

@@ -2,6 +2,7 @@ import type { Locale } from 'gateway/protocol';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { ChatController, ChatState } from './chat/controller.js';
 import { Announcer } from './components/Announcer.js';
+import type { Identity } from './components/Avatar.js';
 import { ClosingFeedback } from './components/ClosingFeedback.js';
 import { Composer } from './components/Composer.js';
 import { ConversationList } from './components/ConversationList.js';
@@ -14,6 +15,8 @@ export interface AppProps {
   texts: Texts;
   locale?: Locale;
   assistantName: string;
+  /** Tenant images (logo, avatars). */
+  identity?: Identity;
   /** Asks the loader to hide the window (minimize, Escape). */
   onHide: () => void;
   /** Called with a function that focuses the composer (used when the loader shows the window). */
@@ -27,6 +30,7 @@ export function App({
   texts,
   locale = 'ro',
   assistantName,
+  identity = {},
   onHide,
   registerFocus,
 }: AppProps) {
@@ -86,6 +90,7 @@ export function App({
         assistantName={assistantName}
         texts={texts}
         canClose={view === 'chat' && state.conversationId !== undefined}
+        imageUrl={identity.logoUrl ?? identity.assistantAvatarUrl}
         onShowConversations={() => {
           setView('conversations');
           void controller.refreshConversations();
@@ -144,6 +149,8 @@ export function App({
             texts={texts}
             busy={state.busy}
             suggestions={state.suggestions}
+            followUps={state.followUps}
+            identity={identity}
             hasOlder={state.hasOlder}
             loading={state.loading}
             onLoadOlder={() => void controller.loadOlder()}

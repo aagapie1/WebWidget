@@ -5,6 +5,7 @@ import type { Tenant, TenantRegistry } from '../config/tenants.js';
 import {
   deleteConversation,
   getMessages,
+  getSuggestedQuestions,
   listConversations,
   sendMessageFeedback,
 } from '../dify/client.js';
@@ -88,6 +89,22 @@ export function conversationRoutes(app: FastifyInstance, options: ConversationRo
     if (!result.ok) return replyError(reply, result.code, 'ro', tenant);
     await feedbackStore.delete(tenant.id, params.data.id);
     return reply.code(204).send();
+  });
+
+  /** Follow-up questions after an answer; only for tenants that enable them (extra model call). */
+  app.get('/api/messages/:id/suggested', async (request, reply) => {
+    const params = idParams.safeParse(request.params);
+    const tenant = tenantOf(request.query);
+    if (!params.success) return replyError(reply, 'invalid_request', 'ro');
+    if (!tenant) return replyError(reply, 'tenant_not_found', 'ro');
+    if (!tenant.behavior.suggestionsAfterAnswer) {
+      return reply.header('cache-control', 'no-store').send({ questions: [] });
+    }
+    const user = readVisitor(request);
+    if (!user) return replyError(reply, 'conversation_not_found', 'ro', tenant);
+    const result = await getSuggestedQuestions(tenant, user, params.data.id);
+    if (!result.ok) return replyError(reply, result.code, 'ro', tenant);
+    return reply.header('cache-control', 'no-store').send({ questions: result.value });
   });
 
   app.post('/api/messages/:id/feedback', async (request, reply) => {

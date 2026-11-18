@@ -15,6 +15,8 @@ export class ScriptedTransport implements ChatTransport {
   readonly closingFeedback: [string, Rating, string | undefined][] = [];
   conversations: ConversationList = { conversations: [], hasMore: false };
   histories = new Map<string, History>();
+  followUps: string[] = [];
+  readonly suggestedFor: string[] = [];
   /** Makes the next non-stream call fail with this error. */
   failNext: ApiError | undefined;
 
@@ -59,6 +61,12 @@ export class ScriptedTransport implements ChatTransport {
   async sendConversationFeedback(conversationId: string, rating: Rating, comment?: string) {
     await this.#maybeFail();
     this.closingFeedback.push([conversationId, rating, comment]);
+  }
+
+  async suggested(messageId: string): Promise<string[]> {
+    await this.#maybeFail();
+    this.suggestedFor.push(messageId);
+    return this.followUps;
   }
 
   async #maybeFail(): Promise<void> {

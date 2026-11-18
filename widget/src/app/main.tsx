@@ -3,7 +3,8 @@ import { loaderMessageSchema, message, type AppMessage } from '../shared/message
 import { App } from './App.js';
 import { fetchWidgetConfig, GatewayTransport } from './chat/api.js';
 import { ChatController } from './chat/controller.js';
-import { parseLocale, texts as textsFor } from './i18n/index.js';
+import { parseLocale, texts as textsFor, withOverrides } from './i18n/index.js';
+import { applyTheme } from './theme.js';
 import { markdownToText, setNewTabNote } from './markdown.js';
 import './styles.css';
 
@@ -64,14 +65,20 @@ async function start(): Promise<void> {
     return;
   }
 
+  // Tenant look and texts (ADR 007); colors are pre-validated for WCAG AA by the gateway.
+  applyTheme(document.documentElement, config.theme);
+  const tenantTexts = withOverrides(texts, config.texts);
+  setNewTabNote(tenantTexts.links.newTab);
+
   const controller = new ChatController({
     transport: new GatewayTransport(tenant, locale, {
       code: 'internal_error',
-      message: texts.errors.network,
+      message: tenantTexts.errors.network,
       retryable: true,
     }),
-    texts,
+    texts: tenantTexts,
     toPlainText: markdownToText,
+    suggestionsAfterAnswer: config.suggestionsAfterAnswer,
   });
   controller.setWelcome(config.welcomeMessage);
   controller.setSuggestions(config.suggestedQuestions);
@@ -83,7 +90,8 @@ async function start(): Promise<void> {
     <App
       locale={locale}
       controller={controller}
-      texts={texts}
+      texts={tenantTexts}
+      identity={config.identity}
       assistantName={config.assistantName}
       onHide={hide}
       registerFocus={(focus) => {

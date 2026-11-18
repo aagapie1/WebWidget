@@ -45,6 +45,8 @@ export interface ChatState {
   conversationsHasMore: boolean;
   /** A history, list or delete request is running. */
   loading: boolean;
+  /** Follow-up questions under the last answer (tenants that enable them, ADR 007). */
+  followUps: readonly string[];
 }
 
 export interface ControllerOptions {
@@ -54,6 +56,8 @@ export interface ControllerOptions {
   schedule?: (flush: () => void) => void;
   /** Plain text of an answer for the announcement (Markdown → text). */
   toPlainText?: (markdown: string) => string;
+  /** Ask the gateway for follow-up questions after each answer (extra model call, opt-in). */
+  suggestionsAfterAnswer?: boolean;
 }
 
 let nextId = 0;
@@ -71,12 +75,14 @@ export class ChatController {
     conversations: [],
     conversationsHasMore: false,
     loading: false,
+    followUps: [],
   };
   readonly #listeners = new Set<(state: ChatState) => void>();
   readonly #transport: ChatTransport;
   readonly #texts: Texts;
   readonly #schedule: (flush: () => void) => void;
   readonly #toPlainText: (markdown: string) => string;
+  readonly #suggestionsAfterAnswer: boolean;
 
   #welcome = '';
   #taskId: string | undefined;
@@ -93,6 +99,7 @@ export class ChatController {
     this.#texts = options.texts;
     this.#schedule = options.schedule ?? ((flush) => requestAnimationFrame(flush));
     this.#toPlainText = options.toPlainText ?? ((text) => text);
+    this.#suggestionsAfterAnswer = options.suggestionsAfterAnswer ?? false;
   }
 
   get state(): ChatState {
@@ -175,6 +182,7 @@ export class ChatController {
       const title = this.#state.conversations.find((item) => item.id === id)?.title;
       this.#update({
         conversationId: id,
+        followUps: [],
         busy: false,
         hasOlder: history.hasMore,
         messages: [
@@ -295,6 +303,7 @@ export class ChatController {
     if (!question || this.#state.busy) return;
     this.#lastQuestion = question;
     this.#update({
+      followUps: [],
       messages: [
         ...this.#state.messages,
         { id: newId(), author: 'user', text: question, status: 'complete' },
@@ -331,6 +340,7 @@ export class ChatController {
     this.#generation++;
     this.#lastQuestion = '';
     this.#update({
+      followUps: [],
       conversationId: undefined,
       hasOlder: false,
       messages: this.#welcome ? [this.#welcomeMessage()] : [],
@@ -410,6 +420,7 @@ export class ChatController {
           this.#flush(answerId);
           this.#patch(answerId, { citations: event.citations, serverId: event.messageId });
           this.#finish(answerId, 'complete');
+          void this.#loadFollowUps(event.messageId, generation);
           break;
         case 'error':
           outcome.finished = true;
@@ -449,6 +460,17 @@ export class ChatController {
         ],
       });
       await this.#ask(question, false);
+    }
+  }
+
+  async #loadFollowUps(messageId: string, generation: number): Promise<void> {
+    if (!this.#suggestionsAfterAnswer) return;
+    try {
+      const questions = await this.#transport.suggested(messageId);
+      if (generation === this.#generation && !this.#state.busy)
+        this.#update({ followUps: questions });
+    } catch {
+      // Optional: no follow-ups.
     }
   }
 

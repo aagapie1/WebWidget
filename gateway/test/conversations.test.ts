@@ -275,3 +275,31 @@ describe('Sec-Fetch-Site (ADR 005)', () => {
     expect((await fetch(`${h.url}/api/conversations?tenant=pilot`)).status).toBe(200);
   });
 });
+
+describe('GET /api/messages/:id/suggested', () => {
+  it('returns nothing and does not call Dify when the tenant has it off (default)', async () => {
+    started = true;
+    h = await startHarness();
+    const cookie = await visitorCookie();
+    const response = await fetch(`${h.url}/api/messages/${MESSAGE}/suggested?tenant=pilot`, {
+      headers: { cookie },
+    });
+    expect(await response.json()).toEqual({ questions: [] });
+    expect(h.dify.requests).toHaveLength(0);
+  });
+
+  it('asks Dify when the tenant enables it', async () => {
+    started = true;
+    h = await startHarness({
+      tenant: { behavior: { suggestionsAfterAnswer: true, visitorCookieDays: 30 } },
+    });
+    const cookie = await visitorCookie();
+    h.dify.handler = (_req, res) =>
+      res.writeHead(200).end('{"result":"success","data":[" Și taxa? ","","Unde?","A","B"]}');
+    const response = await fetch(`${h.url}/api/messages/${MESSAGE}/suggested?tenant=pilot`, {
+      headers: { cookie },
+    });
+    expect(await response.json()).toEqual({ questions: ['Și taxa?', 'Unde?', 'A'] });
+    expect(h.dify.requests[0]?.url).toContain(`/v1/messages/${MESSAGE}/suggested?user=`);
+  });
+});
