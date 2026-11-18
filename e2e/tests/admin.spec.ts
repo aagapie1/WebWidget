@@ -338,13 +338,49 @@ test('no serious or critical axe violations on the login page', async ({ page })
   expect(await serious(page)).toEqual([]);
 });
 
-test('no serious or critical axe violations in the editor', async ({ page }) => {
+// The editor is scanned region by region, each in a fresh page of the same session: a scan of
+// the whole editor at once crashed Firefox in CI ("Page crashed"), even without frames. The
+// preview frame holds the public widget, axe-tested in its own specs, and is left out.
+const EDITOR_REGIONS = [
+  '.topbar',
+  '#section-identity',
+  '#section-launcher',
+  '#section-window',
+  '#section-texts',
+  '#section-proactive',
+  '#section-citations',
+  '#section-behavior',
+  '#section-allowedOrigins',
+  '.editor__side > .card',
+  '.preview__head',
+];
+
+test('no serious or critical axe violations in the editor', async ({ page, context }) => {
+  test.setTimeout(120_000);
   await openEditor(page, PILOT_ADMIN);
-  // The preview frame holds the public widget, axe-tested in its own specs (widget,
-  // white-label). Injecting axe into the nested frames crashed Firefox in CI, so the frame is
-  // removed before scanning the editor itself.
-  await page.locator('.preview__frame').evaluate((frame) => {
-    frame.remove();
-  });
-  expect(await serious(page)).toEqual([]);
+  await page.close();
+  for (const region of EDITOR_REGIONS) {
+    await test.step(`axe: ${region}`, async () => {
+      const tab = await context.newPage();
+      try {
+        await tab.goto(`${ADMIN}/admin/`);
+        await expect(tab.getByLabel('Numele clientului')).toBeVisible();
+        await tab.locator('.preview__frame').evaluate((frame) => {
+          frame.remove();
+        });
+        const target = region.startsWith('#section-')
+          ? tab.locator('section').filter({ has: tab.locator(region) })
+          : tab.locator(region);
+        await expect(target.first()).toBeVisible();
+        const selector = region.startsWith('#section-') ? `section:has(> ${region})` : region;
+        const results = await new AxeBuilder({ page: tab }).include(selector).analyze();
+        const serious = results.violations.filter(
+          (violation) => violation.impact === 'serious' || violation.impact === 'critical',
+        );
+        expect(serious, region).toEqual([]);
+      } finally {
+        await tab.close();
+      }
+    });
+  }
 });
