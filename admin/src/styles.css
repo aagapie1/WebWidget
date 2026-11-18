@@ -607,7 +607,7 @@ summary {
   padding: calc(0.6rem - 1px) calc(0.4rem - 1px);
 }
 /* The native radio covers the whole tile, invisible (no appearance), and draws the keyboard
-   focus ring itself. No :has(): suspected cause of the Firefox crash under axe in CI. */
+   focus ring itself (on :focus: WebKit does not match :focus-visible after arrow keys). */
 .tile__input {
   position: absolute;
   inset: 0;
@@ -618,7 +618,7 @@ summary {
   background: transparent;
   cursor: pointer;
 }
-.tile__input:focus-visible {
+.tile__input:focus {
   outline: 3px solid var(--focus);
   outline-offset: 3px;
 }

@@ -520,7 +520,11 @@ const EDITOR_REGIONS: { area: string; selector: string }[] = [
   { area: 'Aspect', selector: '.app-header' },
   { area: 'Aspect', selector: '.statusbar' },
   { area: 'Aspect', selector: '.sidebar' },
-  { area: 'Aspect', selector: '#section-identity' },
+  // Identitate in parts: a scan of the whole section crashes Firefox in CI ("Page crashed").
+  { area: 'Aspect', selector: '[aria-labelledby="section-identity"] > h2' },
+  { area: 'Aspect', selector: '[aria-labelledby="section-identity"] > .row' },
+  { area: 'Aspect', selector: '[aria-labelledby="section-identity"] > .image-field' },
+  { area: 'Aspect', selector: '[aria-labelledby="section-identity"] > fieldset' },
   { area: 'Aspect', selector: '#section-launcher' },
   { area: 'Aspect', selector: '#section-window' },
   { area: 'Aspect', selector: '#section-colors' },
@@ -537,6 +541,9 @@ test('no serious or critical axe violations in the editor', async ({ page, conte
   test.setTimeout(120_000);
   await openEditor(page, PILOT_ADMIN);
   await page.close();
+  // Every region is scanned even if one fails, so that one run names all the problems (and a
+  // browser crash names its region).
+  const failures: string[] = [];
   for (const { area: name, selector: region } of EDITOR_REGIONS) {
     await test.step(`axe: ${name} ${region}`, async () => {
       const tab = await context.newPage();
@@ -547,22 +554,23 @@ test('no serious or critical axe violations in the editor', async ({ page, conte
         await tab.locator('.preview__frame').evaluate((frame) => {
           frame.remove();
         });
-        const target = region.startsWith('#section-')
-          ? tab.locator('section').filter({ has: tab.locator(region) })
-          : tab.locator(region);
-        await expect(target.first()).toBeVisible();
-        // No :has() in the selector (suspected in a Firefox crash under axe).
         const selector = region.startsWith('#section-')
           ? `section[aria-labelledby="${region.slice(1)}"]`
           : region;
+        await expect(tab.locator(selector).first()).toBeVisible();
         const results = await new AxeBuilder({ page: tab }).include(selector).analyze();
         const serious = results.violations.filter(
           (violation) => violation.impact === 'serious' || violation.impact === 'critical',
         );
-        expect(serious, region).toEqual([]);
+        if (serious.length > 0) {
+          failures.push(`${region}: ${serious.map((violation) => violation.id).join(', ')}`);
+        }
+      } catch (error) {
+        failures.push(`${region}: ${String(error).split('\n')[0] ?? ''}`);
       } finally {
-        await tab.close();
+        await tab.close().catch(() => undefined);
       }
     });
   }
+  expect(failures).toEqual([]);
 });
