@@ -225,7 +225,11 @@ const dify = createServer(async (req, res) => {
 function site(name) {
   return createServer((req, res) => {
     // /brand.html embeds the second tenant (white-label tests, E4).
-    const tenant = req.url?.startsWith('/brand.html') ? 'e2e-brand' : 'e2e';
+    const tenant = req.url?.startsWith('/brand.html')
+      ? 'e2e-brand'
+      : req.url?.startsWith('/off.html')
+        ? 'e2e-off'
+        : 'e2e';
     if (req.url?.startsWith('/spoof.html')) {
       // A page that is not allowed, framing the app while claiming an allowed parent.
       const src = `${GATEWAY}/w/app?tenant=e2e&parent=${encodeURIComponent('http://127.0.0.1:5180')}`;

@@ -64,6 +64,19 @@ Status: accepted (E4) · 2026-11-17
   `showOnMobile`. Shown once per browsing session: the loader stores only a "shown" flag in the
   host page's `sessionStorage`. The animation is disabled with `prefers-reduced-motion`.
 
+## Completions requested from the E4b spec (still `schemaVersion: 1`, all optional)
+
+- `theme.userBubble` / `onUserBubble` and `theme.button` / `onButton`: fall back to the accent
+  gradient and `onAccent`; the contrast check runs on the effective colors.
+- `window.position`: `auto` (default, follows the launcher) | `bottom-right` | `bottom-left`;
+  loader-config sends the resolved side.
+- `launcher.icon`: `{ type: builtin, name }` | `{ type: asset, file }`. Only the builtin `chat`
+  (the default icon) exists until E4b; unknown names are validation errors. A bare file name is
+  still accepted and read as the asset form, so existing version 1 files stay valid.
+- `enabled` (default `true`). A disabled tenant: `tenant_disabled` (HTTP 503, localized) on every
+  `/api/*` route and on `/w/app`; the loader-config answer keeps CORS for allowed origins so the
+  loader can read it, shows no launcher and never loads the chat.
+
 ## How E4 prepares E4b (admin interface)
 
 - E4b reads and writes **exactly this schema**; its form can be generated/validated from it.

@@ -19,11 +19,17 @@ launcher:
 window:
   width: 400
   height: 600
+  # Separate from the launcher (left): the window opens on the right.
+  position: bottom-right
 theme:
   accent: '#0b6e4f'
   accentEnd: '#095c42'
   link: '#08573f'
   assistantBubble: '#eef5f1'
+  userBubble: '#e3f1ea'
+  onUserBubble: '#0b3d2c'
+  button: '#8a1c1c'
+  onButton: '#ffffff'
 texts:
   ro:
     composer.placeholder: Întrebați primăria…

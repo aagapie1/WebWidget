@@ -49,7 +49,49 @@ test('the chat window uses the tenant colors, logo, name and texts', async ({ pa
   // Computed style, not the bounding box: the opening animation briefly scales the panel.
   const panel = widget(page).locator('.panel');
   await expect(panel).toHaveCSS('width', '400px');
-  await expect(panel).toHaveCSS('left', '20px');
+  // window.position is separate from the launcher: launcher left, window right.
+  await expect(panel).toHaveCSS('right', '20px');
+  const box = await panel.boundingBox();
+  expect((box?.x ?? 0) + (box?.width ?? 0)).toBeGreaterThan((page.viewportSize()?.width ?? 0) / 2);
+});
+
+test('optional user bubble and button colors are applied', async ({ page }) => {
+  await gotoBrand(page);
+  await launcher(page).click();
+  const input = chat(page).getByLabel('Mesajul dumneavoastră');
+  await input.fill('Care e programul?');
+  await expect(chat(page).getByRole('button', { name: 'Trimite' })).toHaveCSS(
+    'background-color',
+    'rgb(138, 28, 28)',
+  );
+  await input.press('Enter');
+  const bubble = chat(page).locator('.message--user .message__bubble');
+  await expect(bubble).toHaveCSS('background-color', 'rgb(227, 241, 234)');
+  await expect(bubble).toHaveCSS('color', 'rgb(11, 61, 44)');
+});
+
+test('a disabled tenant shows no launcher and its API answers tenant_disabled', async ({
+  page,
+}) => {
+  const responses: number[] = [];
+  page.on('response', (response) => {
+    if (response.url().includes('/api/loader-config')) responses.push(response.status());
+  });
+  await page.goto(`${SITE}/off.html`);
+  await expect.poll(() => responses).toEqual([503]);
+  await expect(page.locator('[data-chat-widget]')).toHaveCount(0);
+  await page.waitForTimeout(2500); // past the idle preload: the chat must never load
+  expect(page.frames().some((frame) => frame.url().includes('/w/app'))).toBe(false);
+
+  const api = await page.request.get(`${GATEWAY}/api/widget-config?tenant=e2e-off`);
+  expect(api.status()).toBe(503);
+  expect(await api.json()).toEqual({
+    error: {
+      code: 'tenant_disabled',
+      message: 'Asistentul nu este disponibil momentan pe acest site.',
+      retryable: false,
+    },
+  });
 });
 
 test('proactive message: after the delay, as a status, opens the chat, once per session', async ({

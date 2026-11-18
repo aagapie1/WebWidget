@@ -91,6 +91,15 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
         .header('content-security-policy', "default-src 'none'; frame-ancestors 'none'")
         .send(chatError('tenant_disabled', locale).message);
     }
+    // loader.js reads loader-config cross-site: without CORS the browser would hide this answer
+    // and the loader would fall back to showing a default launcher.
+    const origin = request.headers.origin;
+    if (request.url.startsWith('/api/loader-config') && origin !== undefined) {
+      const tenant = options.tenants.get(id);
+      if (tenant?.allowedOrigins.includes(origin)) {
+        reply.header('access-control-allow-origin', origin).header('vary', 'Origin');
+      }
+    }
     return replyError(reply, 'tenant_disabled', locale);
   });
 

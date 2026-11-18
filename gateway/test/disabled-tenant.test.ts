@@ -31,6 +31,18 @@ describe('disabled tenant (E4b §5.6)', () => {
     expect(await response.json()).toEqual(disabled);
   });
 
+  it('loader-config keeps CORS on the tenant_disabled answer, so the loader can read it', async () => {
+    const response = await fetch(`${h.url}/api/loader-config?tenant=pilot`, {
+      headers: { origin: SITE },
+    });
+    expect(response.status).toBe(503);
+    expect(response.headers.get('access-control-allow-origin')).toBe(SITE);
+    const foreign = await fetch(`${h.url}/api/loader-config?tenant=pilot`, {
+      headers: { origin: 'https://evil.example' },
+    });
+    expect(foreign.headers.get('access-control-allow-origin')).toBeNull();
+  });
+
   it('chat answers tenant_disabled and Dify is never called', async () => {
     const response = await postJson(`${h.url}/api/chat`, { tenant: 'pilot', message: 'Bună' });
     expect(response.status).toBe(503);

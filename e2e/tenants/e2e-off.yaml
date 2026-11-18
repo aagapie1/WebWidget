@@ -1,0 +1,9 @@
+# Disabled tenant (E4b §5.6): no launcher, the API answers tenant_disabled.
+schemaVersion: 1
+id: e2e-off
+name: Client dezactivat
+enabled: false
+difyBaseUrl: ${DIFY_BASE_URL}
+difyApiKeyEnv: DIFY_API_KEY_E2E
+allowedOrigins:
+  - http://127.0.0.1:5180
