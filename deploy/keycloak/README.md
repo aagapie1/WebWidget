@@ -18,3 +18,13 @@ never use these realms or passwords outside local development and CI.
 - Admin client in each realm: `widget-admin-ui`, confidential, PKCE S256, secret
   `dev-secret-<realm>-admin-ui` (gateway env `ADMIN_OIDC_SECRET_*`).
 - The files are generated once and committed; edit them directly or re-export from Keycloak.
+
+## Verified (2026-11-18, Keycloak 26.3.5)
+
+Authorization Code + PKCE against `widget-admin-ui` in each realm: issuers
+`http://localhost:8081/realms/<realm>`; `roles` claim: `pilot-admin` → widget-admin,
+`pilot-editor` → widget-editor, `pilot-viewer` → none, `demo-admin` → widget-admin,
+`platform-admin` → super-admin; through `idp-sim` brokering: `alice` → widget-admin,
+`bob` → widget-editor, `carol` → none (users created just-in-time in `pilot`).
+
+Start / stop: `pnpm services:up`, `pnpm services:down` (Rancher Desktop, Podman or Docker).
