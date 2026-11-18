@@ -14,6 +14,8 @@ interface ImageFieldProps {
   upload: (file: File) => Promise<{ file: string }>;
   onChange: (file: string | undefined) => void;
   errors?: readonly string[] | undefined;
+  /** Where the image appears (e.g. "Apare în antetul ferestrei."). */
+  where?: string | undefined;
   /** Hide the field label when a surrounding control already names it. */
   hideLabel?: boolean;
 }
@@ -125,6 +127,11 @@ export function ImageField(props: ImageFieldProps) {
         </ul>
       )}
       <p id={hintId} class="field__hint">
+        {props.where && (
+          <>
+            <strong>{props.where}</strong>{' '}
+          </>
+        )}
         {props.canUpload ? t.images.formats : t.images.adminsOnly}
       </p>
     </div>

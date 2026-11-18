@@ -1255,3 +1255,48 @@ a.badge {
 .workspace__form [id] {
   scroll-margin-top: calc(var(--bar-height, 64px) + 16px);
 }
+
+/* Română / English tabs (texts). */
+.locale-tabs__list {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border-soft);
+  margin-bottom: 16px;
+}
+.locale-tabs__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+.locale-tabs__tab[aria-selected='true'] {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.locale-tabs__tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.text-group {
+  border: 0;
+  padding: 0;
+  margin: 0 0 16px;
+}
+.text-group > legend {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.image-caption {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+}

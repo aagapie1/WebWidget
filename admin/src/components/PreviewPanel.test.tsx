@@ -7,14 +7,14 @@ describe('PreviewPanel', () => {
   it('reloads the preview after each saved draft, reusing the short-lived token', async () => {
     const createToken = vi.fn(() => Promise.resolve({ url: '/admin/preview?id=pilot--p-abc' }));
     const { rerender } = renderWithI18n(<PreviewPanel revision={0} createToken={createToken} />);
-    const frame = await screen.findByTitle('Previzualizarea widget-ului cu ciorna');
+    const frame = await screen.findByTitle('Previzualizarea asistentului cu ciorna');
     expect(frame.getAttribute('src')).toBe(
       '/admin/preview?id=pilot--p-abc&locale=ro&show=window&r=0',
     );
     rerender(<PreviewPanel revision={1} createToken={createToken} />);
     await waitFor(() => {
       expect(
-        screen.getByTitle('Previzualizarea widget-ului cu ciorna').getAttribute('src'),
+        screen.getByTitle('Previzualizarea asistentului cu ciorna').getAttribute('src'),
       ).toMatch(/&r=1$/);
     });
     expect(createToken).toHaveBeenCalledTimes(1);
@@ -27,12 +27,12 @@ describe('PreviewPanel', () => {
         createToken={() => Promise.resolve({ url: '/admin/preview?id=x' })}
       />,
     );
-    await screen.findByTitle('Previzualizarea widget-ului cu ciorna');
+    await screen.findByTitle('Previzualizarea asistentului cu ciorna');
     const phone = screen.getByRole('button', { name: 'Telefon' });
     fireEvent.click(phone);
     expect(phone.getAttribute('aria-pressed')).toBe('true');
     expect(document.querySelector('.preview__canvas--mobile')).toBeTruthy();
-    const frame = screen.getByTitle<HTMLIFrameElement>('Previzualizarea widget-ului cu ciorna');
+    const frame = screen.getByTitle<HTMLIFrameElement>('Previzualizarea asistentului cu ciorna');
     expect([frame.style.width, frame.style.height]).toEqual(['390px', '844px']);
   });
 
@@ -56,7 +56,7 @@ describe('PreviewPanel', () => {
           keepAlive={keepAlive}
         />,
       );
-      await screen.findByTitle('Previzualizarea widget-ului cu ciorna');
+      await screen.findByTitle('Previzualizarea asistentului cu ciorna');
       await vi.advanceTimersByTimeAsync(KEEP_ALIVE_MS);
       expect(keepAlive).toHaveBeenCalledWith('pilot--p-abc');
       await vi.advanceTimersByTimeAsync(KEEP_ALIVE_MS);
@@ -72,7 +72,7 @@ describe('PreviewPanel', () => {
       <PreviewPanel revision={0} createToken={createToken} show="launcher" />,
     );
     const frame = await screen.findByTitle<HTMLIFrameElement>(
-      'Previzualizarea widget-ului cu ciorna',
+      'Previzualizarea asistentului cu ciorna',
     );
     expect(frame.getAttribute('src')).toBe(
       '/admin/preview?id=pilot--p-abc&locale=ro&show=launcher&r=0',

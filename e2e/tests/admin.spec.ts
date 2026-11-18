@@ -167,12 +167,12 @@ test('an editor saves the draft but cannot publish (visible reason)', async ({ p
   await expect(reason).toBeHidden();
   await publish.hover();
   await expect(reason).toBeVisible();
-  await expect(reason).toHaveText(/^Doar administratorii \(rolul widget-admin\) pot publica/);
+  await expect(reason).toHaveText(/^Doar administratorii pot publica/);
   expect((await api(page, 'POST', '/admin/api/tenants/pilot/config/publish', {})).status).toBe(403);
   // Images and allowed domains are for administrators too.
   await expect(page.getByText('Doar administratorii pot încărca imagini.').first()).toBeVisible();
   await area(page, 'Domenii permise');
-  await expect(page.getByLabel('Domenii pe care funcționează widget-ul')).toHaveAttribute(
+  await expect(page.getByLabel('Domenii pe care funcționează asistentul')).toHaveAttribute(
     'readonly',
     '',
   );
@@ -190,7 +190,7 @@ test('changes show in the preview at once and publicly only after publishing', a
   await previewConfig;
 
   // Preview: the real widget with the draft (launcher color and side).
-  const preview = page.frameLocator('iframe[title="Previzualizarea widget-ului cu ciorna"]');
+  const preview = page.frameLocator('iframe[title="Previzualizarea asistentului cu ciorna"]');
   const launcher = preview.locator('[data-chat-widget^="pilot--p-"] .launcher');
   await expect(launcher).toHaveCSS('background-image', /rgb\(11, 110, 79\)/);
   // Public widget: unchanged until publishing.
@@ -358,7 +358,7 @@ test('no serious or critical axe violations on the login page', async ({ page })
 });
 
 const preview = (page: Page) =>
-  page.frameLocator('iframe[title="Previzualizarea widget-ului cu ciorna"]');
+  page.frameLocator('iframe[title="Previzualizarea asistentului cu ciorna"]');
 const previewWidget = (page: Page) => preview(page).locator('[data-chat-widget^="pilot--p-"]');
 
 test('the preview opens on a sample conversation and follows the edited section', async ({
@@ -400,7 +400,7 @@ test("starter questions: take the assistant's, reorder, see them in the preview"
 }) => {
   await openEditor(page, PILOT_ADMIN);
   await area(page, 'Texte și întrebări');
-  const romanian = page.getByRole('group', { name: 'Română' });
+  const romanian = page.getByRole('tabpanel', { name: 'Română' });
   await expect(romanian.getByText('Care e programul?')).toBeVisible();
   await romanian.getByRole('button', { name: 'Preia și editează' }).click();
   await expect(romanian.getByLabel('Întrebarea 1', { exact: true })).toHaveValue(
@@ -445,7 +445,7 @@ test('validation errors show in the status bar, link to the field and block publ
 }) => {
   await openEditor(page, PILOT_ADMIN);
   await area(page, 'Domenii permise');
-  const domains = page.getByLabel('Domenii pe care funcționează widget-ul');
+  const domains = page.getByLabel('Domenii pe care funcționează asistentul');
   await domains.fill('http://127.0.0.1:5180\nhttps://www.exemplu.ro/pagina');
   const badge = page.locator('.statusbar').getByRole('link', { name: /1 eroare/ });
   await expect(badge).toBeVisible();
@@ -455,7 +455,9 @@ test('validation errors show in the status bar, link to the field and block publ
   await expect(page.locator('#publish-blocker')).toHaveText(/^Corectați eroarea/);
   // The sidebar marks the area; the badge leads to the field.
   await expect(
-    page.getByRole('navigation', { name: 'Zone de configurare' }).getByText('1', { exact: true }),
+    page
+      .getByRole('navigation', { name: 'Zone de configurare' })
+      .getByRole('link', { name: /^Domenii permise.*1 eroare/ }),
   ).toBeVisible();
   await area(page, 'Aspect');
   await badge.click();

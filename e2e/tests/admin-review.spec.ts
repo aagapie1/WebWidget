@@ -23,7 +23,7 @@ async function signIn(page: Page): Promise<void> {
 async function ready(page: Page): Promise<void> {
   await expect(page.getByLabel('Numele clientului')).toBeVisible();
   const chat = page
-    .frameLocator('iframe[title="Previzualizarea widget-ului cu ciorna"]')
+    .frameLocator('iframe[title="Previzualizarea asistentului cu ciorna"]')
     .frameLocator('iframe[title="Asistent virtual"]');
   await expect(chat.getByText('Care este programul cu publicul?')).toBeVisible();
   await page.waitForTimeout(500); // the window's opening animation

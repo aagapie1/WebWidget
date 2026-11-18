@@ -13,6 +13,7 @@ const rename = async (value: string) => {
 describe('Editor', () => {
   beforeEach(() => {
     sessionStorage.clear();
+    history.replaceState(null, '', '#');
   });
   afterEach(() => {
     vi.restoreAllMocks();
@@ -205,6 +206,35 @@ describe('Editor', () => {
     expect(
       screen.getByRole('button', { name: 'Renunță la modificări' }).getAttribute('aria-disabled'),
     ).toBe('true');
+  });
+
+  it('texts: one language per tab, every field named by the text it replaces (no keys)', async () => {
+    renderWithI18n(<Editor api={fakeApi()} tenant="pilot" onSessionExpired={vi.fn()} />);
+    fireEvent.click(await screen.findByRole('link', { name: 'Texte și întrebări' }));
+    const tabs = await screen.findByRole('tablist', { name: 'Limba textelor' });
+    expect(
+      within(tabs)
+        .getAllByRole('tab')
+        .map((tab) => tab.textContent),
+    ).toEqual(['Română', 'Engleză']);
+    expect(screen.getByText('Dacă lăsați gol, se folosește mesajul configurat în asistent.'));
+    expect(screen.getByLabelText('„Deschide asistentul virtual”')).toBeTruthy();
+    expect(screen.getByRole('group', { name: 'Mesaje de eroare' })).toBeTruthy();
+    const labels = [...document.querySelectorAll('.workspace__form label, form label')].map(
+      (label) => label.textContent,
+    );
+    expect(labels.filter((label) => /^[a-z]+\.[a-zA-Z_]+$/.test(label))).toEqual([]);
+    expect(document.body.textContent).not.toMatch(/Dify|cookie/);
+
+    fireEvent.click(within(tabs).getByRole('tab', { name: 'Engleză' }));
+    expect(await screen.findByLabelText('„Open the virtual assistant”')).toBeTruthy();
+  });
+
+  it('says under each image where it appears', async () => {
+    renderWithI18n(<Editor api={fakeApi()} tenant="pilot" onSessionExpired={vi.fn()} />);
+    expect(await screen.findByText('Apare în antetul ferestrei.')).toBeTruthy();
+    expect(screen.getByText('Apare lângă răspunsurile asistentului.')).toBeTruthy();
+    expect(screen.getByText('Apare lângă întrebările vizitatorului.')).toBeTruthy();
   });
 
   it('shows values (not grey placeholders) and only the fields that make sense', async () => {

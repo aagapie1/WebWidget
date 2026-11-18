@@ -68,7 +68,7 @@ const ro = {
     colors: 'Culori',
     color: {
       accent: 'Culoare principală (antet, buton)',
-      accentEnd: 'Culoare principală, capătul gradientului',
+      accentEnd: 'Culoare principală, a doua nuanță (degradeu)',
       onAccent: 'Text pe culoarea principală',
       text: 'Text',
       textMuted: 'Text secundar',
@@ -83,7 +83,7 @@ const ro = {
     colorDefault: 'Implicit',
     reset: 'Revino la implicit',
     welcome: 'Mesaj de întâmpinare',
-    welcomeHint: 'Gol: se folosește mesajul de deschidere configurat în Dify.',
+    welcomeHint: 'Dacă lăsați gol, se folosește mesajul configurat în asistent.',
     placeholder: 'Textul din câmpul de scriere',
     moreTexts: 'Alte texte ale interfeței',
     textsFor: { ro: 'Română', en: 'Engleză' },
@@ -92,7 +92,7 @@ const ro = {
     proactiveTextEn: 'Textul mesajului (engleză)',
     delaySeconds: 'Întârziere (secunde)',
     frequency: 'Frecvență',
-    perSession: 'O dată pe sesiune',
+    perSession: 'O dată la fiecare vizită',
     perDay: 'O dată pe zi (în curând)',
     showOnMobile: 'Afișează și pe telefon',
     documentTitles: 'Titluri afișate pentru documente',
@@ -102,13 +102,13 @@ const ro = {
     remove: 'Elimină',
     showSnippets: 'Afișează fragmentul din document',
     suggestions: 'Întrebări sugerate după răspuns',
-    suggestionsHint: 'Fiecare răspuns costă un apel suplimentar la model.',
-    cookieDays: 'Durata cookie-ului de vizitator (zile)',
+    suggestionsHint: 'Poate încetini răspunsurile.',
+    cookieDays: 'Cât timp își vede vizitatorul conversațiile anterioare (zile)',
     privacyPolicyUrl: 'Link spre politica de confidențialitate',
-    origins: 'Domenii pe care funcționează widget-ul',
+    origins: 'Domenii pe care funcționează asistentul',
     originsHint: 'Câte un domeniu pe linie, de exemplu https://www.primaria-exemplu.ro',
     originsWarning:
-      'Atenție: widget-ul va funcționa doar pe aceste domenii. Un domeniu șters oprește asistentul pe site-ul respectiv.',
+      'Atenție: asistentul va funcționa doar pe aceste domenii. Un domeniu șters oprește asistentul pe site-ul respectiv.',
     originsReadOnly: 'Doar administratorii pot modifica domeniile.',
   },
   images: {
@@ -147,7 +147,7 @@ const ro = {
   publish: {
     button: 'Publică',
     editorOnly:
-      'Doar administratorii (rolul widget-admin) pot publica. Ciorna dumneavoastră e salvată și poate fi publicată de un administrator.',
+      'Doar administratorii pot publica. Ciorna dumneavoastră e salvată și poate fi publicată de un administrator.',
     fixErrors: (count: number) =>
       `Corectați ${count === 1 ? 'eroarea' : `cele ${count} erori`} înainte de publicare.`,
     nothing: 'Nu există modificări de publicat.',
@@ -164,10 +164,10 @@ const ro = {
   },
   preview: {
     title: 'Previzualizare',
-    frame: 'Previzualizarea widget-ului cu ciorna',
+    frame: 'Previzualizarea asistentului cu ciorna',
     desktop: 'Desktop',
     mobile: 'Telefon',
-    note: 'Previzualizarea folosește ciorna. Mesajele trimise ajung la Dify, marcate ca previzualizare.',
+    note: 'Previzualizarea folosește ciorna. Întrebările puse aici primesc răspunsuri reale; sunt marcate ca test, ca să poată fi excluse din statistici.',
     unavailable: 'Previzualizarea nu este disponibilă.',
   },
   errors: {
@@ -185,8 +185,27 @@ const ro = {
     loadFailed: 'Configurația nu a putut fi încărcată.',
     server: 'Server',
   },
-  contrastTitle: 'Contrast (WCAG 2.1 AA)',
+  contrastTitle: 'Contrast (lizibilitate, WCAG 2.1 AA)',
   ux: {
+    textsLanguage: 'Limba textelor',
+    otherTextsHint:
+      'Fiecare câmp arată, ca etichetă, textul folosit acum. Lăsați gol ca să rămână acesta.',
+    textGroups: {
+      launcher: 'Butonul și fereastra',
+      header: 'Antetul ferestrei',
+      messages: 'Mesaje',
+      composer: 'Câmpul de scriere',
+      suggestions: 'Sugestii și surse',
+      feedback: 'Evaluarea răspunsurilor',
+      conversations: 'Conversațiile anterioare',
+      errors: 'Mesaje de eroare',
+    } as Record<string, string>,
+    imageWhere: {
+      logo: 'Apare în antetul ferestrei.',
+      assistant: 'Apare lângă răspunsurile asistentului.',
+      user: 'Apare lângă întrebările vizitatorului.',
+      launcher: 'Apare pe butonul de pornire.',
+    },
     sameSide: 'Fereastra pe aceeași parte cu butonul',
     sameSideHint: 'Altfel o puteți așeza separat, la dreapta sau la stânga.',
     proactiveDescription:
@@ -223,7 +242,7 @@ const ro = {
     tenantLabel: 'Client',
     checkOk: 'În regulă',
     checkWarn: 'De verificat',
-    domainsMissing: 'Nu există niciun domeniu permis: widget-ul nu va funcționa pe niciun site.',
+    domainsMissing: 'Nu există niciun domeniu permis: asistentul nu va funcționa pe niciun site.',
     domainsInvalid: 'Unele domenii permise au erori.',
     defaultIs: (value: string | number) => `Implicit: ${String(value)}`,
     scaledTo: (percent: number) => `Scalat la ${String(percent)}%`,
@@ -381,7 +400,7 @@ const en: Dictionary = {
     colors: 'Colors',
     color: {
       accent: 'Main color (header, launcher)',
-      accentEnd: 'Main color, gradient end',
+      accentEnd: 'Main color, second shade (gradient)',
       onAccent: 'Text on the main color',
       text: 'Text',
       textMuted: 'Secondary text',
@@ -396,7 +415,7 @@ const en: Dictionary = {
     colorDefault: 'Default',
     reset: 'Reset to default',
     welcome: 'Welcome message',
-    welcomeHint: 'Empty: the opening statement configured in Dify is used.',
+    welcomeHint: 'If left empty, the message configured in the assistant is used.',
     placeholder: 'Message field placeholder',
     moreTexts: 'Other interface texts',
     textsFor: { ro: 'Romanian', en: 'English' },
@@ -405,7 +424,7 @@ const en: Dictionary = {
     proactiveTextEn: 'Message text (English)',
     delaySeconds: 'Delay (seconds)',
     frequency: 'Frequency',
-    perSession: 'Once per session',
+    perSession: 'Once per visit',
     perDay: 'Once per day (coming soon)',
     showOnMobile: 'Also show on phones',
     documentTitles: 'Display titles for documents',
@@ -415,13 +434,13 @@ const en: Dictionary = {
     remove: 'Remove',
     showSnippets: 'Show the document excerpt',
     suggestions: 'Suggested questions after each answer',
-    suggestionsHint: 'Each answer costs one extra model call.',
-    cookieDays: 'Visitor cookie lifetime (days)',
+    suggestionsHint: 'May slow down the answers.',
+    cookieDays: 'How long visitors see their previous conversations (days)',
     privacyPolicyUrl: 'Privacy policy link',
-    origins: 'Domains where the widget works',
+    origins: 'Domains where the assistant works',
     originsHint: 'One domain per line, for example https://www.example-city.ro',
     originsWarning:
-      'Warning: the widget only works on these domains. Removing a domain stops the assistant on that site.',
+      'Warning: the assistant only works on these domains. Removing a domain stops the assistant on that site.',
     originsReadOnly: 'Only administrators can change the domains.',
   },
   images: {
@@ -459,7 +478,7 @@ const en: Dictionary = {
   publish: {
     button: 'Publish',
     editorOnly:
-      'Only administrators (widget-admin role) can publish. Your draft is saved and an administrator can publish it.',
+      'Only administrators can publish. Your draft is saved and an administrator can publish it.',
     fixErrors: (count: number) =>
       `Fix ${count === 1 ? 'the error' : `the ${count} errors`} before publishing.`,
     nothing: 'There are no changes to publish.',
@@ -476,10 +495,10 @@ const en: Dictionary = {
   },
   preview: {
     title: 'Preview',
-    frame: 'Preview of the widget with the draft',
+    frame: 'Preview of the assistant with the draft',
     desktop: 'Desktop',
     mobile: 'Phone',
-    note: 'The preview uses the draft. Messages you send reach Dify, marked as preview.',
+    note: 'The preview uses the draft. Questions asked here get real answers; they are marked as tests so they can be left out of statistics.',
     unavailable: 'The preview is not available.',
   },
   errors: {
@@ -500,6 +519,24 @@ const en: Dictionary = {
   },
   contrastTitle: 'Contrast (WCAG 2.1 AA)',
   ux: {
+    textsLanguage: 'Language of the texts',
+    otherTextsHint: 'Each field shows, as its label, the text used now. Leave it empty to keep it.',
+    textGroups: {
+      launcher: 'Launcher and window',
+      header: 'Window header',
+      messages: 'Messages',
+      composer: 'Message box',
+      suggestions: 'Suggestions and sources',
+      feedback: 'Answer ratings',
+      conversations: 'Previous conversations',
+      errors: 'Error messages',
+    },
+    imageWhere: {
+      logo: 'Shown in the window header.',
+      assistant: "Shown next to the assistant's answers.",
+      user: "Shown next to the visitor's questions.",
+      launcher: 'Shown on the launcher.',
+    },
     sameSide: 'Window on the same side as the launcher',
     sameSideHint: 'Otherwise you can place it separately, on the right or on the left.',
     proactiveDescription:
@@ -536,7 +573,7 @@ const en: Dictionary = {
     tenantLabel: 'Client',
     checkOk: 'OK',
     checkWarn: 'To check',
-    domainsMissing: 'There is no allowed domain: the widget will not work on any site.',
+    domainsMissing: 'There is no allowed domain: the assistant will not work on any site.',
     domainsInvalid: 'Some allowed domains have errors.',
     defaultIs: (value: string | number) => `Default: ${String(value)}`,
     scaledTo: (percent: number) => `Scaled to ${String(percent)}%`,

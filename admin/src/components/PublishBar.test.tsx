@@ -12,7 +12,7 @@ describe('PublishBar (request 2)', () => {
     const button = screen.getByRole('button', { name: /^Publică/ });
     expect(button.getAttribute('aria-disabled')).toBe('true');
     const reason = document.getElementById(button.getAttribute('aria-describedby') ?? '');
-    expect(reason?.textContent).toMatch(/^Doar administratorii \(rolul widget-admin\) pot publica/);
+    expect(reason?.textContent).toMatch(/^Doar administratorii pot publica/);
     fireEvent.click(button);
     expect(onPublish).not.toHaveBeenCalled();
   });

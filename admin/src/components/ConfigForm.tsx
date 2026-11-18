@@ -1,7 +1,7 @@
 import type { ComponentChildren } from 'preact';
 import { useState } from 'preact/hooks';
 import { DEFAULT_THEME } from 'gateway/config-schema';
-import { TEXT_KEYS } from 'gateway/texts';
+import { ERROR_TEXTS, TEXT_KEYS } from 'gateway/texts';
 import { texts as widgetTexts } from 'widget/i18n';
 import type { Config, ConfigState } from '../api.js';
 import { useI18n } from '../i18n.js';
@@ -10,6 +10,7 @@ import { ColorField } from './ColorField.js';
 import { CheckboxField, Field, NumberField, SelectField, TextField } from './Field.js';
 import { ImageField } from './ImageField.js';
 import { IntegrationSection } from './IntegrationSection.js';
+import { LocaleTabs } from './LocaleTabs.js';
 import { NodeIcon, OptionGrid, type GridOption } from './OptionGrid.js';
 import { QuestionsEditor } from './QuestionsEditor.js';
 import { SwitchRow } from './SwitchRow.js';
@@ -164,6 +165,10 @@ export function ConfigForm({
   const swatch = (content: preact.ComponentChildren) => <span class="glyph">{content}</span>;
   const value = (path: string) => getIn(config, path.split('.'));
   const errorsFor = (path: string) => errors[path];
+  const textErrors = {
+    ro: Object.keys(errors).filter((path) => path.startsWith('texts.ro.')).length,
+    en: Object.keys(errors).filter((path) => path.startsWith('texts.en.')).length,
+  };
   const set = (path: string) => (next: unknown) => {
     onChange(path.split('.'), next);
   };
@@ -282,6 +287,7 @@ export function ConfigForm({
           </div>
           <ImageField
             label={t.fields.logo}
+            where={t.ux.imageWhere.logo}
             tenant={tenant}
             value={str(value('identity.logo'))}
             canUpload={permissions.assets}
@@ -291,6 +297,7 @@ export function ConfigForm({
           />
           <OptionGrid
             legend={t.fields.assistantAvatar}
+            hint={t.ux.imageWhere.assistant}
             value={assistantChoice}
             options={assistantOptions}
             onChange={(choice) => {
@@ -326,6 +333,7 @@ export function ConfigForm({
           )}
           <OptionGrid
             legend={t.fields.userAvatar}
+            hint={t.ux.imageWhere.user}
             value={userChoice}
             options={userOptions}
             onChange={(choice) => {
@@ -362,6 +370,7 @@ export function ConfigForm({
         <Section id="launcher" title={t.sections.launcher ?? ''}>
           <OptionGrid
             legend={t.fields.icon}
+            hint={t.ux.imageWhere.launcher}
             value={iconChoice}
             options={launcherOptions}
             onChange={(choice) => {
@@ -485,48 +494,75 @@ export function ConfigForm({
       )}
       {area === 'texts' && (
         <Section id="texts" title={t.sections.texts ?? ''}>
-          {(['ro', 'en'] as const).map((locale) => {
-            const defaults = widgetTexts(locale) as unknown as Record<string, unknown>;
-            const field = (key: string, label: string, hint?: string) => (
-              <TextField
-                key={key}
-                label={label}
-                hint={hint}
-                value={str(value(`texts.${locale}`) && getIn(value(`texts.${locale}`), [key]))}
-                placeholder={str(getIn(defaults, key.split('.')))}
-                onChange={(next) => {
-                  onChange(['texts', locale, key], next);
-                }}
-                errors={errorsFor(`texts.${locale}.${key}`)}
-              />
-            );
-            return (
-              <fieldset key={locale} class="field">
-                <legend>{t.fields.textsFor[locale]}</legend>
-                {field('welcome', t.fields.welcome, t.fields.welcomeHint)}
-                {field('composer.placeholder', t.fields.placeholder)}
-                <QuestionsEditor
-                  questions={
-                    Array.isArray(getIn(value('texts'), [locale, 'suggestedQuestions']))
-                      ? (getIn(value('texts'), [locale, 'suggestedQuestions']) as string[])
-                      : undefined
-                  }
-                  assistantQuestions={assistantQuestions}
-                  errors={errors}
-                  errorPath={`texts.${locale}.suggestedQuestions`}
+          <LocaleTabs label={t.ux.textsLanguage} errors={textErrors}>
+            {(locale) => {
+              const defaults = widgetTexts(locale) as unknown as Record<string, unknown>;
+              /** The text used now when the field is empty (widget or gateway default). */
+              const defaultOf = (key: string): string => {
+                const widget = getIn(defaults, key.split('.'));
+                if (typeof widget === 'string') return widget;
+                const code = key.startsWith('errors.') ? key.slice('errors.'.length) : '';
+                return (ERROR_TEXTS[locale] as Record<string, string | undefined>)[code] ?? key;
+              };
+              const current = (key: string) =>
+                str(value(`texts.${locale}`) && getIn(value(`texts.${locale}`), [key]));
+              const field = (key: string, label: string, hint?: string, placeholder?: string) => (
+                <TextField
+                  key={key}
+                  label={label}
+                  hint={hint}
+                  value={current(key)}
+                  placeholder={placeholder}
                   onChange={(next) => {
-                    onChange(['texts', locale, 'suggestedQuestions'], next);
+                    onChange(['texts', locale, key], next);
                   }}
+                  errors={errorsFor(`texts.${locale}.${key}`)}
                 />
-                <details>
-                  <summary>{t.fields.moreTexts}</summary>
-                  {TEXT_KEYS.filter(
-                    (key) => key !== 'welcome' && key !== 'composer.placeholder',
-                  ).map((key) => field(key, key))}
-                </details>
-              </fieldset>
-            );
-          })}
+              );
+              const others = TEXT_KEYS.filter(
+                (key) => key !== 'welcome' && key !== 'composer.placeholder',
+              );
+              const groups = new Map<string, string[]>();
+              for (const key of others) {
+                const prefix = key.split('.')[0] ?? key;
+                const group = t.ux.textGroups[prefix] ? prefix : 'launcher';
+                groups.set(group, [...(groups.get(group) ?? []), key]);
+              }
+              return (
+                <>
+                  {field('welcome', t.fields.welcome, t.fields.welcomeHint)}
+                  {field(
+                    'composer.placeholder',
+                    t.fields.placeholder,
+                    t.ux.defaultIs(defaultOf('composer.placeholder')),
+                  )}
+                  <QuestionsEditor
+                    questions={
+                      Array.isArray(getIn(value('texts'), [locale, 'suggestedQuestions']))
+                        ? (getIn(value('texts'), [locale, 'suggestedQuestions']) as string[])
+                        : undefined
+                    }
+                    assistantQuestions={assistantQuestions}
+                    errors={errors}
+                    errorPath={`texts.${locale}.suggestedQuestions`}
+                    onChange={(next) => {
+                      onChange(['texts', locale, 'suggestedQuestions'], next);
+                    }}
+                  />
+                  <details>
+                    <summary>{t.fields.moreTexts}</summary>
+                    <p class="field__hint">{t.ux.otherTextsHint}</p>
+                    {[...groups].map(([group, keys]) => (
+                      <fieldset key={group} class="text-group">
+                        <legend>{t.ux.textGroups[group]}</legend>
+                        {keys.map((key) => field(key, `„${defaultOf(key)}”`))}
+                      </fieldset>
+                    ))}
+                  </details>
+                </>
+              );
+            }}
+          </LocaleTabs>
         </Section>
       )}
       {area === 'proactive' && (
