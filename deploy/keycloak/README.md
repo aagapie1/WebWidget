@@ -28,3 +28,18 @@ Authorization Code + PKCE against `widget-admin-ui` in each realm: issuers
 `bob` → widget-editor, `carol` → none (users created just-in-time in `pilot`).
 
 Start / stop: `pnpm services:up`, `pnpm services:down` (Rancher Desktop, Podman or Docker).
+
+## Gateways that may sign in
+
+The `widget-admin-ui` client accepts these callbacks (development only):
+
+- `http://localhost:3000/admin/auth/callback`: `pnpm dev` gateway;
+- `http://localhost:3100/admin/auth/callback`: `pnpm --filter gateway dev:admin` (Postgres source);
+- `http://localhost:3200/admin/auth/callback`: admin end-to-end tests (`E2E_ADMIN=1`, database
+  `widget_e2e`).
+
+The login page lists the organisation codes (`pilot`, `demo-primarie`, `platform`) outside
+production only.
+
+After changing a realm file, recreate the container so it imports the realms again:
+`docker compose -f deploy/docker-compose.dev.yml up -d --force-recreate keycloak`.

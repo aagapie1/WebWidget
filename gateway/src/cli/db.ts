@@ -1,6 +1,7 @@
 /**
  * `pnpm db:migrate` — applies gateway/migrations as the schema owner (DATABASE_OWNER_URL).
  * `pnpm db:seed [dir]` — imports YAML tenants as version 1 (DATABASE_URL, application role).
+ * `db.ts reset-test` — empties the admin tables of a *_test / *_e2e database (owner role).
  */
 import { resolve } from 'node:path';
 import pg from 'pg';
@@ -30,7 +31,24 @@ if (command === 'migrate') {
   } finally {
     await pool.end();
   }
+} else if (command === 'reset-test') {
+  // Empties the admin tables of a TEST database (end-to-end runs). Refuses any other database.
+  const url = process.env.DATABASE_OWNER_URL;
+  if (!url) throw new Error('DATABASE_OWNER_URL is not set');
+  const database = new URL(url).pathname.slice(1);
+  if (!/_(test|e2e)$/.test(database)) {
+    throw new Error(`reset-test refuses database "${database}" (only *_test or *_e2e)`);
+  }
+  const pool = new pg.Pool({ connectionString: url });
+  try {
+    await pool.query(
+      'TRUNCATE tenant_config_versions, tenant_config_drafts, tenant_assets, audit_log RESTART IDENTITY',
+    );
+    console.log(`reset ${database}`);
+  } finally {
+    await pool.end();
+  }
 } else {
-  console.error('usage: db.ts migrate | seed [tenants dir]');
+  console.error('usage: db.ts migrate | seed [tenants dir] | reset-test');
   process.exit(2);
 }

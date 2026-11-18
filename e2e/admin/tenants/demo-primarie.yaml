@@ -1,0 +1,8 @@
+# Admin e2e tenant (realm `demo-primarie`); seeded into the widget_e2e database on every run.
+schemaVersion: 1
+id: demo-primarie
+name: Primăria e2e
+difyBaseUrl: ${DIFY_BASE_URL}
+difyApiKeyEnv: DIFY_API_KEY_E2E
+allowedOrigins:
+  - http://127.0.0.1:5180

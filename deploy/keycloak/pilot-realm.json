@@ -49,12 +49,13 @@
       "serviceAccountsEnabled": false,
       "redirectUris": [
         "http://localhost:3000/admin/auth/callback",
-        "http://localhost:3100/admin/auth/callback"
+        "http://localhost:3100/admin/auth/callback",
+        "http://localhost:3200/admin/auth/callback"
       ],
-      "webOrigins": ["http://localhost:3000", "http://localhost:3100"],
+      "webOrigins": ["http://localhost:3000", "http://localhost:3100", "http://localhost:3200"],
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "http://localhost:3000/admin/*##http://localhost:3100/admin/*"
+        "post.logout.redirect.uris": "http://localhost:3000/admin/*##http://localhost:3100/admin/*##http://localhost:3200/admin/*"
       },
       "protocolMappers": [
         {

@@ -5,7 +5,7 @@
 import { randomUUID } from 'node:crypto';
 import { createServer } from 'node:http';
 
-const GATEWAY = process.env.E2E_GATEWAY ?? 'http://localhost:3100';
+const GATEWAY = process.env.E2E_GATEWAY ?? 'http://localhost:3101';
 
 const requests = [];
 let failuresLeft = 1;

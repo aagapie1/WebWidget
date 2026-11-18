@@ -16,3 +16,11 @@ CREATE DATABASE widget_test OWNER widget_owner;
 REVOKE ALL ON SCHEMA public FROM PUBLIC;
 GRANT USAGE, CREATE ON SCHEMA public TO widget_owner;
 GRANT USAGE ON SCHEMA public TO widget_app;
+
+-- Separate database for the admin end-to-end tests (Playwright resets it on every run).
+\connect postgres
+CREATE DATABASE widget_e2e OWNER widget_owner;
+\connect widget_e2e
+REVOKE ALL ON SCHEMA public FROM PUBLIC;
+GRANT USAGE, CREATE ON SCHEMA public TO widget_owner;
+GRANT USAGE ON SCHEMA public TO widget_app;

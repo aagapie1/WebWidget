@@ -1,0 +1,15 @@
+# Admin end-to-end tests (E4b.1): the development Keycloak realms (deploy/keycloak), mapped to
+# the e2e admin tenants below. Secrets come from the Playwright web server env (test values).
+tenants:
+  - tenant: pilot
+    issuer: http://localhost:8081/realms/pilot
+    clientId: widget-admin-ui
+    clientSecretEnv: ADMIN_OIDC_SECRET_PILOT
+  - tenant: demo-primarie
+    issuer: http://localhost:8081/realms/demo-primarie
+    clientId: widget-admin-ui
+    clientSecretEnv: ADMIN_OIDC_SECRET_DEMO_PRIMARIE
+platform:
+  issuer: http://localhost:8081/realms/platform
+  clientId: widget-admin-ui
+  clientSecretEnv: ADMIN_OIDC_SECRET_PLATFORM

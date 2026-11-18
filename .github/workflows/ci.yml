@@ -66,8 +66,35 @@ jobs:
       fail-fast: false
       matrix:
         browser: [chromium, firefox, webkit]
+    # Admin interface e2e (E4b.1): Postgres and Redis here, Keycloak started after the checkout
+    # (it imports the test realms from the repository). Test credentials only.
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 10
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: dev-postgres-superuser
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 3s --health-retries 20
     steps:
       - uses: actions/checkout@v5
+      - name: Start Keycloak with the test realms
+        run: >-
+          docker run -d --name keycloak -p 8081:8080
+          -v "$GITHUB_WORKSPACE/deploy/keycloak:/opt/keycloak/data/import:ro"
+          -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=dev-keycloak-admin
+          -e KC_HOSTNAME=http://localhost:8081 -e KC_HOSTNAME_BACKCHANNEL_DYNAMIC=true
+          quay.io/keycloak/keycloak:26.3 start-dev --import-realm
+      - run: psql -v ON_ERROR_STOP=1 -h localhost -p 55432 -U postgres -f deploy/postgres/init/01-roles.sql
+        env:
+          PGPASSWORD: dev-postgres-superuser
       - uses: actions/setup-node@v5
         with:
           node-version: 22
@@ -76,10 +103,19 @@ jobs:
       - run: corepack enable
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter e2e exec playwright install --with-deps ${{ matrix.browser }}
+      - name: Wait for Keycloak
+        run: |
+          for i in $(seq 1 90); do
+            curl -sf -o /dev/null http://localhost:8081/realms/pilot/.well-known/openid-configuration && exit 0
+            sleep 2
+          done
+          docker logs keycloak | tail -50
+          exit 1
       # Fake Dify only: no secrets, no access to real Dify instances.
       - run: pnpm --filter e2e exec playwright test --project ${{ matrix.browser }}
         env:
           E2E_ALL_BROWSERS: '1'
+          E2E_ADMIN: '1'
       - uses: actions/upload-artifact@v5
         if: failure()
         with:

@@ -19,6 +19,8 @@ const envSchema = z.object({
   DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }).optional(),
   /** Server-only admin login configuration (ADR 008): issuer → tenant map. Admin is off without it. */
   ADMIN_AUTH_CONFIG: z.string().min(1).optional(),
+  /** Admin login starts + callbacks per client address per 10 minutes (ADR 008). */
+  ADMIN_LOGIN_LIMIT: z.coerce.number().int().positive().default(30),
   VISITOR_COOKIE_SECRET: z.string().min(32, 'must be at least 32 characters'),
   /** Time allowed for Dify to answer with response headers. */
   DIFY_CONNECT_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),
