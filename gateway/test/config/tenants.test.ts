@@ -371,6 +371,30 @@ describe('E4 completions (schema version 1, all optional)', () => {
     );
   });
 
+  it('allowed origins: https, or http only for localhost / 127.0.0.1 / [::1]', async () => {
+    const origins = async (list: string[]) =>
+      validateTenant(
+        validYaml.replace(
+          'allowedOrigins:\n  - http://localhost:5173',
+          `allowedOrigins:\n${list.map((origin) => `  - ${origin}`).join('\n')}`,
+        ),
+        { env, fileName: 'pilot.yaml' },
+      );
+    const local = await origins([
+      'https://www.primaria-exemplu.ro',
+      'http://localhost:5173',
+      'http://127.0.0.1:5180',
+      'http://[::1]:8080',
+    ]);
+    expect(local.errors).toEqual([]);
+    const plain = await origins(['http://www.primaria-exemplu.ro']);
+    expect(plain.tenant).toBeUndefined();
+    expect(plain.errors.join()).toMatch(/allowedOrigins.0: must use https/);
+    const path = await origins(['https://www.primaria-exemplu.ro/pagina']);
+    expect(path.errors.join()).toMatch(/must be a bare origin/);
+    expect(path.errors.join()).not.toMatch(/must use https/);
+  });
+
   it('enabled defaults to true and can be turned off', async () => {
     const tenant = await parseTenant(`${validYaml}enabled: false\n`, env, 'pilot.yaml');
     expect(tenant.enabled).toBe(false);

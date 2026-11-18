@@ -1300,3 +1300,25 @@ a.badge {
   color: var(--muted);
   font-size: 0.875rem;
 }
+
+/* Allowed domains: one row per domain. */
+.origins__list {
+  list-style: none;
+  margin: 8px 0 12px;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.origins__row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: start;
+}
+.origins__row .field__errors {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+.origins__row.field--invalid input {
+  border-color: var(--danger, #b42318);
+}

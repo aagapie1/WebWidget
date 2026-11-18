@@ -1,5 +1,11 @@
 import { contrastRatio } from 'gateway/contrast';
-import { contrastChecks, DEFAULT_THEME, tenantSchema, type Theme } from 'gateway/config-schema';
+import {
+  contrastChecks,
+  DEFAULT_THEME,
+  ORIGIN_HTTPS_MESSAGE,
+  tenantSchema,
+  type Theme,
+} from 'gateway/config-schema';
 import type { Config } from './api.js';
 import type { Dictionary } from './i18n.js';
 
@@ -179,7 +185,8 @@ function messageFor(issue: Issue, path: string, t: Dictionary): string {
       if (path === 'behavior.privacyPolicyUrl') return t.errors.url;
       return t.errors.format;
     case 'custom':
-      return path.startsWith('allowedOrigins') ? t.errors.origin : issue.message;
+      if (!path.startsWith('allowedOrigins')) return issue.message;
+      return issue.message === ORIGIN_HTTPS_MESSAGE ? t.errors.originHttps : t.errors.origin;
     default:
       return t.errors.format;
   }

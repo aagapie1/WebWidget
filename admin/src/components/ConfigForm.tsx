@@ -7,11 +7,12 @@ import type { Config, ConfigState } from '../api.js';
 import { useI18n } from '../i18n.js';
 import { getIn, type FieldErrors, type Path } from '../model.js';
 import { ColorField } from './ColorField.js';
-import { CheckboxField, Field, NumberField, SelectField, TextField } from './Field.js';
+import { CheckboxField, NumberField, SelectField, TextField } from './Field.js';
 import { ImageField } from './ImageField.js';
 import { IntegrationSection } from './IntegrationSection.js';
 import { LocaleTabs } from './LocaleTabs.js';
 import { NodeIcon, OptionGrid, type GridOption } from './OptionGrid.js';
+import { OriginsList } from './OriginsList.js';
 import { QuestionsEditor } from './QuestionsEditor.js';
 import { SwitchRow } from './SwitchRow.js';
 import { AppWindow, Lightbulb, MessageCircleMore, TextQuote, Upload } from '../icons.js';
@@ -105,45 +106,6 @@ function Section({
 }
 
 /** One origin per line; the text is kept as typed, the list is what gets saved. */
-function OriginsField(props: {
-  origins: string[];
-  editable: boolean;
-  errors: string[];
-  onChange: (origins: string[]) => void;
-}) {
-  const { t } = useI18n();
-  const [text, setText] = useState(props.origins.join('\n'));
-  return (
-    <Field
-      label={t.fields.origins}
-      hint={props.editable ? t.fields.originsHint : t.fields.originsReadOnly}
-      errors={props.errors}
-    >
-      {({ id, describedBy, invalid }) => (
-        <textarea
-          id={id}
-          rows={4}
-          readOnly={!props.editable}
-          value={text}
-          aria-describedby={describedBy}
-          aria-invalid={invalid}
-          spellcheck={false}
-          onInput={(event) => {
-            const raw = event.currentTarget.value;
-            setText(raw);
-            props.onChange(
-              raw
-                .split('\n')
-                .map((line) => line.trim())
-                .filter(Boolean),
-            );
-          }}
-        />
-      )}
-    </Field>
-  );
-}
-
 /** The editable configuration (spec §5.1), grouped in sections. */
 export function ConfigForm({
   tenant,
@@ -715,12 +677,10 @@ export function ConfigForm({
       {area === 'domains' && (
         <Section id="allowedOrigins" title={t.sections.allowedOrigins ?? ''}>
           <p class="warning">{t.fields.originsWarning}</p>
-          <OriginsField
+          <OriginsList
             origins={origins}
-            editable={permissions.origins}
-            errors={Object.entries(errors)
-              .filter(([path]) => path.startsWith('allowedOrigins'))
-              .flatMap(([, list]) => list)}
+            errorsAt={(index) => errors[`allowedOrigins.${String(index)}`]}
+            listErrors={errors.allowedOrigins}
             onChange={(next) => {
               onChange(['allowedOrigins'], next);
             }}

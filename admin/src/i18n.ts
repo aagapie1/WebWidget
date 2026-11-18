@@ -107,10 +107,16 @@ const ro = {
     cookieDays: 'Cât timp își vede vizitatorul conversațiile anterioare (zile)',
     privacyPolicyUrl: 'Link spre politica de confidențialitate',
     origins: 'Domenii pe care funcționează asistentul',
-    originsHint: 'Câte un domeniu pe linie, de exemplu https://www.primaria-exemplu.ro',
+    originsHint: 'Doar adresa site-ului, fără cale, de exemplu https://www.primaria-exemplu.ro',
+    originLabel: (n: number) => `Domeniul ${String(n)}`,
+    addOrigin: 'Adaugă domeniu',
+    removeOrigin: (n: number, origin: string) =>
+      origin ? `Elimină domeniul ${String(n)} (${origin})` : `Elimină domeniul ${String(n)}`,
+    removeOriginTitle: 'Eliminați domeniul?',
+    removeOriginBody: (origin: string) => `Asistentul se va opri pe ${origin} după publicare.`,
+    removeOriginConfirm: 'Elimină domeniul',
     originsWarning:
       'Atenție: asistentul va funcționa doar pe aceste domenii. Un domeniu șters oprește asistentul pe site-ul respectiv.',
-    originsReadOnly: 'Doar administratorii pot modifica domeniile.',
   },
   images: {
     upload: 'Încarcă imagine',
@@ -178,6 +184,7 @@ const ro = {
     color: 'Culoare în format #rrggbb.',
     url: 'Adresă web invalidă (https://…).',
     origin: 'Doar domeniul, de exemplu https://www.exemplu.ro (fără cale).',
+    originHttps: 'Folosiți https:// (http e permis doar pentru localhost, în dezvoltare).',
     tooSmall: (min: number) => `Minimum ${min}.`,
     tooBig: (max: number) => `Maximum ${max}.`,
     contrast: (ratio: string, other: string, min: number) =>
@@ -440,10 +447,16 @@ const en: Dictionary = {
     cookieDays: 'How long visitors see their previous conversations (days)',
     privacyPolicyUrl: 'Privacy policy link',
     origins: 'Domains where the assistant works',
-    originsHint: 'One domain per line, for example https://www.example-city.ro',
+    originsHint: 'Only the site address, no path, for example https://www.example-city.ro',
+    originLabel: (n: number) => `Domain ${String(n)}`,
+    addOrigin: 'Add domain',
+    removeOrigin: (n: number, origin: string) =>
+      origin ? `Remove domain ${String(n)} (${origin})` : `Remove domain ${String(n)}`,
+    removeOriginTitle: 'Remove the domain?',
+    removeOriginBody: (origin: string) => `The assistant will stop on ${origin} once published.`,
+    removeOriginConfirm: 'Remove domain',
     originsWarning:
       'Warning: the assistant only works on these domains. Removing a domain stops the assistant on that site.',
-    originsReadOnly: 'Only administrators can change the domains.',
   },
   images: {
     upload: 'Upload image',
@@ -511,6 +524,7 @@ const en: Dictionary = {
     color: 'Color in #rrggbb format.',
     url: 'Invalid web address (https://…).',
     origin: 'The domain only, for example https://www.example.ro (no path).',
+    originHttps: 'Use https:// (http is allowed only for localhost, in development).',
     tooSmall: (min: number) => `At least ${min}.`,
     tooBig: (max: number) => `At most ${max}.`,
     contrast: (ratio: string, other: string, min: number) =>

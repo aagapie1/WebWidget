@@ -175,11 +175,23 @@ test('an editor saves the draft but cannot publish (visible reason)', async ({ p
   expect((await api(page, 'POST', '/admin/api/tenants/pilot/config/publish', {})).status).toBe(403);
   // Images and allowed domains are for administrators too.
   await expect(page.getByText('Doar administratorii pot încărca imagini.').first()).toBeVisible();
-  await area(page, 'Domenii permise');
-  await expect(page.getByLabel('Domenii pe care funcționează asistentul')).toHaveAttribute(
-    'readonly',
-    '',
-  );
+  // The allowed domains are not shown to an editor at all; the server refuses a change too.
+  await expect(
+    page.getByRole('navigation', { name: 'Zone de configurare' }).getByRole('link'),
+  ).not.toContainText(['Domenii permise']);
+  const state = JSON.parse((await api(page, 'GET', '/admin/api/tenants/pilot/config')).text) as {
+    published: { version: number; config: Record<string, unknown> };
+    draft: { revision: number; config: Record<string, unknown> } | null;
+  };
+  const changed = await api(page, 'PUT', '/admin/api/tenants/pilot/config/draft', {
+    config: {
+      ...(state.draft?.config ?? state.published.config),
+      allowedOrigins: ['https://x.ro'],
+    },
+    baseVersion: state.published.version,
+    draftRevision: state.draft?.revision ?? null,
+  });
+  expect(changed.status).toBe(403);
   expect((await discardDraft(page, 'pilot')).status).toBe(204);
 });
 
@@ -449,8 +461,16 @@ test('validation errors show in the status bar, link to the field and block publ
 }) => {
   await openEditor(page, PILOT_ADMIN);
   await area(page, 'Domenii permise');
-  const domains = page.getByLabel('Domenii pe care funcționează asistentul');
-  await domains.fill('http://127.0.0.1:5180\nhttps://www.exemplu.ro/pagina');
+  await expect(page.getByLabel('Domeniul 1', { exact: true })).toHaveValue('http://127.0.0.1:5180');
+  await page.getByRole('button', { name: 'Adaugă domeniu' }).click();
+  const domains = page.getByLabel('Domeniul 2', { exact: true });
+  await expect(domains).toBeFocused();
+  // http is refused outside localhost; the error stays on its row.
+  await domains.fill('http://www.exemplu.ro');
+  await expect(page.locator('#section-allowedOrigins').locator('..')).toContainText(
+    'Folosiți https://',
+  );
+  await domains.fill('https://www.exemplu.ro/pagina');
   const badge = page.locator('.statusbar').getByRole('link', { name: /1 eroare/ });
   await expect(badge).toBeVisible();
   await expect(publishButton(page)).toHaveAttribute('aria-disabled', 'true');
@@ -467,6 +487,13 @@ test('validation errors show in the status bar, link to the field and block publ
   await badge.click();
   await expect(domains).toBeFocused();
   await saved(page);
+
+  // Removing a domain asks first: the assistant stops there once published.
+  await page.getByRole('button', { name: 'Elimină domeniul 1 (http://127.0.0.1:5180)' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Eliminați domeniul?' });
+  await expect(dialog).toContainText('Asistentul se va opri pe http://127.0.0.1:5180');
+  await dialog.getByRole('button', { name: 'Anulează' }).click();
+  await expect(page.getByLabel('Domeniul 1', { exact: true })).toHaveValue('http://127.0.0.1:5180');
   expect((await discardDraft(page, 'pilot')).status).toBe(204);
 });
 

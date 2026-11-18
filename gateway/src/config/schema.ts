@@ -24,16 +24,30 @@ export const assetNameSchema = z
     'must be a .png, .jpg, .webp or .svg file name',
   );
 
-const originSchema = z.string().refine(
-  (value) => {
-    try {
-      return new URL(value).origin === value;
-    } catch {
-      return false;
-    }
-  },
-  { message: 'must be a bare origin, e.g. https://www.example.ro' },
-);
+export const ORIGIN_MESSAGE = 'must be a bare origin, e.g. https://www.example.ro';
+export const ORIGIN_HTTPS_MESSAGE = 'must use https (http only for localhost)';
+/** http is allowed only for local development (E4b.1 UX 14). */
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+const originSchema = z
+  .string()
+  .refine(
+    (value) => {
+      try {
+        return new URL(value).origin === value;
+      } catch {
+        return false;
+      }
+    },
+    { message: ORIGIN_MESSAGE, abort: true },
+  )
+  .refine(
+    (value) => {
+      const url = new URL(value);
+      return url.protocol === 'https:' || LOCAL_HOSTS.has(url.hostname);
+    },
+    { message: ORIGIN_HTTPS_MESSAGE },
+  );
 
 const textValue = z.string().trim().min(1).max(2000);
 /** Known keys only: an unknown key is an error (strict object). */

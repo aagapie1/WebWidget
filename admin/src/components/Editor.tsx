@@ -348,6 +348,11 @@ export function Editor({ api, tenant, onSessionExpired, gatewayOrigin, frame }: 
       ? `/admin/api/tenants/${encodeURIComponent(tenant)}/assets/${encodeURIComponent(identityConfig.logo)}`
       : undefined;
 
+  // The allowed domains are for administrators (E4b.1 UX 14): editors do not see the area.
+  const visibleAreas = state.permissions.origins
+    ? AREAS
+    : AREAS.filter((item) => item !== 'domains');
+  const shown: Area = visibleAreas.includes(area) ? area : 'aspect';
   // Errors per area (sidebar) and in the status bar; contrast has its own indicator.
   const errorPaths = Object.entries(errors).filter(([, list]) => list.length > 0);
   const areaErrors: Partial<Record<Area, number>> = {};
@@ -464,10 +469,16 @@ export function Editor({ api, tenant, onSessionExpired, gatewayOrigin, frame }: 
       </div>
 
       <div class="workspace">
-        <Sidebar area={area} changed={changedAreas} errors={areaErrors} onArea={setArea} />
+        <Sidebar
+          area={shown}
+          visible={visibleAreas}
+          changed={changedAreas}
+          errors={areaErrors}
+          onArea={setArea}
+        />
         <main class="workspace__form" onFocusIn={followSection}>
           <h1 class="area-title" id="area-title" tabIndex={-1}>
-            {t.ux.areas[area]}
+            {t.ux.areas[shown]}
           </h1>
           {restored && (
             <p class="notice" role="status">
@@ -499,7 +510,7 @@ export function Editor({ api, tenant, onSessionExpired, gatewayOrigin, frame }: 
           )}
           <ConfigForm
             key={formKey}
-            area={area}
+            area={shown}
             tenant={tenant}
             config={config}
             errors={errors}
@@ -520,9 +531,13 @@ export function Editor({ api, tenant, onSessionExpired, gatewayOrigin, frame }: 
                         : draftOrigins.length === 0
                           ? 'missing'
                           : 'ok',
-                    onDomains: () => {
-                      setArea('domains');
-                    },
+                    ...(state.permissions.origins
+                      ? {
+                          onDomains: () => {
+                            setArea('domains');
+                          },
+                        }
+                      : {}),
                     checkInstallations,
                   }
                 : undefined
