@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 import { ADMIN, ADMIN_E2E, DIFY_KEY } from '../constants.js';
 
 /**
@@ -537,48 +537,87 @@ const EDITOR_REGIONS: { area: string; selector: string }[] = [
   { area: 'Aspect', selector: '.preview__head' },
 ];
 
+type AxeVariant = 'default' | 'no-contrast' | 'contrast-only' | 'static-bars' | 'moved-to-top';
+
+/**
+ * Scans one region in a fresh page. A variant changes one thing, to find what crashes Firefox
+ * under axe in CI on the lower Aspect sections (diagnostic, temporary).
+ */
+async function scanRegion(
+  context: BrowserContext,
+  name: string,
+  region: string,
+  variant: AxeVariant,
+): Promise<string | undefined> {
+  const tab = await context.newPage();
+  try {
+    await tab.goto(`${ADMIN}/admin/`);
+    await expect(tab.getByLabel('Numele clientului')).toBeVisible();
+    if (name !== 'Aspect') await area(tab, name);
+    // The preview's widget is axe-tested in its own specs; its header is scanned on its own.
+    if (region === '.preview__head') {
+      await tab.locator('.preview__frame').evaluate((frame) => {
+        frame.remove();
+      });
+    } else {
+      await tab.locator('#preview-column').evaluate((column) => {
+        column.remove();
+      });
+    }
+    const selector = region.startsWith('#section-')
+      ? `section[aria-labelledby="${region.slice(1)}"]`
+      : region;
+    await expect(tab.locator(selector).first()).toBeVisible();
+    if (variant === 'static-bars') {
+      await tab.addStyleTag({
+        content: '.statusbar, .sidebar, .app-header { position: static !important; }',
+      });
+    }
+    if (variant === 'moved-to-top') {
+      await tab
+        .locator(selector)
+        .first()
+        .evaluate((section) => {
+          section.parentElement?.prepend(section);
+        });
+    }
+    await tab.locator(selector).first().scrollIntoViewIfNeeded();
+    let builder = new AxeBuilder({ page: tab }).include(selector);
+    if (variant === 'no-contrast') builder = builder.disableRules(['color-contrast']);
+    if (variant === 'contrast-only') builder = builder.withRules(['color-contrast']);
+    const results = await builder.analyze();
+    const serious = results.violations.filter(
+      (violation) => violation.impact === 'serious' || violation.impact === 'critical',
+    );
+    return serious.length > 0 ? serious.map((violation) => violation.id).join(', ') : undefined;
+  } catch (error) {
+    return String(error).split('\n')[0] ?? 'error';
+  } finally {
+    await tab.close().catch(() => undefined);
+  }
+}
+
 test('no serious or critical axe violations in the editor', async ({ page, context }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(240_000);
   await openEditor(page, PILOT_ADMIN);
   await page.close();
-  // Every region is scanned even if one fails, so that one run names all the problems (and a
-  // browser crash names its region).
+  // Every region is scanned even if one fails, so that one run names all the problems. A crash
+  // is retried with variants, which say what triggers it.
   const failures: string[] = [];
   for (const { area: name, selector: region } of EDITOR_REGIONS) {
     await test.step(`axe: ${name} ${region}`, async () => {
-      const tab = await context.newPage();
-      try {
-        await tab.goto(`${ADMIN}/admin/`);
-        await expect(tab.getByLabel('Numele clientului')).toBeVisible();
-        if (name !== 'Aspect') await area(tab, name);
-        // The preview's widget is axe-tested in its own specs. For the form regions the whole
-        // preview column goes: next to its large scaled canvas, Firefox crashed in CI while axe
-        // scanned the lower Aspect sections (launcher, window, colors).
-        if (region === '.preview__head') {
-          await tab.locator('.preview__frame').evaluate((frame) => {
-            frame.remove();
-          });
-        } else {
-          await tab.locator('#preview-column').evaluate((column) => {
-            column.remove();
-          });
-        }
-        const selector = region.startsWith('#section-')
-          ? `section[aria-labelledby="${region.slice(1)}"]`
-          : region;
-        await expect(tab.locator(selector).first()).toBeVisible();
-        await tab.locator(selector).first().scrollIntoViewIfNeeded();
-        const results = await new AxeBuilder({ page: tab }).include(selector).analyze();
-        const serious = results.violations.filter(
-          (violation) => violation.impact === 'serious' || violation.impact === 'critical',
-        );
-        if (serious.length > 0) {
-          failures.push(`${region}: ${serious.map((violation) => violation.id).join(', ')}`);
-        }
-      } catch (error) {
-        failures.push(`${region}: ${String(error).split('\n')[0] ?? ''}`);
-      } finally {
-        await tab.close().catch(() => undefined);
+      const problem = await scanRegion(context, name, region, 'default');
+      if (!problem) return;
+      failures.push(`${region}: ${problem}`);
+      if (!problem.includes('crashed')) return;
+      for (const variant of [
+        'no-contrast',
+        'contrast-only',
+        'static-bars',
+        'moved-to-top',
+      ] as const) {
+        const outcome = await scanRegion(context, name, region, variant);
+        failures.push(`  ${variant}: ${outcome ?? 'ok'}`);
       }
     });
   }
