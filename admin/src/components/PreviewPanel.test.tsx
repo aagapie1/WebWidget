@@ -1,7 +1,7 @@
 import { fireEvent, screen, waitFor } from '@testing-library/preact';
 import { describe, expect, it, vi } from 'vitest';
 import { renderWithI18n } from '../test-utils.js';
-import { PreviewPanel } from './PreviewPanel.js';
+import { KEEP_ALIVE_MS, PreviewPanel } from './PreviewPanel.js';
 
 describe('PreviewPanel', () => {
   it('reloads the preview after each saved draft, reusing the short-lived token', async () => {
@@ -39,5 +39,26 @@ describe('PreviewPanel', () => {
     expect((await screen.findByRole('alert')).textContent).toBe(
       'Previzualizarea nu este disponibilă.',
     );
+  });
+
+  it('keeps the preview token alive while the panel is open', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const keepAlive = vi.fn(() => Promise.resolve());
+      renderWithI18n(
+        <PreviewPanel
+          revision={0}
+          createToken={() => Promise.resolve({ url: '/admin/preview?id=pilot--p-abc' })}
+          keepAlive={keepAlive}
+        />,
+      );
+      await screen.findByTitle('Previzualizarea widget-ului cu ciorna');
+      await vi.advanceTimersByTimeAsync(KEEP_ALIVE_MS);
+      expect(keepAlive).toHaveBeenCalledWith('pilot--p-abc');
+      await vi.advanceTimersByTimeAsync(KEEP_ALIVE_MS);
+      expect(keepAlive).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

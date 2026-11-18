@@ -31,7 +31,8 @@ export const redactPreview = (text: string): string =>
   text.replace(/--p-[0-9a-f]{32}/g, '--p-[redacted]');
 
 /**
- * Short-lived preview tokens (ADR 008): 10 minutes, bound to the admin session that created them
+ * Short-lived preview tokens (ADR 008): 10 minutes after their last use (the admin interface
+ * keeps an open preview alive), bound to the admin session that created them
  * (logging out ends the preview) and to one tenant. Kept in Redis for every replica.
  */
 export class PreviewService {
@@ -71,6 +72,8 @@ export class PreviewService {
     if (!record?.success || record.data.tenant !== tenantId) return undefined;
     // Bound to the admin session: no session, no preview.
     if (!(await this.store.get(record.data.session))) return undefined;
+    // Sliding expiry: 10 minutes after the last use, so an open preview keeps working.
+    await this.store.set(recordKey(token), raw ?? '', PREVIEW_TTL_SECONDS);
 
     const published = await this.#configs.published(tenantId);
     if (!published) return undefined;

@@ -50,6 +50,8 @@ describe.skipIf(!appUrl || !ownerUrl)('admin configuration API (Postgres)', () =
   let registry: Map<string, Tenant>;
   let stopWatching: () => void;
   let sessions: AdminSessions;
+  // Clock of the session / token store (preview token expiry).
+  let now = Date.now();
 
   beforeAll(async () => {
     tenantEnv.DIFY_BASE_URL = await dify.start();
@@ -86,7 +88,8 @@ describe.skipIf(!appUrl || !ownerUrl)('admin configuration API (Postgres)', () =
     const loaded = await source.load();
     registry = new Map([...loaded].filter(([id]) => TENANTS.includes(id)));
     stopWatching = source.watch(registry);
-    const store = new MemoryKeyValueStore();
+    now = Date.now();
+    const store = new MemoryKeyValueStore(() => now);
     sessions = new AdminSessions(store);
     app = await buildApp({
       env: loadEnv({
@@ -464,5 +467,23 @@ describe.skipIf(!appUrl || !ownerUrl)('admin configuration API (Postgres)', () =
     expect(late.json()).toMatchObject({
       error: { code: 'draft_conflict', publishedVersion: 2, draft: null },
     });
+  });
+
+  it('keeps a preview token alive while it is used and ends it 10 minutes after the last use', async () => {
+    const admin = await as('widget-admin');
+    const { id } = (await admin('POST', '/admin/api/tenants/gamma/preview-token', {})).json<{
+      id: string;
+    }>();
+    const use = async () =>
+      (await app.inject({ url: '/api/loader-config?tenant=' + id })).statusCode;
+    const minutes = (n: number) => {
+      now += n * 60_000;
+    };
+    minutes(9);
+    expect(await use()).toBe(200);
+    minutes(9); // 18 minutes after creation, 9 after the last use
+    expect(await use()).toBe(200);
+    minutes(11);
+    expect(await use()).toBe(404);
   });
 });

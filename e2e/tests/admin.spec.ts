@@ -326,16 +326,25 @@ test('the Dify key never appears in the admin interface traffic', async ({ page 
   expect((await discardDraft(page, 'pilot')).status).toBe(204);
 });
 
-test('no serious or critical axe violations on the login page and the editor', async ({ page }) => {
-  const serious = async () =>
-    // The preview frame holds the public widget, which has its own axe tests (widget specs).
-    // Scanning the two nested frames here crashed Firefox in CI.
-    (await new AxeBuilder({ page }).exclude('.preview__frame').analyze()).violations.filter(
-      (violation) => violation.impact === 'serious' || violation.impact === 'critical',
-    );
+const serious = async (page: Page) =>
+  (await new AxeBuilder({ page }).analyze()).violations.filter(
+    (violation) => violation.impact === 'serious' || violation.impact === 'critical',
+  );
+
+test('no serious or critical axe violations on the login page', async ({ page }) => {
   await page.goto(`${ADMIN}/admin/`);
   await expect(page.getByRole('heading', { name: 'Autentificare' })).toBeVisible();
-  expect(await serious()).toEqual([]);
+  await expect(page.getByRole('button', { name: 'pilot' })).toBeVisible();
+  expect(await serious(page)).toEqual([]);
+});
+
+test('no serious or critical axe violations in the editor', async ({ page }) => {
   await openEditor(page, PILOT_ADMIN);
-  expect(await serious()).toEqual([]);
+  // The preview frame holds the public widget, axe-tested in its own specs (widget,
+  // white-label). Injecting axe into the nested frames crashed Firefox in CI, so the frame is
+  // removed before scanning the editor itself.
+  await page.locator('.preview__frame').evaluate((frame) => {
+    frame.remove();
+  });
+  expect(await serious(page)).toEqual([]);
 });

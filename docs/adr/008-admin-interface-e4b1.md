@@ -171,3 +171,6 @@ draft_conflict` (who saved, when) and nothing is overwritten. Autosave then stop
   `admin` and `admin-login` without `Secure`, because WebKit refuses Secure cookies on
   http://localhost. In production the gateway refuses to start the admin interface without
   an https `PUBLIC_ORIGIN`.
+- Preview tokens use a sliding expiry: 10 minutes after their last use, never beyond the admin
+  session. The open preview panel renews its token every 5 minutes. Before this, the preview
+  widget stopped answering 10 minutes after the last saved draft.
