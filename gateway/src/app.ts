@@ -6,6 +6,7 @@ import type { AdminApiOptions } from './admin/api.js';
 import type { AdminAuthConfig } from './admin/auth-config.js';
 import type { KeyValueStore } from './admin/kv.js';
 import type { OidcClient } from './admin/oidc.js';
+import { PREVIEW_ID, PreviewService, redactPreview, TenantsWithPreviews } from './admin/preview.js';
 import { adminRoutes } from './admin/routes.js';
 import { chatRoute } from './chat/route.js';
 import type { AppEnv } from './config/env.js';
@@ -32,12 +33,26 @@ export interface BuildAppOptions {
 const REQUEST_ID = /^[a-zA-Z0-9-]{8,64}$/;
 
 export async function buildApp(options: BuildAppOptions): Promise<FastifyInstance> {
+  // Admin preview (ADR 008): requests with a preview tenant id use the draft configuration.
+  const preview = options.admin?.api
+    ? new PreviewService(
+        options.admin.store,
+        options.admin.api.db,
+        options.admin.api.tenantEnv,
+        options.env.PUBLIC_ORIGIN,
+      )
+    : undefined;
+  const previews = preview ? new TenantsWithPreviews(options.tenants) : undefined;
+  const tenants: TenantRegistry = previews ?? options.tenants;
   const app = Fastify({
     logger: {
       level: options.env.LOG_LEVEL,
       // No personal data in logs (CLAUDE.md rule 7): no IP, no cookies, no bodies.
       serializers: {
-        req: (req: { method: string; url: string }) => ({ method: req.method, url: req.url }),
+        req: (req: { method: string; url: string }) => ({
+          method: req.method,
+          url: redactPreview(req.url),
+        }),
       },
       redact: ['req.headers.authorization', 'req.headers.cookie'],
     },
@@ -84,11 +99,17 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   // Disabled tenant (E4b §5.6): every API call and the chat page answer `tenant_disabled`; the
   // loader sees it from loader-config and shows no launcher. Checked after body parsing.
   app.addHook('preHandler', async (request, reply) => {
-    if (!request.url.startsWith('/api/') && !request.url.startsWith('/w/app')) return;
+    const isAsset = request.url.startsWith('/w/t/');
+    if (!request.url.startsWith('/api/') && !request.url.startsWith('/w/app') && !isAsset) return;
     const fromQuery = (request.query as Record<string, unknown> | undefined)?.tenant;
     const fromBody = (request.body as Record<string, unknown> | undefined)?.tenant;
-    const id = typeof fromQuery === 'string' ? fromQuery : fromBody;
-    if (typeof id !== 'string' || options.tenants.get(id)?.enabled !== false) return;
+    const fromPath = (request.params as Record<string, unknown> | undefined)?.tenant;
+    const id = typeof fromQuery === 'string' ? fromQuery : isAsset ? fromPath : fromBody;
+    if (typeof id !== 'string') return;
+    if (preview && previews && PREVIEW_ID.test(id)) {
+      previews.remember(id, await preview.resolve(id));
+    }
+    if (isAsset || tenants.get(id)?.enabled !== false) return;
     const locale =
       (request.query as Record<string, unknown> | undefined)?.locale === 'en' ? 'en' : 'ro';
     if (request.url.startsWith('/w/app')) {
@@ -102,7 +123,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     // and the loader would fall back to showing a default launcher.
     const origin = request.headers.origin;
     if (request.url.startsWith('/api/loader-config') && origin !== undefined) {
-      const tenant = options.tenants.get(id);
+      const tenant = tenants.get(id);
       if (tenant?.allowedOrigins.includes(origin)) {
         reply.header('access-control-allow-origin', origin).header('vary', 'Origin');
       }
@@ -112,24 +133,29 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
 
   app.get('/healthz', () => ({ status: 'ok' }));
 
-  widgetConfigRoute(app, options.tenants);
-  tenantAssetRoutes(app, options.tenants);
-  await widgetRoute(app, { tenants: options.tenants, distDir: options.env.WIDGET_DIST_DIR });
+  widgetConfigRoute(app, tenants);
+  tenantAssetRoutes(app, tenants);
+  await widgetRoute(app, { tenants, distDir: options.env.WIDGET_DIST_DIR });
 
   conversationRoutes(app, {
     env: options.env,
-    tenants: options.tenants,
+    tenants,
     feedbackStore: options.feedbackStore ?? new MemoryFeedbackStore(),
   });
 
   chatRoute(app, {
     env: options.env,
-    tenants: options.tenants,
+    tenants,
     ...(options.difyDispatcher ? { difyDispatcher: options.difyDispatcher } : {}),
   });
 
   if (options.admin) {
-    adminRoutes(app, { env: options.env, tenants: options.tenants, ...options.admin });
+    adminRoutes(app, {
+      env: options.env,
+      tenants: options.tenants,
+      ...options.admin,
+      ...(preview ? { preview } : {}),
+    });
   }
 
   return app;

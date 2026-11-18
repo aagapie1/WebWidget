@@ -35,7 +35,7 @@ export type LoginState = z.infer<typeof loginSchema>;
 export const randomToken = (): string => randomBytes(32).toString('base64url');
 
 /** Redis holds a hash of the cookie value, so a Redis dump yields no usable session cookie. */
-const sessionKey = (id: string): string =>
+export const sessionKey = (id: string): string =>
   `admin:session:${createHash('sha256').update(id).digest('base64url')}`;
 const loginKey = (state: string): string =>
   `admin:login:${createHash('sha256').update(state).digest('base64url')}`;

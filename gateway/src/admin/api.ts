@@ -7,6 +7,8 @@ import { AdminConfigStore, PublishConflictError } from './config-store.js';
 import { diff, editableView, mergeServerFields, originsOf, type ConfigObject } from './editable.js';
 import { can } from './identity.js';
 import { IMAGE_LIMITS, processImage } from './images.js';
+import type { PreviewService } from './preview.js';
+import { SESSION_COOKIE } from './sessions.js';
 import { adminError, authorize, sessionOf } from './guard.js';
 
 type Env = Readonly<Record<string, string | undefined>>;
@@ -38,7 +40,10 @@ function adminMessages(errors: readonly string[]): string[] {
   );
 }
 
-export function adminConfigRoutes(app: FastifyInstance, options: AdminApiOptions): void {
+export function adminConfigRoutes(
+  app: FastifyInstance,
+  options: AdminApiOptions & { preview?: PreviewService },
+): void {
   const store = new AdminConfigStore(options.db);
   const assets = new PgAssetSource(options.db);
 
@@ -167,6 +172,18 @@ export function adminConfigRoutes(app: FastifyInstance, options: AdminApiOptions
       if (error instanceof PublishConflictError) return adminError(reply, 'conflict');
       throw error;
     }
+  });
+
+  // Preview (spec §5.2): a 10-minute token bound to this admin session and tenant.
+  app.post('/api/tenants/:tenant/preview-token', async (request, reply) => {
+    const found = await tenantFor(request, reply, 'edit');
+    if (!found) return reply;
+    if (!options.preview) return adminError(reply, 'not_found');
+    const created = await options.preview.create(
+      found.tenant,
+      request.cookies[SESSION_COOKIE] ?? '',
+    );
+    return { ...created, url: `/admin/preview?id=${created.id}` };
   });
 
   // Images (spec §5.4): the raw file as the body; the real type is read from the bytes.

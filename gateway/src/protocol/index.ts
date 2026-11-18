@@ -41,7 +41,8 @@ export type ErrorCode = z.infer<typeof errorCodeSchema>;
 
 export const MAX_MESSAGE_LENGTH = 4000;
 
-export const tenantIdSchema = z.string().check(z.regex(/^[a-z0-9-]{1,64}$/));
+/** A tenant id, or an admin preview id `<tenant>--p-<token>` (ADR 008). */
+export const tenantIdSchema = z.string().check(z.regex(/^[a-z0-9-]{1,100}$/));
 
 /** Body of `POST /api/chat`. Strict: unknown fields are rejected, never forwarded to Dify. */
 export const chatRequestSchema = z.strictObject({

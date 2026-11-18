@@ -4,8 +4,9 @@ import type { AppEnv } from '../config/env.js';
 import type { TenantRegistry } from '../config/tenants.js';
 import { adminConfigRoutes, type AdminApiOptions } from './api.js';
 import type { AdminAuthConfig } from './auth-config.js';
-import { adminError, attachSession, sessionOf } from './guard.js';
+import { adminError, attachSession, authorize, sessionOf } from './guard.js';
 import { identityFromClaims } from './identity.js';
+import { PREVIEW_ID, type PreviewService } from './preview.js';
 import type { KeyValueStore } from './kv.js';
 import { pkce, type OidcClient } from './oidc.js';
 import {
@@ -26,6 +27,8 @@ export interface AdminRouteOptions {
   tenants: TenantRegistry;
   /** Configuration API (Postgres, ADR 008); only the session endpoints without it. */
   api?: AdminApiOptions;
+  /** Draft preview (needs the configuration API). */
+  preview?: PreviewService;
 }
 
 const LIMITS = {
@@ -39,6 +42,49 @@ const loginQuery = z.object({
   org: z.string().max(64),
   returnTo: z.string().max(512).optional(),
 });
+const previewQuery = z.object({
+  id: z.string().max(110),
+  locale: z.enum(['ro', 'en']).default('ro'),
+});
+
+/** The neutral demo page of the preview. The id is validated (letters, digits, dashes). */
+function previewPage(id: string, locale: 'ro' | 'en'): string {
+  const text =
+    locale === 'en'
+      ? {
+          title: 'Preview',
+          heading: 'Sample page',
+          body: 'The widget below uses the draft configuration. Visitors do not see it until it is published.',
+        }
+      : {
+          title: 'Previzualizare',
+          heading: 'Pagină demonstrativă',
+          body: 'Widget-ul de mai jos folosește configurația-ciornă. Vizitatorii nu o văd până la publicare.',
+        };
+  return `<!doctype html>
+<html lang="${locale}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${text.title}</title>
+<style>
+  body { margin: 0; min-height: 100vh; background: #f4f5f7; color: #1f2328; font: 16px/1.5 system-ui, sans-serif; }
+  main { max-width: 40rem; padding: 2rem 1.5rem; }
+  .bar { height: 0.75rem; margin: 0.75rem 0; border-radius: 0.375rem; background: #dfe3e8; }
+</style>
+</head>
+<body>
+<main>
+<h1>${text.heading}</h1>
+<p>${text.body}</p>
+<div class="bar" style="width: 90%"></div><div class="bar" style="width: 75%"></div><div class="bar" style="width: 82%"></div>
+</main>
+<script src="/w/loader.js" data-tenant="${id}" data-locale="${locale}" async></script>
+</body>
+</html>
+`;
+}
+
 const callbackQuery = z.object({ state: z.string().max(128) }).loose();
 
 /** Only paths of the admin interface; never another origin (open redirect). */
@@ -250,7 +296,28 @@ export function adminRoutes(app: FastifyInstance, options: AdminRouteOptions): v
           return { redirect };
         });
 
-        if (options.api) adminConfigRoutes(guarded, options.api);
+        if (options.api) {
+          adminConfigRoutes(guarded, {
+            ...options.api,
+            ...(options.preview ? { preview: options.preview } : {}),
+          });
+        }
+
+        // Preview page (spec §5.2): a neutral page with the real loader and the preview tenant id.
+        // Framed by the admin interface only (same origin).
+        guarded.get('/preview', (request, reply) => {
+          const query = previewQuery.safeParse(request.query);
+          const match = query.success ? PREVIEW_ID.exec(query.data.id) : null;
+          if (!query.success || !match) return adminError(reply, 'not_found');
+          if (!authorize(request, reply, match[1] ?? '', 'edit')) return reply;
+          return reply
+            .type('text/html; charset=utf-8')
+            .header(
+              'content-security-policy',
+              "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'self'; base-uri 'none'; form-action 'none'",
+            )
+            .send(previewPage(query.data.id, query.data.locale));
+        });
 
         next();
       });

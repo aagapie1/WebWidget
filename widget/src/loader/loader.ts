@@ -343,7 +343,7 @@ export function optionsFromScript(
   pageOrigin: string,
 ): LoaderOptions | undefined {
   const tenant = script?.dataset.tenant;
-  if (!script?.src || !tenant || !/^[a-z0-9-]{1,64}$/.test(tenant)) return undefined;
+  if (!script?.src || !tenant || !/^[a-z0-9-]{1,100}$/.test(tenant)) return undefined;
   return {
     tenant,
     gatewayOrigin: new URL(script.src).origin,

@@ -18,7 +18,7 @@ import {
   type ErrorCode,
   type Locale,
 } from '../protocol/index.js';
-import type { Tenant } from '../config/tenants.js';
+import { logTenant, type Tenant } from '../config/tenants.js';
 import { resolveVisitor } from '../visitor/index.js';
 
 export interface ChatRouteOptions {
@@ -47,7 +47,7 @@ export function chatRoute(app: FastifyInstance, options: ChatRouteOptions): void
     if (!tenant) return replyError(reply, 'tenant_not_found', locale);
 
     const user = resolveVisitor(request, reply, tenant.behavior.visitorCookieDays);
-    const log = request.log.child({ tenant: tenant.id, conversationId });
+    const log = request.log.child({ ...logTenant(tenant), conversationId });
 
     // Aborted when the browser disconnects or the whole answer takes too long.
     const clientGone = new AbortController();
@@ -138,7 +138,7 @@ export function chatRoute(app: FastifyInstance, options: ChatRouteOptions): void
     const result = await stopTask(tenant, parsed.data.taskId, user);
     if (!result.ok) {
       request.log.warn(
-        { tenant: tenant.id, code: result.code, difyStatus: result.status },
+        { ...logTenant(tenant), code: result.code, difyStatus: result.status },
         'Dify stop failed',
       );
       return replyError(reply, result.code, 'ro', tenant);

@@ -40,6 +40,8 @@ export interface TenantAsset {
 export interface Tenant extends Omit<TenantConfig, 'difyApiKeyEnv'> {
   readonly difyApiKey: string;
   readonly assets: ReadonlyMap<string, TenantAsset>;
+  /** Draft configuration shown in the admin preview (ADR 008); never set for public tenants. */
+  readonly preview?: { tenantId: string };
 }
 
 export type TenantRegistry = ReadonlyMap<string, Tenant>;
@@ -398,4 +400,11 @@ export async function loadTenants(dir: string, env: Env): Promise<Map<string, Te
     throw new TenantConfigError(`No tenant configuration found in ${dir}`);
   }
   return tenants;
+}
+
+/** Log fields for a tenant: the real id (never a preview token) and the preview mark (ADR 008). */
+export function logTenant(tenant: Tenant): { tenant: string; preview?: true } {
+  return tenant.preview
+    ? { tenant: tenant.preview.tenantId, preview: true }
+    : { tenant: tenant.id };
 }

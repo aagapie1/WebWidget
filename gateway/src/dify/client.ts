@@ -35,6 +35,14 @@ export type ChatMessageResult =
   | { ok: false; code: ErrorCode; status?: number; difyCode?: string };
 
 /**
+ * The Dify `user` of a visitor. Preview traffic from the admin interface is marked with the
+ * `preview-` prefix so statistics and exports can exclude it (ADR 008).
+ */
+export function difyUser(tenant: Pick<Tenant, 'preview'>, visitor: string): string {
+  return tenant.preview ? `preview-${visitor}` : visitor;
+}
+
+/**
  * `POST {difyBaseUrl}/chat-messages` in streaming mode.
  * `auto_generate_name` is always false (SPEC §4): no extra model call for the title.
  */
@@ -43,7 +51,7 @@ export async function sendChatMessage(params: ChatMessageParams): Promise<ChatMe
     inputs: {},
     query: params.query,
     response_mode: 'streaming',
-    user: params.user,
+    user: difyUser(params.tenant, params.user),
     auto_generate_name: false,
     ...(params.conversationId ? { conversation_id: params.conversationId } : {}),
   };
@@ -153,7 +161,7 @@ export async function stopTask(
     'POST',
     `/chat-messages/${encodeURIComponent(taskId)}/stop`,
     {
-      user,
+      user: difyUser(tenant, user),
     },
   );
   return result.ok ? { ok: true, value: null } : result;
@@ -179,7 +187,12 @@ export async function listConversations(
   user: string,
   lastId?: string,
 ): Promise<SimpleResult<DifyConversationList>> {
-  const query = pageQuery({ user, last_id: lastId, limit: '20', sort_by: '-updated_at' });
+  const query = pageQuery({
+    user: difyUser(tenant, user),
+    last_id: lastId,
+    limit: '20',
+    sort_by: '-updated_at',
+  });
   const result = await callJson(tenant, 'GET', `/conversations?${query}`);
   if (!result.ok) return result;
   const parsed = difyConversationListSchema.safeParse(result.value);
@@ -194,7 +207,7 @@ export async function getMessages(
   firstId?: string,
 ): Promise<SimpleResult<DifyMessageList>> {
   const query = pageQuery({
-    user,
+    user: difyUser(tenant, user),
     conversation_id: conversationId,
     first_id: firstId,
     limit: '20',
@@ -215,7 +228,7 @@ export async function deleteConversation(
     'DELETE',
     `/conversations/${encodeURIComponent(conversationId)}`,
     {
-      user,
+      user: difyUser(tenant, user),
     },
   );
   return result.ok ? { ok: true, value: null } : result;
@@ -232,7 +245,7 @@ export async function renameConversation(
     tenant,
     'POST',
     `/conversations/${encodeURIComponent(conversationId)}/name`,
-    { name, auto_generate: false, user },
+    { name, auto_generate: false, user: difyUser(tenant, user) },
   );
   return result.ok ? { ok: true, value: null } : result;
 }
@@ -250,7 +263,7 @@ export async function sendMessageFeedback(
     `/messages/${encodeURIComponent(messageId)}/feedbacks`,
     {
       rating,
-      user,
+      user: difyUser(tenant, user),
     },
   );
   return result.ok ? { ok: true, value: null } : result;
@@ -262,7 +275,7 @@ export async function getSuggestedQuestions(
   user: string,
   messageId: string,
 ): Promise<SimpleResult<string[]>> {
-  const query = pageQuery({ user });
+  const query = pageQuery({ user: difyUser(tenant, user) });
   const result = await callJson(
     tenant,
     'GET',

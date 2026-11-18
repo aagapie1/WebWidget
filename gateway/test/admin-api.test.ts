@@ -13,13 +13,19 @@ import { loadEnv } from '../src/config/env.js';
 import type { Tenant } from '../src/config/tenants.js';
 import { migrate } from '../src/db/migrate.js';
 import { PostgresTenantSource } from '../src/db/postgres-source.js';
+import { FakeDify } from './fake-dify.js';
+import { PREVIEW_ID } from '../src/admin/preview.js';
 
 // Real Postgres (same test database as db.test.ts; this file only touches its own tenants).
 const appUrl = process.env.TEST_DATABASE_URL;
 const ownerUrl = process.env.TEST_DATABASE_OWNER_URL;
 const ORIGIN = 'https://gateway.test';
 const TENANTS = ['gamma', 'delta'];
-const tenantEnv = { DIFY_BASE_URL: 'http://dify.test/v1', KEY_GAMMA: 'app-secret-gamma-key' };
+const tenantEnv: Record<string, string> = {
+  DIFY_BASE_URL: 'http://dify.test/v1',
+  KEY_GAMMA: 'app-secret-gamma-key',
+};
+const dify = new FakeDify();
 
 const seedConfig = (id: string) => ({
   schemaVersion: 1,
@@ -46,11 +52,13 @@ describe.skipIf(!appUrl || !ownerUrl)('admin configuration API (Postgres)', () =
   let sessions: AdminSessions;
 
   beforeAll(async () => {
+    tenantEnv.DIFY_BASE_URL = await dify.start();
     await migrate(ownerUrl ?? '', resolve('migrations'), () => undefined);
     pool = new pg.Pool({ connectionString: appUrl });
     owner = new pg.Pool({ connectionString: ownerUrl });
   });
   afterAll(async () => {
+    await dify.stop();
     await pool.end();
     await owner.end();
   });
@@ -322,5 +330,67 @@ describe.skipIf(!appUrl || !ownerUrl)('admin configuration API (Postgres)', () =
     const publicUrl = registry.get('gamma')?.assets.get(file)?.url ?? '';
     expect((await app.inject({ url: publicUrl })).statusCode).toBe(200);
     expect((await auditRows()).map((row) => row.action)).toContain('asset.upload');
+  });
+
+  it('previews the draft through a session-bound token, without changing the public widget', async () => {
+    const admin = await as('widget-admin');
+    const { published } = (await admin('GET', CONFIG)).json<ConfigResponse>();
+    await admin('PUT', `${CONFIG}/draft`, {
+      config: { ...published.config, theme: { accent: '#0b6e4f' } },
+    });
+    const created = await admin('POST', '/admin/api/tenants/gamma/preview-token', {});
+    expect(created.statusCode).toBe(200);
+    const { id, url } = created.json<{ id: string; url: string }>();
+    expect(id).toMatch(PREVIEW_ID);
+
+    // The preview page: real loader, preview tenant id, framed by the admin only.
+    const page = await admin('GET', url);
+    expect(page.statusCode).toBe(200);
+    expect(page.body).toContain(`data-tenant="${id}"`);
+    expect(page.headers['content-security-policy']).toContain("frame-ancestors 'self'");
+
+    // Draft in the preview, published version for visitors.
+    const loader = await app.inject({
+      url: `/api/loader-config?tenant=${id}`,
+      headers: { origin: ORIGIN },
+    });
+    expect(loader.json<{ theme: { accent: string } }>().theme.accent).toBe('#0b6e4f');
+    expect(loader.headers['access-control-allow-origin']).toBe(ORIGIN);
+    expect(await accentOf()).toBe('#3a36d0');
+
+    // Preview traffic is marked for Dify (statistics exclude it).
+    dify.requests.length = 0;
+    await app.inject({
+      method: 'POST',
+      url: '/api/chat',
+      headers: { origin: ORIGIN },
+      payload: { tenant: id, message: 'Bună' },
+    });
+    const user = (dify.requests[0]?.body as { user?: string } | undefined)?.user;
+    expect(user).toMatch(/^preview-[0-9a-f-]{36}$/);
+
+    // Another tenant cannot use or open this preview; a forged token resolves nothing.
+    const other = await as('widget-admin', 'delta');
+    expect((await other('GET', url)).statusCode).toBe(403);
+    const forged = id.replace(/[0-9a-f]{32}$/, '0'.repeat(32));
+    expect((await app.inject({ url: `/api/loader-config?tenant=${forged}` })).statusCode).toBe(404);
+
+    // Logging out ends the preview.
+    await admin('POST', '/admin/auth/logout', {});
+    expect((await app.inject({ url: `/api/loader-config?tenant=${id}` })).statusCode).toBe(404);
+  });
+
+  it('lets editors preview but not open a preview id of another tenant', async () => {
+    const editor = await as('widget-editor');
+    expect((await editor('POST', '/admin/api/tenants/gamma/preview-token', {})).statusCode).toBe(
+      200,
+    );
+    expect((await editor('POST', '/admin/api/tenants/delta/preview-token', {})).statusCode).toBe(
+      403,
+    );
+    expect((await editor('GET', '/admin/preview?id=delta--p-' + 'a'.repeat(32))).statusCode).toBe(
+      403,
+    );
+    expect((await editor('GET', '/admin/preview?id=<script>')).statusCode).toBe(404);
   });
 });

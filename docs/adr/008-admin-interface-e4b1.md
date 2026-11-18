@@ -90,6 +90,21 @@ records (no audit screen), the security of §6. Everything else of E4b is E4b.2 
   `preview-` prefix and the gateway logs carry `preview: true`; statistics and exports filter
   them out.
 
+- Implementation notes (step 4, preview):
+  - The preview tenant id is `<tenant>--p-<32 hex token>`. The widget already carries its tenant
+    id to the loader, the iframe and the API, so the preview needs no widget change. The tenant id
+    limit grew from 64 to 100 characters for this.
+  - A gateway hook resolves preview ids before the handler: the token is checked in Redis
+    (tenant, 10 minutes), the admin session must still exist, and the draft is loaded and
+    validated with the same fallbacks as the tenant sources. Routes keep their synchronous
+    registry lookup. A per-replica cache of up to 30 seconds only bridges the hook and the
+    handler, so every request re-checks the token.
+  - The preview tenant allows `PUBLIC_ORIGIN` (the gateway's own `/admin/preview` page). Asset
+    URLs are rewritten under the preview id, so draft images are shown before publishing.
+  - Every Dify call goes through `difyUser()` (`preview-` prefix). Logs carry the real tenant id
+    and `preview: true`; tokens are redacted from logged URLs.
+  - `/admin/preview?id=` requires an admin session that may edit that tenant, and sets
+    `frame-ancestors 'self'`.
 - Implementation notes (step 3):
   - The admin API never sends or accepts the server fields (`schemaVersion`, `id`, `enabled`,
     `difyBaseUrl`, `difyApiKeyEnv`). They are copied from the published version on every save,
