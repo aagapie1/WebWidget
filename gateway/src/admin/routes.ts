@@ -49,10 +49,16 @@ const loginQuery = z.object({
 const previewQuery = z.object({
   id: z.string().max(110),
   locale: z.enum(['ro', 'en']).default('ro'),
+  /** Starting state of the preview (launcher, proactive bubble or open window). */
+  show: z.enum(['launcher', 'proactive', 'window']).default('window'),
 });
 
 /** The neutral demo page of the preview. The id is validated (letters, digits, dashes). */
-function previewPage(id: string, locale: 'ro' | 'en'): string {
+function previewPage(
+  id: string,
+  locale: 'ro' | 'en',
+  show: 'launcher' | 'proactive' | 'window',
+): string {
   const text =
     locale === 'en'
       ? {
@@ -83,7 +89,7 @@ function previewPage(id: string, locale: 'ro' | 'en'): string {
 <p>${text.body}</p>
 <div class="bar" style="width: 90%"></div><div class="bar" style="width: 75%"></div><div class="bar" style="width: 82%"></div>
 </main>
-<script src="/w/loader.js" data-tenant="${id}" data-locale="${locale}" async></script>
+<script src="/w/loader.js" data-tenant="${id}" data-locale="${locale}" data-preview="${show}" async></script>
 </body>
 </html>
 `;
@@ -360,7 +366,7 @@ export function adminRoutes(app: FastifyInstance, options: AdminRouteOptions): v
               'content-security-policy',
               "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'self'; base-uri 'none'; form-action 'none'",
             )
-            .send(previewPage(query.data.id, query.data.locale));
+            .send(previewPage(query.data.id, query.data.locale, query.data.show));
         });
 
         next();

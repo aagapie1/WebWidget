@@ -28,6 +28,7 @@
   },
   "exports": {
     "./i18n": "./src/app/i18n/index.ts",
-    "./icons": "./src/shared/icons/index.ts"
+    "./icons": "./src/shared/icons/index.ts",
+    "./messages": "./src/shared/messages.ts"
   }
 }

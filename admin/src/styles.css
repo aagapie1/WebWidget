@@ -118,9 +118,17 @@ code {
   gap: 1.25rem;
   align-items: start;
 }
+/* The preview stays in view next to the form: launcher, bubble and window without scrolling. */
 .editor__side {
   position: sticky;
   top: 1rem;
+  display: flex;
+  flex-direction: column;
+  block-size: calc(100vh - 2rem);
+  min-block-size: 560px;
+}
+.editor__side > .card {
+  flex: none;
 }
 @media (max-width: 960px) {
   .editor {
@@ -128,6 +136,10 @@ code {
   }
   .editor__side {
     position: static;
+    block-size: auto;
+  }
+  .preview__stage {
+    block-size: 75vh;
   }
 }
 
@@ -406,7 +418,15 @@ summary {
   align-items: center;
   gap: 0.5rem;
 }
+.preview {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-block-size: 0;
+}
 .preview__stage {
+  flex: 1;
+  min-block-size: 420px;
   margin-top: 0.75rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -419,12 +439,18 @@ summary {
   border: 0;
   background: #fff;
   inline-size: 100%;
-  block-size: 720px;
+  block-size: 100%;
+}
+.preview__stage--mobile {
+  align-items: center;
+  padding: 0.5rem 0;
 }
 .preview__stage--mobile .preview__frame {
   inline-size: 375px;
   max-inline-size: 100%;
-  block-size: 700px;
+  block-size: min(100%, 667px);
+  border-radius: 1.25rem;
+  box-shadow: 0 0 0 8px #1b1f2a;
 }
 
 .dialog {

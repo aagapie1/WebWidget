@@ -258,3 +258,28 @@ describe('ChatController', () => {
     expect(chat.state.messages.at(-1)?.text).toBe('ab');
   });
 });
+
+describe('ChatController admin preview sample (ADR 008)', () => {
+  it('shows the welcome, the sample and the starter questions; sample ratings stay local', async () => {
+    const transport = new ScriptedTransport([]);
+    const rate = vi.spyOn(transport, 'rateMessage');
+    const chat = controller(transport);
+    chat.setWelcome('Bună ziua!');
+    const { previewSample } = await import('../preview-sample.js');
+    chat.showSample(previewSample('ro'), ['Care e programul?']);
+
+    expect(chat.state.messages.map((message) => message.author)).toEqual([
+      'assistant',
+      'user',
+      'assistant',
+    ]);
+    expect(chat.state.messages[0]?.text).toBe('Bună ziua!');
+    expect(chat.state.messages[2]?.text).toContain('](https://www.example.ro/servicii)');
+    expect(chat.state.messages[2]?.citations).toHaveLength(1);
+    expect(chat.state.followUps).toEqual(['Care e programul?']);
+
+    await chat.rate('sample-answer', 'like');
+    expect(chat.state.messages[2]?.feedback).toBe('like');
+    expect(rate).not.toHaveBeenCalled();
+  });
+});

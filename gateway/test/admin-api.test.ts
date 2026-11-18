@@ -361,6 +361,18 @@ describe.skipIf(!appUrl || !ownerUrl)('admin configuration API (Postgres)', () =
     const page = await admin('GET', url);
     expect(page.statusCode).toBe(200);
     expect(page.body).toContain(`data-tenant="${id}"`);
+    // Opens on the chat window by default; the admin interface may start on another state.
+    expect(page.body).toContain('data-preview="window"');
+    expect((await admin('GET', `${url}&show=proactive`)).body).toContain(
+      'data-preview="proactive"',
+    );
+    expect((await admin('GET', `${url}&show=everything`)).statusCode).toBe(404);
+    // The chat window of a preview shows the sample conversation.
+    const widgetConfig = await app.inject({ url: `/api/widget-config?tenant=${id}` });
+    expect(widgetConfig.json()).toMatchObject({ preview: true });
+    expect(
+      (await app.inject({ url: '/api/widget-config?tenant=gamma' })).json(),
+    ).not.toHaveProperty('preview');
     expect(page.headers['content-security-policy']).toContain("frame-ancestors 'self'");
 
     // Draft in the preview, published version for visitors.

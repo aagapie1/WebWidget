@@ -5,6 +5,7 @@ import { fetchWidgetConfig, GatewayTransport } from './chat/api.js';
 import { ChatController } from './chat/controller.js';
 import { parseLocale, texts as textsFor, withOverrides } from './i18n/index.js';
 import { applyTheme } from './theme.js';
+import { previewSample } from './preview-sample.js';
 import { markdownToText, setNewTabNote } from './markdown.js';
 import './styles.css';
 
@@ -82,8 +83,13 @@ async function start(): Promise<void> {
   });
   controller.setWelcome(config.welcomeMessage);
   controller.setSuggestions(config.suggestedQuestions);
-  // Resume the latest conversation with its history (ADR 005); no-op for new visitors.
-  void controller.resumeLatest();
+  if (config.preview) {
+    // Admin preview (ADR 008): a sample conversation instead of the visitor's history.
+    controller.showSample(previewSample(locale), config.suggestedQuestions);
+  } else {
+    // Resume the latest conversation with its history (ADR 005); no-op for new visitors.
+    void controller.resumeLatest();
+  }
   document.title = config.assistantName;
 
   render(

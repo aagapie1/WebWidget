@@ -8,7 +8,9 @@ describe('PreviewPanel', () => {
     const createToken = vi.fn(() => Promise.resolve({ url: '/admin/preview?id=pilot--p-abc' }));
     const { rerender } = renderWithI18n(<PreviewPanel revision={0} createToken={createToken} />);
     const frame = await screen.findByTitle('Previzualizarea widget-ului cu ciorna');
-    expect(frame.getAttribute('src')).toBe('/admin/preview?id=pilot--p-abc&locale=ro&r=0');
+    expect(frame.getAttribute('src')).toBe(
+      '/admin/preview?id=pilot--p-abc&locale=ro&show=window&r=0',
+    );
     rerender(<PreviewPanel revision={1} createToken={createToken} />);
     await waitFor(() => {
       expect(
@@ -60,5 +62,26 @@ describe('PreviewPanel', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('starts in the state of the edited section and follows it without reloading', async () => {
+    const createToken = () => Promise.resolve({ url: '/admin/preview?id=pilot--p-abc' });
+    const { rerender } = renderWithI18n(
+      <PreviewPanel revision={0} createToken={createToken} show="launcher" />,
+    );
+    const frame = await screen.findByTitle<HTMLIFrameElement>(
+      'Previzualizarea widget-ului cu ciorna',
+    );
+    expect(frame.getAttribute('src')).toBe(
+      '/admin/preview?id=pilot--p-abc&locale=ro&show=launcher&r=0',
+    );
+    const post = vi.spyOn(frame.contentWindow as Window, 'postMessage');
+    rerender(<PreviewPanel revision={0} createToken={createToken} show="proactive" />);
+    expect(post).toHaveBeenCalledWith(
+      { source: 'chat-widget', v: 1, type: 'preview', show: 'proactive' },
+      window.location.origin,
+    );
+    // Same document: the change did not reload the frame.
+    expect(frame.getAttribute('src')).toMatch(/show=launcher/);
   });
 });

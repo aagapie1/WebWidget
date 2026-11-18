@@ -26,6 +26,24 @@ export type LoaderMessage = z.infer<typeof loaderMessageSchema>;
 
 type Payload<T> = T extends unknown ? Omit<T, 'source' | 'v'> : never;
 
-export function message<T extends AppMessage | LoaderMessage>(payload: Payload<T>): T {
+export function message<T extends AppMessage | LoaderMessage | PreviewControl>(
+  payload: Payload<T>,
+): T {
   return { source: SOURCE, v: VERSION, ...payload } as T;
 }
+
+/** What the admin preview shows: the closed launcher, the proactive bubble or the open window. */
+export const PREVIEW_STATES = ['launcher', 'proactive', 'window'] as const;
+export type PreviewState = (typeof PREVIEW_STATES)[number];
+
+/**
+ * Admin preview page → loader (ADR 008): the admin interface, served by the gateway itself,
+ * shows the state matching the section being edited. Accepted only by a loader started in
+ * preview mode, from its parent window on the gateway origin.
+ */
+export const previewControlSchema = z.object({
+  ...envelope,
+  type: z.literal('preview'),
+  show: z.enum(PREVIEW_STATES),
+});
+export type PreviewControl = z.infer<typeof previewControlSchema>;

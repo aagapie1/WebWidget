@@ -93,6 +93,8 @@ export class ChatController {
   #lastQuestion = '';
   /** Incremented when the visible conversation changes; stale async results are ignored. */
   #generation = 0;
+  /** Admin preview sample (ADR 008): its ratings stay local. */
+  #sample = false;
 
   constructor(options: ControllerOptions) {
     this.#transport = options.transport;
@@ -125,6 +127,19 @@ export class ChatController {
 
   setSuggestions(questions: readonly string[]): void {
     this.#update({ suggestions: questions });
+  }
+
+  /**
+   * Admin preview (ADR 008): a sample conversation after the welcome message, so that every
+   * color, avatar and text of the draft is visible. Nothing is stored; the chips are the starter
+   * questions. Real questions asked afterwards still go to the assistant (marked as preview).
+   */
+  showSample(messages: readonly ChatMessage[], chips: readonly string[]): void {
+    this.#sample = true;
+    this.#update({
+      messages: [...(this.#welcome ? [this.#welcomeMessage()] : []), ...messages],
+      followUps: chips,
+    });
   }
 
   /** On open: resume the visitor's most recent conversation, if any (ADR 005). */
@@ -257,6 +272,7 @@ export class ChatController {
     const previous = message.feedback ?? null;
     const next = previous === rating ? null : rating;
     this.#patch(messageId, { feedback: next });
+    if (this.#sample && message.serverId.startsWith('sample-')) return;
     try {
       await this.#transport.rateMessage(message.serverId, next);
       this.#update({

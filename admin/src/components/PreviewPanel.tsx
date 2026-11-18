@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { message, type PreviewControl, type PreviewState } from 'widget/messages';
 import { useI18n } from '../i18n.js';
 
 const TOKEN_REUSE_MS = 8 * 60 * 1000; // tokens live 10 minutes after their last use
@@ -13,6 +14,8 @@ interface PreviewPanelProps {
   revision: number;
   createToken: () => Promise<{ url: string }>;
   keepAlive?: (id: string) => Promise<unknown>;
+  /** What to show: follows the section being edited (launcher, proactive bubble, window). */
+  show?: PreviewState;
 }
 
 /** Live preview of the draft in the real widget, desktop or phone width (spec §5.2). */
@@ -20,6 +23,7 @@ export function PreviewPanel({
   revision,
   createToken,
   keepAlive = touchPreview,
+  show = 'window',
 }: PreviewPanelProps) {
   const { t, locale } = useI18n();
   const [mode, setMode] = useState<'desktop' | 'mobile'>('desktop');
@@ -27,6 +31,10 @@ export function PreviewPanel({
   const [failed, setFailed] = useState(false);
   // The pending or obtained token request, shared by overlapping reloads.
   const token = useRef<{ url: Promise<string>; at: number } | undefined>(undefined);
+  const frame = useRef<HTMLIFrameElement>(null);
+  // Reloads start in the current state; changing the state itself does not reload.
+  const showRef = useRef(show);
+  showRef.current = show;
 
   useEffect(() => {
     let cancelled = false;
@@ -39,7 +47,7 @@ export function PreviewPanel({
         });
       }
       // A changing query reloads the iframe after each saved draft.
-      const url = `${await token.current.url}&locale=${locale}&r=${String(revision)}`;
+      const url = `${await token.current.url}&locale=${locale}&show=${showRef.current}&r=${String(revision)}`;
       if (!cancelled) {
         setSrc(url);
         setFailed(false);
@@ -52,6 +60,14 @@ export function PreviewPanel({
       cancelled = true;
     };
   }, [revision, locale, createToken]);
+
+  // The loader in the preview page follows the section being edited (same origin only).
+  useEffect(() => {
+    frame.current?.contentWindow?.postMessage(
+      message<PreviewControl>({ type: 'preview', show }),
+      window.location.origin,
+    );
+  }, [show]);
 
   // The token expires 10 minutes after its last use: keep the open preview alive, even when
   // nothing is saved for a while (otherwise its widget stops answering).
@@ -96,7 +112,7 @@ export function PreviewPanel({
         {failed ? (
           <p role="alert">{t.preview.unavailable}</p>
         ) : (
-          src && <iframe class="preview__frame" title={t.preview.frame} src={src} />
+          src && <iframe ref={frame} class="preview__frame" title={t.preview.frame} src={src} />
         )}
       </div>
     </section>

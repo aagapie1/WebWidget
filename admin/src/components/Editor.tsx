@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import type { PreviewState } from 'widget/messages';
 import {
   ApiError,
   type AdminApi,
@@ -24,7 +25,7 @@ import { PublishBar } from './PublishBar.js';
 import { PublishDialog } from './PublishDialog.js';
 import { SaveStatus, type SaveState } from './SaveStatus.js';
 
-export const AUTOSAVE_MS = 1200;
+export const AUTOSAVE_MS = 800;
 
 interface EditorProps {
   api: AdminApi;
@@ -52,6 +53,15 @@ export function Editor({ api, tenant, onSessionExpired }: EditorProps) {
   const [restored, setRestored] = useState(false);
   const [previewRevision, setPreviewRevision] = useState(0);
   const [formKey, setFormKey] = useState(0);
+  // The preview follows the section being edited (launcher, proactive bubble, open window).
+  const [previewShow, setPreviewShow] = useState<PreviewState>('window');
+  const followSection = (event: FocusEvent) => {
+    const section = (event.target as Element | null)?.closest('section[aria-labelledby]');
+    const id = section?.getAttribute('aria-labelledby');
+    setPreviewShow(
+      id === 'section-launcher' ? 'launcher' : id === 'section-proactive' ? 'proactive' : 'window',
+    );
+  };
   const [publishing, setPublishing] = useState<{ busy: boolean; error?: string } | undefined>();
   const base = useRef<Base>({ version: 0, revision: null });
   const latest = useRef(config);
@@ -214,7 +224,7 @@ export function Editor({ api, tenant, onSessionExpired }: EditorProps) {
 
   return (
     <div class="editor">
-      <div class="editor__form">
+      <div class="editor__form" onFocusIn={followSection}>
         {restored && (
           <p class="notice" role="status">
             {t.save.restored}
@@ -299,7 +309,7 @@ export function Editor({ api, tenant, onSessionExpired }: EditorProps) {
             </ul>
           )}
         </div>
-        <PreviewPanel revision={previewRevision} createToken={createToken} />
+        <PreviewPanel revision={previewRevision} createToken={createToken} show={previewShow} />
       </aside>
       {publishing && (
         <PublishDialog

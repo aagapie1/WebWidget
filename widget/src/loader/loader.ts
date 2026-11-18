@@ -7,7 +7,14 @@
  */
 import { errorResponseSchema, loaderConfigSchema, type LoaderConfig } from 'gateway/protocol';
 import { parseLocale, texts } from '../app/i18n/index.js';
-import { appMessageSchema, message, type LoaderMessage } from '../shared/messages.js';
+import {
+  appMessageSchema,
+  message,
+  PREVIEW_STATES,
+  previewControlSchema,
+  type LoaderMessage,
+  type PreviewState,
+} from '../shared/messages.js';
 import { LOADER_CSS } from './styles.js';
 import { iconElement, LAUNCHER_ICONS } from '../shared/icons/index.js';
 
@@ -34,6 +41,11 @@ export interface LoaderOptions {
   preloadWhenIdle?: boolean;
   /** Fetches the tenant's loader configuration; tests pass a stub. */
   loadConfig?: () => Promise<LoaderConfig | 'disabled' | undefined>;
+  /**
+   * Admin preview (ADR 008, `data-preview`): starts in this state and follows the admin
+   * interface's `preview` messages. Never steals focus.
+   */
+  preview?: PreviewState;
 }
 
 export interface LoaderHandle {
@@ -112,6 +124,7 @@ export function mountLoader(options: LoaderOptions, doc: Document = document): L
   let everOpened = false;
   let proactive: HTMLElement | undefined;
   let proactiveTimer: number | undefined;
+  let appliedConfig: LoaderConfig | undefined;
 
   const post = (payload: LoaderMessage): void => {
     iframe?.contentWindow?.postMessage(payload, options.gatewayOrigin);
@@ -183,6 +196,15 @@ export function mountLoader(options: LoaderOptions, doc: Document = document): L
     else removeProactive();
   });
 
+  // Admin preview only: the admin interface (same origin as the gateway) chooses the state.
+  if (options.preview) {
+    view?.addEventListener('message', (event: MessageEvent<unknown>) => {
+      if (event.origin !== options.gatewayOrigin || event.source !== view.parent) return;
+      const parsed = previewControlSchema.safeParse(event.data);
+      if (parsed.success) showPreview(parsed.data.show);
+    });
+  }
+
   view?.addEventListener('message', (event: MessageEvent<unknown>) => {
     if (event.origin !== options.gatewayOrigin) return;
     if (!iframe || event.source !== iframe.contentWindow) return;
@@ -207,6 +229,30 @@ export function mountLoader(options: LoaderOptions, doc: Document = document): L
     }
   });
 
+  /** Shows the proactive bubble now (announced politely; focus stays where the visitor is). */
+  const showProactive = (config: NonNullable<LoaderConfig['proactive']>): void => {
+    removeProactive();
+    const bubble = doc.createElement('div');
+    bubble.className = 'proactive';
+    // Announced once, politely; focus stays where the visitor is.
+    bubble.setAttribute('role', 'status');
+    const textButton = doc.createElement('button');
+    textButton.type = 'button';
+    textButton.className = 'proactive__text';
+    textButton.textContent = config.text;
+    textButton.addEventListener('click', open);
+    const dismiss = doc.createElement('button');
+    dismiss.type = 'button';
+    dismiss.className = 'proactive__close';
+    dismiss.setAttribute('aria-label', labels.proactiveClose);
+    dismiss.title = labels.proactiveClose;
+    dismiss.innerHTML = ICON_X;
+    dismiss.addEventListener('click', removeProactive);
+    bubble.append(textButton, dismiss);
+    proactive = bubble;
+    root.append(bubble);
+  };
+
   /** Proactive message (ADR 007): once per browsing session, never steals focus. */
   const scheduleProactive = (config: NonNullable<LoaderConfig['proactive']>): void => {
     const key = `chat-widget-proactive:${options.tenant}`;
@@ -216,27 +262,23 @@ export function mountLoader(options: LoaderOptions, doc: Document = document): L
       proactiveTimer = undefined;
       if (everOpened) return;
       writeSession(view, key);
-
-      const bubble = doc.createElement('div');
-      bubble.className = 'proactive';
-      // Announced once, politely; focus stays where the visitor is.
-      bubble.setAttribute('role', 'status');
-      const textButton = doc.createElement('button');
-      textButton.type = 'button';
-      textButton.className = 'proactive__text';
-      textButton.textContent = config.text;
-      textButton.addEventListener('click', open);
-      const dismiss = doc.createElement('button');
-      dismiss.type = 'button';
-      dismiss.className = 'proactive__close';
-      dismiss.setAttribute('aria-label', labels.proactiveClose);
-      dismiss.title = labels.proactiveClose;
-      dismiss.innerHTML = ICON_X;
-      dismiss.addEventListener('click', removeProactive);
-      bubble.append(textButton, dismiss);
-      proactive = bubble;
-      root.append(bubble);
+      showProactive(config);
     }, config.delaySeconds * 1000);
+  };
+
+  /**
+   * Admin preview: shows one state at once, without delays, session memory or moving focus
+   * (the administrator keeps typing in the form next to it).
+   */
+  const showPreview = (state: PreviewState): void => {
+    removeProactive();
+    if (state === 'window') {
+      iframe ??= createIframe();
+      render(true);
+      return;
+    }
+    render(false);
+    if (state === 'proactive' && appliedConfig?.proactive) showProactive(appliedConfig.proactive);
   };
 
   const applyConfig = (config: LoaderConfig | undefined): void => {
@@ -271,10 +313,12 @@ export function mountLoader(options: LoaderOptions, doc: Document = document): L
         // Built-in icon from the bundled set (the default `chat` icon is already drawn).
         openIcon.replaceChildren(iconElement(doc, LAUNCHER_ICONS[config.launcher.icon], 28));
       }
-      if (config.proactive) scheduleProactive(config.proactive);
+      appliedConfig = config;
+      if (config.proactive && !options.preview) scheduleProactive(config.proactive);
     }
     render(!panel.hidden);
     host.style.removeProperty('visibility');
+    if (options.preview) showPreview(options.preview);
   };
 
   // Preload on intent (pointer over, keyboard focus, touch) or when the page is idle.
@@ -348,10 +392,12 @@ export function optionsFromScript(
 ): LoaderOptions | undefined {
   const tenant = script?.dataset.tenant;
   if (!script?.src || !tenant || !/^[a-z0-9-]{1,100}$/.test(tenant)) return undefined;
+  const preview = PREVIEW_STATES.find((state) => state === script.dataset.preview);
   return {
     tenant,
     gatewayOrigin: new URL(script.src).origin,
     locale: parseLocale(script.dataset.locale),
     pageOrigin,
+    ...(preview ? { preview } : {}),
   };
 }

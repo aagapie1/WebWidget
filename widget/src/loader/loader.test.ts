@@ -135,3 +135,91 @@ describe('optionsFromScript', () => {
     ).toBeUndefined();
   });
 });
+
+describe('admin preview mode (ADR 008)', () => {
+  const proactiveConfig = {
+    theme: { accent: '#3a36d0', accentEnd: '#1166c4', onAccent: '#ffffff' },
+    launcher: {
+      position: 'bottom-right' as const,
+      offsetX: 24,
+      offsetY: 24,
+      icon: 'headset' as const,
+    },
+    window: { width: 380, height: 640, position: 'bottom-right' as const },
+    proactive: {
+      text: 'Vă putem ajuta?',
+      delaySeconds: 30,
+      frequency: 'session' as const,
+      showOnMobile: false,
+    },
+    texts: {},
+  };
+
+  async function mountPreview(preview: 'launcher' | 'proactive' | 'window') {
+    document.body.innerHTML = '';
+    handle = mountLoader({
+      tenant: 'pilot--p-0123456789abcdef0123456789abcdef',
+      gatewayOrigin: GATEWAY,
+      locale: 'ro',
+      pageOrigin: GATEWAY,
+      preloadWhenIdle: false,
+      loadConfig: () => Promise.resolve(proactiveConfig),
+      preview,
+    });
+    await handle.configured;
+  }
+
+  it('opens the window at once, and never takes the focus from the admin form', async () => {
+    await mountPreview('window');
+    expect(panel()?.hidden).toBe(false);
+    expect(iframe()).not.toBeNull();
+    const field = document.createElement('input');
+    document.body.prepend(field);
+    field.focus();
+    receive(message({ type: 'preview', show: 'launcher' } as const), GATEWAY, window.parent);
+    receive(message({ type: 'preview', show: 'window' } as const), GATEWAY, window.parent);
+    expect(panel()?.hidden).toBe(false);
+    expect(document.activeElement).toBe(field);
+  });
+
+  it('shows the proactive bubble without its delay, and the chosen launcher icon', async () => {
+    await mountPreview('proactive');
+    expect(panel()?.hidden).toBe(true);
+    expect(handle.root.querySelector('.proactive')?.textContent).toContain('Vă putem ajuta?');
+    expect(handle.root.querySelector('.launcher__icon--open svg')).not.toBeNull();
+  });
+
+  it('follows the admin interface (parent window on the gateway origin only)', async () => {
+    await mountPreview('window');
+    const control = (show: 'launcher' | 'proactive' | 'window') =>
+      message({ type: 'preview', show } as const);
+    receive(control('launcher'), GATEWAY, window.parent);
+    expect(panel()?.hidden).toBe(true);
+    receive(control('proactive'), GATEWAY, window.parent);
+    expect(handle.root.querySelector('.proactive')).not.toBeNull();
+    // Another origin, or not the parent window: ignored.
+    receive(control('window'), 'https://evil.test', window.parent);
+    receive(control('window'), GATEWAY, iframe()?.contentWindow ?? null);
+    expect(panel()?.hidden).toBe(true);
+    receive(control('window'), GATEWAY, window.parent);
+    expect(panel()?.hidden).toBe(false);
+    expect(handle.root.querySelector('.proactive')).toBeNull();
+  });
+
+  it('ignores preview messages outside preview mode', () => {
+    receive(message({ type: 'preview', show: 'window' } as const), GATEWAY, window.parent);
+    expect(panel()?.hidden).toBe(true);
+  });
+});
+
+describe('optionsFromScript preview attribute', () => {
+  it('accepts only the known preview states', () => {
+    const script = document.createElement('script');
+    script.src = `${GATEWAY}/w/loader.js`;
+    script.dataset.tenant = 'pilot';
+    script.dataset.preview = 'window';
+    expect(optionsFromScript(script, GATEWAY)?.preview).toBe('window');
+    script.dataset.preview = 'everything';
+    expect(optionsFromScript(script, GATEWAY)?.preview).toBeUndefined();
+  });
+});
