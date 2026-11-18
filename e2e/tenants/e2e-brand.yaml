@@ -10,7 +10,9 @@ identity:
   assistantName: Asistentul Primăriei
   logo: logo.svg
 launcher:
-  icon: logo.svg
+  icon:
+    type: asset
+    file: logo.svg
   position: bottom-left
   offsetX: 20
   offsetY: 20

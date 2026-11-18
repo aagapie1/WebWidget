@@ -51,7 +51,9 @@ describe('validateTenant / parseTenant', () => {
     expect(tenant.difyApiKey).toBe('app-secret-pilot');
     expect(tenant.texts.ro?.['composer.placeholder']).toBe('Scrieți întrebarea…');
     expect(tenant.launcher).toEqual({ position: 'bottom-right', offsetX: 24, offsetY: 24 });
-    expect(tenant.window).toEqual({ width: 380, height: 640 });
+    expect(tenant.window).toEqual({ width: 380, height: 640, position: 'auto' });
+    expect(tenant.enabled).toBe(true);
+    expect(tenant.launcher.icon).toBeUndefined();
     expect(tenant.identity.userAvatar).toBe('none');
     expect(tenant.proactive).toMatchObject({
       enabled: false,
@@ -259,5 +261,64 @@ describe('loadTenants (strict)', () => {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('E4 completions (schema version 1, all optional)', () => {
+  it('checks the optional user bubble and button colors for contrast', async () => {
+    const ok = `${validYaml}theme:\n  userBubble: '#e8f0fe'\n  onUserBubble: '#0b2a5b'\n  button: '#b42318'\n  onButton: '#ffffff'\n`;
+    expect(await errorsOf(ok)).toBe('');
+    const tenant = await parseTenant(ok, env, 'pilot.yaml');
+    expect(tenant.theme).toMatchObject({ userBubble: '#e8f0fe', button: '#b42318' });
+
+    const badUser = `${validYaml}theme:\n  userBubble: '#e8f0fe'\n`; // white text on a light bubble
+    expect(await errorsOf(badUser)).toMatch(
+      /onAccent #ffffff and userBubble #e8f0fe \(user message text\)/,
+    );
+    const badButton = `${validYaml}theme:\n  onButton: '#d0d0d0'\n`;
+    expect(await errorsOf(badButton)).toMatch(/onButton #d0d0d0 and accent/);
+  });
+
+  it('accepts a window position separate from the launcher', async () => {
+    const tenant = await parseTenant(
+      `${validYaml}launcher:\n  position: bottom-left\nwindow:\n  position: bottom-right\n`,
+      env,
+      'pilot.yaml',
+    );
+    expect(tenant.launcher.position).toBe('bottom-left');
+    expect(tenant.window.position).toBe('bottom-right');
+    expect(await errorsOf(`${validYaml}window:\n  position: top-left\n`)).toMatch(
+      /window\.position/,
+    );
+  });
+
+  it('launcher.icon: builtin or asset; a bare file name is the asset form; unknown builtin fails', async () => {
+    const builtin = await parseTenant(
+      `${validYaml}launcher:\n  icon:\n    type: builtin\n    name: chat\n`,
+      env,
+      'pilot.yaml',
+    );
+    expect(builtin.launcher.icon).toEqual({ type: 'builtin', name: 'chat' });
+    const asset = await validateTenant(
+      `${validYaml}launcher:\n  icon:\n    type: asset\n    file: logo.png\n`,
+      {
+        env,
+        fileName: 'pilot.yaml',
+      },
+    );
+    expect(asset.tenant?.launcher.icon).toEqual({ type: 'asset', file: 'logo.png' });
+    const legacy = await validateTenant(`${validYaml}launcher:\n  icon: logo.png\n`, {
+      env,
+      fileName: 'pilot.yaml',
+    });
+    expect(legacy.tenant?.launcher.icon).toEqual({ type: 'asset', file: 'logo.png' });
+    expect(
+      await errorsOf(`${validYaml}launcher:\n  icon:\n    type: builtin\n    name: rocket\n`),
+    ).toMatch(/launcher\.icon/);
+  });
+
+  it('enabled defaults to true and can be turned off', async () => {
+    const tenant = await parseTenant(`${validYaml}enabled: false\n`, env, 'pilot.yaml');
+    expect(tenant.enabled).toBe(false);
   });
 });

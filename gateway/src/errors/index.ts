@@ -5,6 +5,7 @@ import type { ChatError, ErrorCode, ErrorResponse, Locale } from '../protocol/in
 const RETRYABLE: Readonly<Record<ErrorCode, boolean>> = {
   invalid_request: false,
   tenant_not_found: false,
+  tenant_disabled: false,
   forbidden_origin: false,
   conversation_not_found: false,
   rate_limited: true,
@@ -18,6 +19,7 @@ const RETRYABLE: Readonly<Record<ErrorCode, boolean>> = {
 export const HTTP_STATUS: Readonly<Record<ErrorCode, number>> = {
   invalid_request: 400,
   tenant_not_found: 404,
+  tenant_disabled: 503,
   forbidden_origin: 403,
   conversation_not_found: 404,
   rate_limited: 429,
@@ -33,6 +35,7 @@ const DEFAULT_TEXTS: Readonly<Record<Locale, Readonly<Record<ErrorCode, string>>
   ro: {
     invalid_request: 'Mesajul nu a putut fi trimis. Verificați textul și încercați din nou.',
     tenant_not_found: 'Asistentul nu este disponibil pe acest site.',
+    tenant_disabled: 'Asistentul nu este disponibil momentan pe acest site.',
     forbidden_origin: 'Asistentul nu este disponibil pe acest site.',
     conversation_not_found: 'Conversația nu mai este disponibilă. Începeți o conversație nouă.',
     rate_limited:
@@ -48,6 +51,7 @@ const DEFAULT_TEXTS: Readonly<Record<Locale, Readonly<Record<ErrorCode, string>>
   en: {
     invalid_request: 'The message could not be sent. Please check it and try again.',
     tenant_not_found: 'The assistant is not available on this site.',
+    tenant_disabled: 'The assistant is currently not available on this site.',
     forbidden_origin: 'The assistant is not available on this site.',
     conversation_not_found: 'This conversation is no longer available. Please start a new one.',
     rate_limited: 'You sent many messages in a short time. Please try again in a moment.',

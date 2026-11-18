@@ -74,6 +74,26 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     return reply.code(isClientError ? status : 500).send(body);
   });
 
+  // Disabled tenant (E4b §5.6): every API call and the chat page answer `tenant_disabled`; the
+  // loader sees it from loader-config and shows no launcher. Checked after body parsing.
+  app.addHook('preHandler', async (request, reply) => {
+    if (!request.url.startsWith('/api/') && !request.url.startsWith('/w/app')) return;
+    const fromQuery = (request.query as Record<string, unknown> | undefined)?.tenant;
+    const fromBody = (request.body as Record<string, unknown> | undefined)?.tenant;
+    const id = typeof fromQuery === 'string' ? fromQuery : fromBody;
+    if (typeof id !== 'string' || options.tenants.get(id)?.enabled !== false) return;
+    const locale =
+      (request.query as Record<string, unknown> | undefined)?.locale === 'en' ? 'en' : 'ro';
+    if (request.url.startsWith('/w/app')) {
+      return reply
+        .code(503)
+        .type('text/plain; charset=utf-8')
+        .header('content-security-policy', "default-src 'none'; frame-ancestors 'none'")
+        .send(chatError('tenant_disabled', locale).message);
+    }
+    return replyError(reply, 'tenant_disabled', locale);
+  });
+
   app.get('/healthz', () => ({ status: 'ok' }));
 
   widgetConfigRoute(app, options.tenants);

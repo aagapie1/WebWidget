@@ -5,7 +5,7 @@
  * the tenant configuration (`/api/loader-config`, ADR 007).
  * Plain TypeScript, no framework: budget < 15 KB gzip.
  */
-import { loaderConfigSchema, type LoaderConfig } from 'gateway/protocol';
+import { errorResponseSchema, loaderConfigSchema, type LoaderConfig } from 'gateway/protocol';
 import { parseLocale, texts } from '../app/i18n/index.js';
 import { appMessageSchema, message, type LoaderMessage } from '../shared/messages.js';
 import { LOADER_CSS } from './styles.js';
@@ -32,7 +32,7 @@ export interface LoaderOptions {
   /** Load the chat iframe in the background once the page is idle (default true). */
   preloadWhenIdle?: boolean;
   /** Fetches the tenant's loader configuration; tests pass a stub. */
-  loadConfig?: () => Promise<LoaderConfig | undefined>;
+  loadConfig?: () => Promise<LoaderConfig | 'disabled' | undefined>;
 }
 
 export interface LoaderHandle {
@@ -43,16 +43,25 @@ export interface LoaderHandle {
   readonly configured: Promise<void>;
 }
 
-/** Real fetch of `/api/loader-config` (CORS, no credentials); undefined on any problem. */
-export function fetchLoaderConfig(options: LoaderOptions): Promise<LoaderConfig | undefined> {
+/**
+ * Real fetch of `/api/loader-config` (CORS, no credentials). `disabled` when the tenant was turned
+ * off (E4b §5.6); undefined on any other problem (the launcher then uses the defaults).
+ */
+export function fetchLoaderConfig(
+  options: LoaderOptions,
+): Promise<LoaderConfig | 'disabled' | undefined> {
   const url = new URL('/api/loader-config', options.gatewayOrigin);
   url.searchParams.set('tenant', options.tenant);
   url.searchParams.set('locale', options.locale);
   return fetch(url, { mode: 'cors', credentials: 'omit' })
-    .then(async (response) => (response.ok ? ((await response.json()) as unknown) : undefined))
-    .then((json) => {
+    .then(async (response) => {
+      const json = (await response.json()) as unknown;
+      const error = errorResponseSchema.safeParse(json);
+      if (response.status === 503 && error.success && error.data.error.code === 'tenant_disabled') {
+        return 'disabled' as const;
+      }
       const parsed = loaderConfigSchema.safeParse(json);
-      return parsed.success ? parsed.data : undefined;
+      return response.ok && parsed.success ? parsed.data : undefined;
     })
     .catch(() => undefined);
 }
@@ -242,7 +251,8 @@ export function mountLoader(options: LoaderOptions, doc: Document = document): L
       set('--cw-width', `${String(config.window.width)}px`);
       set('--cw-height', `${String(config.window.height)}px`);
       host.classList.toggle('is-left', config.launcher.position === 'bottom-left');
-      root.host.setAttribute('data-position', config.launcher.position);
+      // The window has its own side (configured separately, or following the launcher).
+      host.classList.toggle('window-left', config.window.position === 'bottom-left');
 
       labels.open = config.texts['launcher.open'] ?? labels.open;
       labels.close = config.texts['launcher.close'] ?? labels.close;
@@ -267,9 +277,8 @@ export function mountLoader(options: LoaderOptions, doc: Document = document): L
   for (const type of ['pointerenter', 'focus', 'touchstart'] as const) {
     launcher.addEventListener(type, preload, { once: true, passive: true });
   }
-  if (options.preloadWhenIdle !== false) whenIdle(doc, preload);
-
   render(false);
+  let disabled = false;
   const load = options.loadConfig ?? (() => fetchLoaderConfig(options));
   const configured = Promise.race([
     load(),
@@ -278,7 +287,22 @@ export function mountLoader(options: LoaderOptions, doc: Document = document): L
         resolve(undefined);
       }, CONFIG_WAIT_MS);
     }),
-  ]).then(applyConfig);
+  ]).then((config) => {
+    if (config === 'disabled') {
+      // Tenant turned off: nothing is shown and the chat is never loaded.
+      disabled = true;
+      host.remove();
+      return;
+    }
+    applyConfig(config);
+  });
+  if (options.preloadWhenIdle !== false) {
+    whenIdle(doc, () => {
+      void configured.then(() => {
+        if (!disabled) preload();
+      });
+    });
+  }
   return { open, hide, root, configured };
 }
 

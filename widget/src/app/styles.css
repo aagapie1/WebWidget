@@ -198,8 +198,8 @@ button {
   place-items: center;
   border: 0;
   border-radius: 50%;
-  color: var(--cw-on-accent);
-  background: var(--cw-gradient);
+  color: var(--cw-on-button, var(--cw-on-accent));
+  background: var(--cw-button-bg, var(--cw-gradient));
   box-shadow: 0 4px 12px color-mix(in srgb, var(--cw-accent) 35%, transparent);
   cursor: pointer;
   transition:
@@ -292,8 +292,8 @@ button {
   justify-content: flex-end;
 }
 .message--user .message__bubble {
-  color: var(--cw-on-accent);
-  background: var(--cw-gradient);
+  color: var(--cw-user-text, var(--cw-on-accent));
+  background: var(--cw-user-bg, var(--cw-gradient));
   border-bottom-right-radius: 6px;
   box-shadow: 0 2px 8px color-mix(in srgb, var(--cw-accent) 25%, transparent);
 }
@@ -519,12 +519,12 @@ p.message__text {
   margin-bottom: 12px;
 }
 .pill-button--primary {
-  color: var(--cw-on-accent);
+  color: var(--cw-on-button, var(--cw-on-accent));
   border-color: transparent;
-  background: var(--cw-gradient);
+  background: var(--cw-button-bg, var(--cw-gradient));
 }
 .pill-button--primary:hover:not(:disabled) {
-  background: var(--cw-gradient);
+  background: var(--cw-button-bg, var(--cw-gradient));
   box-shadow: 0 4px 12px color-mix(in srgb, var(--cw-accent) 35%, transparent);
 }
 .pill-button--primary:disabled {

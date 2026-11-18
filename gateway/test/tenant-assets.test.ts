@@ -84,7 +84,8 @@ describe('GET /api/loader-config', () => {
         offsetY: 32,
         iconUrl: expect.stringMatching(/^\/w\/t\/pilot\/[0-9a-f]{10}-logo\.svg$/) as unknown,
       },
-      window: { width: 420, height: 600 },
+      // window.position defaults to auto: it opens on the launcher's side.
+      window: { width: 420, height: 600, position: 'bottom-left' },
       proactive: {
         text: 'Aveți o întrebare? Vă putem ajuta.',
         delaySeconds: 5,

@@ -20,7 +20,7 @@ const config: LoaderConfig = {
     offsetY: 32,
     iconUrl: '/w/t/pilot/0123456789-logo.svg',
   },
-  window: { width: 420, height: 600 },
+  window: { width: 420, height: 600, position: 'bottom-left' },
   proactive,
   texts: { 'launcher.open': 'Deschide chatul primăriei', 'proactive.close': 'Ascunde' },
 };
@@ -143,5 +143,30 @@ describe('loader configuration (E4)', () => {
     vi.advanceTimersByTime(5000);
     expect(proactiveOf(mobile)).not.toBeNull();
     vi.restoreAllMocks();
+  });
+});
+
+describe('loader: window side and disabled tenant (E4 completions)', () => {
+  it('places the window on its own side, independent of the launcher', async () => {
+    const handle = mount({ ...config, window: { ...config.window, position: 'bottom-right' } });
+    await handle.configured;
+    const host = hostOf(handle);
+    expect(host.classList.contains('is-left')).toBe(true); // launcher on the left
+    expect(host.classList.contains('window-left')).toBe(false); // window on the right
+  });
+
+  it('shows nothing and never loads the chat for a disabled tenant', async () => {
+    vi.useRealTimers();
+    const handle = mountLoader({
+      tenant: 'pilot',
+      gatewayOrigin: GATEWAY,
+      locale: 'ro',
+      pageOrigin: 'https://www.primarie.ro',
+      loadConfig: () => Promise.resolve('disabled'),
+    });
+    await handle.configured;
+    expect(document.querySelector('[data-chat-widget]')).toBeNull();
+    await new Promise((resolve) => setTimeout(resolve, 1200)); // idle preload window
+    expect(handle.root.querySelector('iframe')).toBeNull();
   });
 });

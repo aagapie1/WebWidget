@@ -129,12 +129,12 @@ export const LOADER_CSS = `
   outline-offset: 1px;
 }
 :host(.is-left) .launcher,
-:host(.is-left) .panel,
-:host(.is-left) .proactive {
+:host(.is-left) .proactive,
+:host(.window-left) .panel {
   right: auto;
   left: var(--cw-offset-x);
 }
-:host(.is-left) .panel {
+:host(.window-left) .panel {
   transform-origin: bottom left;
 }
 @keyframes cw-open {
@@ -147,7 +147,7 @@ export const LOADER_CSS = `
 }
 @media (max-width: 480px) {
   .panel,
-  :host(.is-left) .panel {
+  :host(.window-left) .panel {
     inset: 0;
     width: 100%;
     height: 100%;

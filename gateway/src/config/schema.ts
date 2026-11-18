@@ -4,7 +4,8 @@ import { contrastRatio } from './contrast.js';
 
 /**
  * Tenant configuration, schema version 1 (ADR 007). Single source of truth for the YAML files
- * today and for the E4b admin interface later. Contains no secrets.
+ * today and for the E4b admin interface later. Contains no secrets. New fields are added as
+ * optional ones with defaults, so existing version 1 files stay valid.
  */
 export const SCHEMA_VERSION = 1;
 
@@ -52,7 +53,7 @@ export const DEFAULT_THEME = {
 } as const;
 
 const themeSchema = z.strictObject({
-  /** Header gradient start, user bubbles, launcher, primary buttons. */
+  /** Header gradient start, launcher; default for user bubbles and buttons. */
   accent: hexColor.default(DEFAULT_THEME.accent),
   /** Header gradient end (use the same value as `accent` for a flat color). */
   accentEnd: hexColor.default(DEFAULT_THEME.accentEnd),
@@ -63,51 +64,91 @@ const themeSchema = z.strictObject({
   background: hexColor.default(DEFAULT_THEME.background),
   assistantBubble: hexColor.default(DEFAULT_THEME.assistantBubble),
   link: hexColor.default(DEFAULT_THEME.link),
+  /** Optional: user message bubbles (default: the accent gradient). */
+  userBubble: hexColor.optional(),
+  /** Optional: text on user bubbles (default: onAccent). */
+  onUserBubble: hexColor.optional(),
+  /** Optional: primary buttons, e.g. send (default: the accent gradient). */
+  button: hexColor.optional(),
+  /** Optional: text and icons on primary buttons (default: onAccent). */
+  onButton: hexColor.optional(),
 });
 export type Theme = z.infer<typeof themeSchema>;
 
-/** Every text/background pair the widget renders, with its WCAG 2.1 AA minimum. */
-export const CONTRAST_PAIRS: readonly {
+export interface ContrastCheck {
   foreground: keyof Theme;
+  foregroundColor: string;
   background: keyof Theme;
+  backgroundColor: string;
   minimum: number;
   usage: string;
-}[] = [
-  {
-    foreground: 'onAccent',
-    background: 'accent',
-    minimum: 4.5,
-    usage: 'header and user message text',
-  },
-  {
-    foreground: 'onAccent',
-    background: 'accentEnd',
-    minimum: 4.5,
-    usage: 'header and user message text',
-  },
-  { foreground: 'text', background: 'background', minimum: 4.5, usage: 'body text' },
-  {
-    foreground: 'text',
-    background: 'assistantBubble',
-    minimum: 4.5,
-    usage: 'assistant message text',
-  },
-  { foreground: 'textMuted', background: 'background', minimum: 4.5, usage: 'hints and dates' },
-  {
-    foreground: 'textMuted',
-    background: 'assistantBubble',
-    minimum: 4.5,
-    usage: 'notes in answers',
-  },
-  { foreground: 'link', background: 'background', minimum: 4.5, usage: 'links and text buttons' },
-  { foreground: 'link', background: 'assistantBubble', minimum: 4.5, usage: 'links in answers' },
-  {
-    foreground: 'accent',
-    background: 'background',
-    minimum: 3,
-    usage: 'launcher and controls (non-text)',
-  },
-];
+}
+
+/**
+ * Every text/background pair the widget renders, with the effective colors (optional colors
+ * fall back to the accent ones) and its WCAG 2.1 AA minimum.
+ */
+export function contrastChecks(theme: Theme): ContrastCheck[] {
+  const pair = (
+    foreground: keyof Theme,
+    background: keyof Theme,
+    minimum: number,
+    usage: string,
+  ): ContrastCheck => ({
+    foreground,
+    foregroundColor: theme[foreground] ?? '',
+    background,
+    backgroundColor: theme[background] ?? '',
+    minimum,
+    usage,
+  });
+  const userText: keyof Theme = theme.onUserBubble ? 'onUserBubble' : 'onAccent';
+  const buttonText: keyof Theme = theme.onButton ? 'onButton' : 'onAccent';
+  const checks: ContrastCheck[] = [
+    pair('onAccent', 'accent', 4.5, 'header text'),
+    pair('onAccent', 'accentEnd', 4.5, 'header text'),
+    ...(theme.userBubble
+      ? [pair(userText, 'userBubble', 4.5, 'user message text')]
+      : [
+          pair(userText, 'accent', 4.5, 'user message text'),
+          pair(userText, 'accentEnd', 4.5, 'user message text'),
+        ]),
+    ...(theme.button
+      ? [pair(buttonText, 'button', 4.5, 'primary button text and icons')]
+      : [
+          pair(buttonText, 'accent', 4.5, 'primary button text and icons'),
+          pair(buttonText, 'accentEnd', 4.5, 'primary button text and icons'),
+        ]),
+    pair('text', 'background', 4.5, 'body text'),
+    pair('text', 'assistantBubble', 4.5, 'assistant message text'),
+    pair('textMuted', 'background', 4.5, 'hints and dates'),
+    pair('textMuted', 'assistantBubble', 4.5, 'notes in answers'),
+    pair('link', 'background', 4.5, 'links and text buttons'),
+    pair('link', 'assistantBubble', 4.5, 'links in answers'),
+    pair('accent', 'background', 3, 'launcher and controls (non-text)'),
+  ];
+  // With the defaults, user bubbles and buttons repeat the header pairs: report each pair once.
+  const seen = new Set<string>();
+  return checks.filter((check) => {
+    const key = `${check.foreground}/${check.background}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/** Built-in launcher icons; the full set arrives with E4b. Unknown names are rejected. */
+export const BUILTIN_ICONS = ['chat'] as const;
+
+/** `{ type: 'builtin', name }` or `{ type: 'asset', file }`; a bare file name is the asset form. */
+const launcherIconSchema = z.union([
+  assetNameSchema.transform((file) => ({ type: 'asset' as const, file })),
+  z.discriminatedUnion('type', [
+    z.strictObject({ type: z.literal('builtin'), name: z.enum(BUILTIN_ICONS) }),
+    z.strictObject({ type: z.literal('asset'), file: assetNameSchema }),
+  ]),
+]);
+export type LauncherIcon = z.infer<typeof launcherIconSchema>;
 
 export const PRESENTATION_SECTIONS = [
   'identity',
@@ -122,10 +163,12 @@ export const PRESENTATION_SECTIONS = [
 export const tenantSchema = z
   .strictObject({
     schemaVersion: z.literal(SCHEMA_VERSION, {
-      message: `schemaVersion must be ${SCHEMA_VERSION}`,
+      message: `schemaVersion must be ${String(SCHEMA_VERSION)}`,
     }),
     id: z.string().regex(/^[a-z0-9-]{1,64}$/, 'id must be lowercase letters, digits or dashes'),
     name: z.string().min(1).max(200),
+    /** A disabled tenant shows no launcher; its API answers `tenant_disabled` (E4b §5.6). */
+    enabled: z.boolean().default(true),
     difyBaseUrl: z.url({ protocol: /^https?$/ }).transform((url) => url.replace(/\/+$/, '')),
     difyApiKeyEnv: z.string().regex(/^[A-Z][A-Z0-9_]*$/),
     allowedOrigins: z.array(originSchema).min(1),
@@ -142,7 +185,7 @@ export const tenantSchema = z
       .default({ userAvatar: 'none' }),
     launcher: z
       .strictObject({
-        icon: assetNameSchema.optional(),
+        icon: launcherIconSchema.optional(),
         position: z.enum(['bottom-right', 'bottom-left']).default('bottom-right'),
         offsetX: z.number().int().min(0).max(200).default(24),
         offsetY: z.number().int().min(0).max(200).default(24),
@@ -152,8 +195,10 @@ export const tenantSchema = z
       .strictObject({
         width: z.number().int().min(320).max(520).default(380),
         height: z.number().int().min(420).max(800).default(640),
+        /** Separate from the launcher; `auto` opens on the launcher's side. */
+        position: z.enum(['auto', 'bottom-right', 'bottom-left']).default('auto'),
       })
-      .default({ width: 380, height: 640 }),
+      .default({ width: 380, height: 640, position: 'auto' }),
     theme: themeSchema.default(DEFAULT_THEME),
     texts: z.strictObject({ ro: textsSchema.optional(), en: textsSchema.optional() }).default({}),
     proactive: z
@@ -188,13 +233,13 @@ export const tenantSchema = z
       .default({ retentionDays: 90 }),
   })
   .superRefine((tenant, context) => {
-    for (const pair of CONTRAST_PAIRS) {
-      const ratio = contrastRatio(tenant.theme[pair.foreground], tenant.theme[pair.background]);
-      if (ratio < pair.minimum) {
+    for (const check of contrastChecks(tenant.theme)) {
+      const ratio = contrastRatio(check.foregroundColor, check.backgroundColor);
+      if (ratio < check.minimum) {
         context.addIssue({
           code: 'custom',
-          path: ['theme', pair.foreground],
-          message: `contrast ${ratio.toFixed(2)}:1 between ${pair.foreground} ${tenant.theme[pair.foreground]} and ${pair.background} ${tenant.theme[pair.background]} (${pair.usage}) is below ${String(pair.minimum)}:1`,
+          path: ['theme', check.foreground],
+          message: `contrast ${ratio.toFixed(2)}:1 between ${check.foreground} ${check.foregroundColor} and ${check.background} ${check.backgroundColor} (${check.usage}) is below ${String(check.minimum)}:1`,
         });
       }
     }

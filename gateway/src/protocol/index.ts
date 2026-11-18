@@ -26,6 +26,7 @@ export type Author = z.infer<typeof authorSchema>;
 export const ERROR_CODES = [
   'invalid_request',
   'tenant_not_found',
+  'tenant_disabled',
   'forbidden_origin',
   'conversation_not_found',
   'rate_limited',
@@ -117,6 +118,11 @@ export const themeSchema = z.object({
   background: hexColorSchema,
   assistantBubble: hexColorSchema,
   link: hexColorSchema,
+  // Optional tenant colors; the widget falls back to the accent ones.
+  userBubble: z.optional(hexColorSchema),
+  onUserBubble: z.optional(hexColorSchema),
+  button: z.optional(hexColorSchema),
+  onButton: z.optional(hexColorSchema),
 });
 export type WidgetTheme = z.infer<typeof themeSchema>;
 
@@ -149,7 +155,12 @@ export const loaderConfigSchema = z.object({
     offsetY: z.number(),
     iconUrl: z.optional(assetUrlSchema),
   }),
-  window: z.object({ width: z.number(), height: z.number() }),
+  window: z.object({
+    width: z.number(),
+    height: z.number(),
+    /** Resolved side (`auto` in the configuration follows the launcher). */
+    position: z.enum(['bottom-right', 'bottom-left']),
+  }),
   proactive: z.nullable(
     z.object({
       text: z.string(),

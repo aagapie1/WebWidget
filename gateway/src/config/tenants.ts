@@ -169,7 +169,10 @@ async function resolveAssets(
       'identity.userAvatar',
       config.identity.userAvatar === 'none' ? undefined : config.identity.userAvatar,
     ],
-    ['launcher.icon', config.launcher.icon],
+    [
+      'launcher.icon',
+      config.launcher.icon?.type === 'asset' ? config.launcher.icon.file : undefined,
+    ],
   ];
   const assets = new Map<string, TenantAsset>();
   for (const [path, name] of references) {

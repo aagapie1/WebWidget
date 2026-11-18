@@ -36,7 +36,9 @@ export function assetUrl(tenant: Tenant, name: string | undefined): string | und
 export function loaderConfig(tenant: Tenant, locale: Locale): LoaderConfig {
   const { proactive } = tenant;
   const text = proactive.text ? (proactive.text[locale] ?? proactive.text.ro) : undefined;
-  const iconUrl = assetUrl(tenant, tenant.launcher.icon);
+  // Built-in icons are drawn by the loader itself (only `chat`, the default, for now).
+  const icon = tenant.launcher.icon;
+  const iconUrl = icon?.type === 'asset' ? assetUrl(tenant, icon.file) : undefined;
   return {
     theme: {
       accent: tenant.theme.accent,
@@ -49,7 +51,12 @@ export function loaderConfig(tenant: Tenant, locale: Locale): LoaderConfig {
       offsetY: tenant.launcher.offsetY,
       ...(iconUrl ? { iconUrl } : {}),
     },
-    window: { width: tenant.window.width, height: tenant.window.height },
+    window: {
+      width: tenant.window.width,
+      height: tenant.window.height,
+      position:
+        tenant.window.position === 'auto' ? tenant.launcher.position : tenant.window.position,
+    },
     proactive:
       proactive.enabled && text
         ? {

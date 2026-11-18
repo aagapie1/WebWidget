@@ -63,6 +63,7 @@ export const GATEWAY_TEXT_KEYS = [
   'welcome',
   'errors.invalid_request',
   'errors.tenant_not_found',
+  'errors.tenant_disabled',
   'errors.forbidden_origin',
   'errors.conversation_not_found',
   'errors.rate_limited',

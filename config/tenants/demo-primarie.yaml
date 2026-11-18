@@ -12,7 +12,9 @@ identity:
   logo: stema.svg
   assistantAvatar: stema.svg
 launcher:
-  icon: stema.svg
+  icon:
+    type: asset
+    file: stema.svg
   position: bottom-left
   offsetX: 20
   offsetY: 20
