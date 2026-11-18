@@ -13,8 +13,7 @@ import { diff, editableView, mergeServerFields, originsOf, type ConfigObject } f
 import { can } from './identity.js';
 import { IMAGE_LIMITS, processImage } from './images.js';
 import type { PreviewService } from './preview.js';
-import { SESSION_COOKIE } from './sessions.js';
-import { adminError, authorize, sessionOf } from './guard.js';
+import { adminError, authorize, sessionIdOf, sessionOf } from './guard.js';
 
 type Env = Readonly<Record<string, string | undefined>>;
 
@@ -221,10 +220,7 @@ export function adminConfigRoutes(
     const found = await tenantFor(request, reply, 'edit');
     if (!found) return reply;
     if (!options.preview) return adminError(reply, 'not_found');
-    const created = await options.preview.create(
-      found.tenant,
-      request.cookies[SESSION_COOKIE] ?? '',
-    );
+    const created = await options.preview.create(found.tenant, sessionIdOf(request));
     return { ...created, url: `/admin/preview?id=${created.id}` };
   });
 

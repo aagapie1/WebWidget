@@ -40,6 +40,10 @@ let adminStore: KeyValueStore | undefined;
 let admin: BuildAppOptions['admin'];
 if (env.ADMIN_AUTH_CONFIG) {
   if (!env.REDIS_URL) throw new Error('ADMIN_AUTH_CONFIG requires REDIS_URL (admin sessions)');
+  // Admin cookies are Secure (`__Secure-`) only over https: production must use it.
+  if (env.NODE_ENV === 'production' && !env.PUBLIC_ORIGIN.startsWith('https:')) {
+    throw new Error('the admin interface requires an https PUBLIC_ORIGIN in production');
+  }
   if (!database)
     throw new Error('ADMIN_AUTH_CONFIG requires TENANT_SOURCE=postgres (drafts, versions)');
   adminStore = await RedisKeyValueStore.connect(env.REDIS_URL);

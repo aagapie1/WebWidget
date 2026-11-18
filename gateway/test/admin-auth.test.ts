@@ -466,3 +466,19 @@ describe('admin interface page (separate bundle)', () => {
     }
   });
 });
+
+describe('admin cookies', () => {
+  it('are __Secure- over https and plain (not Secure) only over http (development)', async () => {
+    const { adminCookies } = await import('../src/admin/sessions.js');
+    expect(adminCookies('https://admin.example.ro')).toEqual({
+      session: '__Secure-admin',
+      login: '__Secure-admin-login',
+      secure: true,
+    });
+    expect(adminCookies('http://localhost:3100')).toEqual({
+      session: 'admin',
+      login: 'admin-login',
+      secure: false,
+    });
+  });
+});

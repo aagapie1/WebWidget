@@ -166,3 +166,8 @@ draft_conflict` (who saved, when) and nothing is overwritten. Autosave then stop
 - Local run: `pnpm --filter gateway dev:admin` (gateway on :3100 with Postgres, Redis, Keycloak;
   `gateway/admin-dev.env`) after `pnpm services:up`, `pnpm db:migrate`, `pnpm db:seed` and
   `pnpm --filter admin build`.
+- Admin cookies follow the scheme of `PUBLIC_ORIGIN`. Over https they are `__Secure-admin` and
+  `__Secure-admin-login` with `Secure`. Over http://localhost (development, e2e) they are
+  `admin` and `admin-login` without `Secure`, because WebKit refuses Secure cookies on
+  http://localhost. In production the gateway refuses to start the admin interface without
+  an https `PUBLIC_ORIGIN`.

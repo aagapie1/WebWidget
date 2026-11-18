@@ -31,17 +31,27 @@ export function adminError(
   return reply.code(STATUS[code]).send({ error: { code, ...details } });
 }
 
-const sessions = new WeakMap<FastifyRequest, AdminSession>();
+const sessions = new WeakMap<FastifyRequest, { session: AdminSession; id: string }>();
 
-export function attachSession(request: FastifyRequest, session: AdminSession): void {
-  sessions.set(request, session);
+/** Set by the guard: the session and its id (the cookie value). */
+export function attachSession(request: FastifyRequest, session: AdminSession, id: string): void {
+  sessions.set(request, { session, id });
+}
+
+function attached(request: FastifyRequest): { session: AdminSession; id: string } {
+  const entry = sessions.get(request);
+  if (!entry) throw new Error('admin route without the session guard');
+  return entry;
 }
 
 /** The session of an authenticated admin request (set by the guard). */
 export function sessionOf(request: FastifyRequest): AdminSession {
-  const session = sessions.get(request);
-  if (!session) throw new Error('admin route without the session guard');
-  return session;
+  return attached(request).session;
+}
+
+/** The session id (binds preview tokens to this session). */
+export function sessionIdOf(request: FastifyRequest): string {
+  return attached(request).id;
 }
 
 /** Server-side authorization for a tenant (spec §4.3). Replies 403 and returns false if denied. */

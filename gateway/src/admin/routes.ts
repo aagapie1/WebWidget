@@ -14,9 +14,8 @@ import type { KeyValueStore } from './kv.js';
 import { pkce, type OidcClient } from './oidc.js';
 import {
   AdminSessions,
-  LOGIN_COOKIE,
+  adminCookies,
   LOGIN_TTL_SECONDS,
-  SESSION_COOKIE,
   randomToken,
   safeEqual,
   withinLimit,
@@ -103,7 +102,8 @@ function safeReturnTo(value: string | undefined): string {
 export function adminRoutes(app: FastifyInstance, options: AdminRouteOptions): void {
   const { env, auth, store, oidc } = options;
   const sessionStore = new AdminSessions(store);
-  const secure = { httpOnly: true, secure: true } as const;
+  const cookies = adminCookies(env.PUBLIC_ORIGIN);
+  const secure = { httpOnly: true, secure: cookies.secure } as const;
   const callbackUri = `${env.PUBLIC_ORIGIN}/admin/auth/callback`;
 
   void app.register(
@@ -202,7 +202,7 @@ export function adminRoutes(app: FastifyInstance, options: AdminRouteOptions): v
           codeChallenge: await pkce.challenge(codeVerifier),
         });
         // Lax: the identity provider brings the browser back with a top-level GET.
-        void reply.setCookie(LOGIN_COOKIE, state, {
+        void reply.setCookie(cookies.login, state, {
           ...secure,
           sameSite: 'lax',
           path: '/admin/auth',
@@ -227,9 +227,9 @@ export function adminRoutes(app: FastifyInstance, options: AdminRouteOptions): v
         ) {
           return adminError(reply, 'rate_limited');
         }
-        void reply.clearCookie(LOGIN_COOKIE, { ...secure, sameSite: 'lax', path: '/admin/auth' });
+        void reply.clearCookie(cookies.login, { ...secure, sameSite: 'lax', path: '/admin/auth' });
         const query = callbackQuery.safeParse(request.query);
-        const bound = request.cookies[LOGIN_COOKIE];
+        const bound = request.cookies[cookies.login];
         // The state must belong to this browser (login CSRF) and is single use.
         if (!query.success || !bound || !safeEqual(bound, query.data.state)) {
           return fail('login_state');
@@ -258,7 +258,7 @@ export function adminRoutes(app: FastifyInstance, options: AdminRouteOptions): v
           realm.sessionSeconds,
           exchanged.idToken,
         );
-        void reply.setCookie(SESSION_COOKIE, id, {
+        void reply.setCookie(cookies.session, id, {
           ...secure,
           sameSite: 'strict',
           path: '/admin',
@@ -277,13 +277,13 @@ export function adminRoutes(app: FastifyInstance, options: AdminRouteOptions): v
           }
           // Only the session cookie authenticates: an Authorization header (for example a
           // token from another realm) is never accepted.
-          const session = await sessionStore.get(request.cookies[SESSION_COOKIE]);
+          const session = await sessionStore.get(request.cookies[cookies.session]);
           if (!session) return adminError(reply, 'unauthenticated');
           if (
             !(await withinLimit(
               store,
               'api',
-              request.cookies[SESSION_COOKIE] ?? '',
+              request.cookies[cookies.session] ?? '',
               LIMITS.api.limit,
               LIMITS.api.windowSeconds,
             ))
@@ -299,7 +299,7 @@ export function adminRoutes(app: FastifyInstance, options: AdminRouteOptions): v
               return adminError(reply, 'csrf');
             }
           }
-          attachSession(request, session);
+          attachSession(request, session, request.cookies[cookies.session] ?? '');
         });
 
         guarded.get('/api/session', (request) => {
@@ -318,8 +318,12 @@ export function adminRoutes(app: FastifyInstance, options: AdminRouteOptions): v
 
         guarded.post('/auth/logout', async (request, reply) => {
           const session = sessionOf(request);
-          await sessionStore.destroy(request.cookies[SESSION_COOKIE]);
-          void reply.clearCookie(SESSION_COOKIE, { ...secure, sameSite: 'strict', path: '/admin' });
+          await sessionStore.destroy(request.cookies[cookies.session]);
+          void reply.clearCookie(cookies.session, {
+            ...secure,
+            sameSite: 'strict',
+            path: '/admin',
+          });
           const realm = auth.realms.get(session.org);
           let redirect = '/admin/';
           if (realm) {

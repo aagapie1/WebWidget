@@ -280,7 +280,7 @@ test('an expired session loses nothing: sign in again and back to the form', asy
 }) => {
   await openEditor(page, PILOT_ADMIN);
   // The gateway session ends (expiry); the Keycloak single sign-on session remains.
-  await context.clearCookies({ name: '__Secure-admin' });
+  await context.clearCookies({ name: /^(__Secure-)?admin$/ });
   const viaKeycloak = page.waitForRequest(/\/realms\/pilot\/protocol\/openid-connect\/auth/);
   await page.getByLabel('Numele clientului').fill('Scris înainte de expirare');
   // The single sign-on session at Keycloak brings the browser straight back.
@@ -328,7 +328,9 @@ test('the Dify key never appears in the admin interface traffic', async ({ page 
 
 test('no serious or critical axe violations on the login page and the editor', async ({ page }) => {
   const serious = async () =>
-    (await new AxeBuilder({ page }).analyze()).violations.filter(
+    // The preview frame holds the public widget, which has its own axe tests (widget specs).
+    // Scanning the two nested frames here crashed Firefox in CI.
+    (await new AxeBuilder({ page }).exclude('.preview__frame').analyze()).violations.filter(
       (violation) => violation.impact === 'serious' || violation.impact === 'critical',
     );
   await page.goto(`${ADMIN}/admin/`);

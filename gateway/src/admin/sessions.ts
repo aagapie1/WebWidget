@@ -7,6 +7,24 @@ import type { KeyValueStore } from './kv.js';
 export const SESSION_COOKIE = '__Secure-admin';
 /** Binds a login in progress to the browser that started it (SameSite=Lax: IdP redirect back). */
 export const LOGIN_COOKIE = '__Secure-admin-login';
+
+export interface AdminCookies {
+  session: string;
+  login: string;
+  secure: boolean;
+}
+
+/**
+ * Cookie names and the Secure flag for the gateway's public origin. Over https (always in
+ * production, enforced at startup) the `__Secure-` cookies above. Over http://localhost
+ * (development, e2e) plain names without Secure, since some browsers (WebKit) refuse Secure
+ * cookies on http://localhost.
+ */
+export function adminCookies(publicOrigin: string): AdminCookies {
+  return publicOrigin.startsWith('https:')
+    ? { session: SESSION_COOKIE, login: LOGIN_COOKIE, secure: true }
+    : { session: 'admin', login: 'admin-login', secure: false };
+}
 export const LOGIN_TTL_SECONDS = 600;
 
 const sessionSchema = z.object({
