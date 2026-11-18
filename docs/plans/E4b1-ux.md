@@ -7,7 +7,7 @@ after review. P3 (login, Keycloak theme, final checks) comes after step 6.
 optional forms of existing fields. `schemaVersion` stays 1, and existing YAML files and published
 versions stay valid.
 
-## P1 — needed for the demo
+## P1 — needed for the demo (done: 760fdce, 7980f17 and the admin commit after them)
 
 ### 1. A preview that shows the effect of changes
 

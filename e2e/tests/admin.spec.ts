@@ -84,8 +84,8 @@ const publicAccent = async (page: Page, tenant: string) =>
     }
   ).theme.accent;
 
-const status = (page: Page) => page.getByRole('status').filter({ hasText: /./ }).first();
-const saved = (page: Page) => expect(status(page)).toHaveText(/^Ciornă salvată la/);
+const status = (page: Page) => page.locator('.save-status').getByRole('status');
+const saved = (page: Page) => expect(status(page)).toHaveText(/^Ciornă: salvată la/);
 const color = (page: Page, label: string) => page.getByLabel(label, { exact: true });
 
 test('a client administrator signs in to their own tenant and cannot reach another', async ({
@@ -217,8 +217,8 @@ test('images: SVG and fake images are refused next to the field, real ones previ
   page,
 }) => {
   await openEditor(page, PILOT_ADMIN);
-  const logo = page.getByLabel('Logo', { exact: true });
-  const field = page.locator('.image-field').filter({ has: logo });
+  const field = page.getByRole('group', { name: 'Logo', exact: true });
+  const logo = field.locator('input[type="file"]');
 
   await logo.setInputFiles({
     name: 'logo.svg',
@@ -338,6 +338,79 @@ test('no serious or critical axe violations on the login page', async ({ page })
   expect(await serious(page)).toEqual([]);
 });
 
+const preview = (page: Page) =>
+  page.frameLocator('iframe[title="Previzualizarea widget-ului cu ciorna"]');
+const previewWidget = (page: Page) => preview(page).locator('[data-chat-widget^="pilot--p-"]');
+
+test('the preview opens on a sample conversation and follows the edited section', async ({
+  page,
+}) => {
+  await openEditor(page, PILOT_ADMIN);
+  const launcher = previewWidget(page).locator('.launcher');
+  // Open window with the sample: question, answer with a link and a source.
+  await expect(launcher).toHaveAttribute('aria-expanded', 'true');
+  const chat = preview(page).frameLocator('iframe[title="Asistent virtual"]');
+  await expect(chat.getByText('Care este programul cu publicul?')).toBeVisible();
+  await expect(chat.getByRole('link', { name: /pagina de servicii/ })).toBeVisible();
+  await expect(chat.getByText('Regulamentul de organizare')).toBeVisible();
+
+  // Editing the launcher: the window closes, the launcher stays in view.
+  await page.getByLabel('Poziție', { exact: true }).focus();
+  await expect(launcher).toHaveAttribute('aria-expanded', 'false');
+  await expect(launcher).toBeInViewport();
+
+  // Editing the proactive message: the bubble shows at once, with the new text.
+  await page.getByLabel('Afișează mesajul proactiv').check();
+  await page.getByLabel('Textul mesajului (română)').fill('Vă putem ajuta cu actele?');
+  await saved(page);
+  await expect(previewWidget(page).locator('.proactive')).toContainText(
+    'Vă putem ajuta cu actele?',
+  );
+  expect((await discardDraft(page, 'pilot')).status).toBe(204);
+});
+
+test("starter questions: take the assistant's, reorder, see them in the preview", async ({
+  page,
+}) => {
+  await openEditor(page, PILOT_ADMIN);
+  const romanian = page.getByRole('group', { name: 'Română' });
+  await expect(romanian.getByText('Care e programul?')).toBeVisible();
+  await romanian.getByRole('button', { name: 'Preia și editează' }).click();
+  await expect(romanian.getByLabel('Întrebarea 1', { exact: true })).toHaveValue(
+    'Care e programul?',
+  );
+  await romanian.getByRole('button', { name: 'Mută mai jos întrebarea 1' }).click();
+  await expect(romanian.getByLabel('Întrebarea 1', { exact: true })).toHaveValue(
+    'Ce taxe sunt? surse',
+  );
+  await expect(romanian.getByRole('status')).toHaveText('Întrebarea a fost mutată pe poziția 2.');
+  await saved(page);
+  const chat = preview(page).frameLocator('iframe[title="Asistent virtual"]');
+  await expect(chat.getByRole('button', { name: 'Ce taxe sunt? surse' })).toBeVisible();
+  expect((await discardDraft(page, 'pilot')).status).toBe(204);
+});
+
+test('site integration: the code to copy, and the installation check', async ({ page }) => {
+  await openEditor(page, PILOT_ADMIN);
+  const section = page.locator('section').filter({ has: page.locator('#section-integration') });
+  await expect(section.locator('pre').first()).toHaveText(
+    `<script src="${ADMIN}/w/loader.js" data-tenant="pilot" async></script>`,
+  );
+  await section.getByLabel('Engleză (data-locale="en")').check();
+  await expect(section.locator('pre').first()).toContainText('data-locale="en"');
+
+  await section.getByRole('button', { name: 'Verifică instalarea' }).click();
+  await expect(section.getByText('Încă nu a fost detectat pe http://127.0.0.1:5180')).toBeVisible();
+  // loader.js on the client's site asks for its configuration (an allowed origin).
+  await page.request.get(`${ADMIN}/api/loader-config?tenant=pilot`, {
+    headers: { origin: 'http://127.0.0.1:5180' },
+  });
+  await section.getByRole('button', { name: 'Verifică instalarea' }).click();
+  await expect(
+    section.getByText(/^Widget detectat pe http:\/\/127\.0\.0\.1:5180 la /),
+  ).toBeVisible();
+});
+
 // The editor is scanned region by region, each in a fresh page of the same session: a scan of
 // the whole editor at once crashed Firefox in CI ("Page crashed"), even without frames. The
 // preview frame holds the public widget, axe-tested in its own specs, and is left out.
@@ -351,6 +424,7 @@ const EDITOR_REGIONS = [
   '#section-citations',
   '#section-behavior',
   '#section-allowedOrigins',
+  '#section-integration',
   '.editor__side > .card',
   '.preview__head',
 ];

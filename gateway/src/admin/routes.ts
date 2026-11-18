@@ -319,6 +319,8 @@ export function adminRoutes(app: FastifyInstance, options: AdminRouteOptions): v
             tenants,
             csrfToken: session.csrf,
             expiresAt: new Date(session.expiresAt).toISOString(),
+            /** For the integration snippet ("Integrare pe site"). */
+            gatewayOrigin: env.PUBLIC_ORIGIN,
           };
         });
 
@@ -350,6 +352,8 @@ export function adminRoutes(app: FastifyInstance, options: AdminRouteOptions): v
           adminConfigRoutes(guarded, {
             ...options.api,
             ...(options.preview ? { preview: options.preview } : {}),
+            store,
+            tenants: options.tenants,
           });
         }
 

@@ -31,7 +31,7 @@ describe('form fields (spec §7)', () => {
         <NumberField
           label="Număr"
           value={3}
-          placeholder={24}
+          defaultValue={24}
           min={0}
           max={10}
           onChange={onNumber}

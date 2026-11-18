@@ -22,7 +22,7 @@ describe('SaveStatus (request 5)', () => {
     const { rerender } = renderWithI18n(
       <SaveStatus state={{ kind: 'saved', at: '2026-11-18T10:05:00.000Z' }} onRetry={onRetry} />,
     );
-    expect(screen.getByRole('status').textContent).toMatch(/^Ciornă salvată la \d{2}:\d{2}$/);
+    expect(screen.getByRole('status').textContent).toMatch(/^Ciornă: salvată la \d{2}:\d{2}$/);
     rerender(<SaveStatus state={{ kind: 'error' }} onRetry={onRetry} />);
     fireEvent.click(screen.getByRole('button', { name: 'Încearcă din nou' }));
     expect(onRetry).toHaveBeenCalled();

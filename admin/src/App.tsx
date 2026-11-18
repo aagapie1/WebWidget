@@ -153,7 +153,13 @@ export function App({
         {session && tenant && (
           <main class="page">
             <h1>{tenant}</h1>
-            <Editor key={tenant} api={api} tenant={tenant} onSessionExpired={onSessionExpired} />
+            <Editor
+              key={tenant}
+              api={api}
+              tenant={tenant}
+              onSessionExpired={onSessionExpired}
+              gatewayOrigin={session.gatewayOrigin}
+            />
           </main>
         )}
       </div>

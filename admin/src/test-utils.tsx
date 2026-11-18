@@ -50,6 +50,10 @@ export function fakeApi(overrides: Partial<AdminApi> = {}): AdminApi {
     previewToken: () =>
       Promise.resolve({ id: 'pilot--p-x', url: '/admin/preview?id=pilot--p-x', expiresAt: '' }),
     logout: never,
+    discardDraft: () => Promise.resolve(),
+    assistantDefaults: () =>
+      Promise.resolve({ welcome: '', suggestedQuestions: [], available: false }),
+    installations: () => Promise.resolve({ installations: [] }),
     ...overrides,
   };
 }

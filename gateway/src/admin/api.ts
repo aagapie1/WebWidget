@@ -13,6 +13,10 @@ import { diff, editableView, mergeServerFields, originsOf, type ConfigObject } f
 import { can } from './identity.js';
 import { IMAGE_LIMITS, processImage } from './images.js';
 import type { PreviewService } from './preview.js';
+import type { KeyValueStore } from './kv.js';
+import type { TenantRegistry } from '../config/tenants.js';
+import { getParameters } from '../dify/client.js';
+import { installations } from '../installs/index.js';
 import { adminError, authorize, sessionIdOf, sessionOf } from './guard.js';
 
 type Env = Readonly<Record<string, string | undefined>>;
@@ -65,7 +69,13 @@ function conflict(reply: FastifyReply, draft: Draft | undefined, publishedVersio
 
 export function adminConfigRoutes(
   app: FastifyInstance,
-  options: AdminApiOptions & { preview?: PreviewService },
+  options: AdminApiOptions & {
+    preview?: PreviewService;
+    /** Redis: installation records ("Verifică instalarea"). */
+    store?: KeyValueStore;
+    /** Published tenants (with their Dify connection), for the assistant's own defaults. */
+    tenants?: TenantRegistry;
+  },
 ): void {
   const store = new AdminConfigStore(options.db);
   const assets = new PgAssetSource(options.db);
@@ -213,6 +223,37 @@ export function adminConfigRoutes(
       if (error instanceof PublishConflictError) return adminError(reply, 'conflict');
       throw error;
     }
+  });
+
+  // The assistant's own welcome message and starter questions (Dify `/parameters`), shown as
+  // suggestions when the tenant has not written its own (E4b.1 UX).
+  app.get('/api/tenants/:tenant/assistant-defaults', async (request, reply) => {
+    const found = await tenantFor(request, reply, 'read');
+    if (!found) return reply;
+    const runtime = options.tenants?.get(found.tenant);
+    const result = runtime ? await getParameters(runtime) : undefined;
+    if (!result?.ok) return { welcome: '', suggestedQuestions: [], available: false };
+    return {
+      welcome: result.value.opening_statement?.trim() ?? '',
+      suggestedQuestions: (result.value.suggested_questions ?? [])
+        .map((question) => question.trim())
+        .filter((question) => question !== '')
+        .slice(0, 5),
+      available: true,
+    };
+  });
+
+  // "Verifică instalarea": when loader.js last loaded on each allowed site.
+  app.get('/api/tenants/:tenant/installations', async (request, reply) => {
+    const found = await tenantFor(request, reply, 'read');
+    if (!found) return reply;
+    const origins = originsOf(found.published.config);
+    const list = Array.isArray(origins)
+      ? origins.filter((origin): origin is string => typeof origin === 'string')
+      : [];
+    return {
+      installations: options.store ? await installations(options.store, found.tenant, list) : [],
+    };
   });
 
   // Preview (spec §5.2): a 10-minute token bound to this admin session and tenant.

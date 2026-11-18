@@ -14,3 +14,4 @@ Ideas and deferred work, outside the current stage. Each item notes the stage it
 - **E4b** — Proactive message frequency "day" and the full built-in launcher icon set (schema already has both).
 - **E4b.2** — Delete uploaded images (`DELETE /admin/api/tenants/:id/assets/:assetId`, spec §8) once no version references them; needs a DELETE grant on `tenant_assets` or a clean-up job run with the owner role.
 - **E7** — GDPR notice at first open uses `behavior.privacyPolicyUrl` (already in the E4 schema).
+- **E5** — loader.js: put its styles in a constructable stylesheet (`adoptedStyleSheets`) instead of a `<style>` element, so sites with a strict CSP do not need `style-src 'unsafe-inline'` (noted in "Integrare pe site", E4b.1 UX).

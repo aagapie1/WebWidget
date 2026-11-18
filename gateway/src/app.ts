@@ -135,7 +135,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   app.get('/healthz', () => ({ status: 'ok' }));
 
   widgetConfigRoute(app, tenants);
-  tenantAssetRoutes(app, tenants);
+  tenantAssetRoutes(app, tenants, options.admin?.store);
   await widgetRoute(app, { tenants, distDir: options.env.WIDGET_DIST_DIR });
 
   conversationRoutes(app, {

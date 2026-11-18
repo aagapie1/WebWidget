@@ -23,7 +23,10 @@ describe('ImageField (request 6)', () => {
         onChange={onChange}
       />,
     );
-    pick(screen.getByLabelText('Logo'), new File(['x'], 'logo.png', { type: 'image/png' }));
+    pick(
+      screen.getByLabelText('Logo', { selector: 'input' }),
+      new File(['x'], 'logo.png', { type: 'image/png' }),
+    );
     await waitFor(() => {
       expect(onChange).toHaveBeenCalledWith('logo-abc.png');
     });
@@ -53,7 +56,7 @@ describe('ImageField (request 6)', () => {
         onChange={() => undefined}
       />,
     );
-    const input = screen.getByLabelText('Logo');
+    const input = screen.getByLabelText('Logo', { selector: 'input' });
     pick(input, new File(['<svg/>'], 'logo.svg', { type: 'image/svg+xml' }));
     const alert = await screen.findByRole('alert');
     expect(alert.textContent).toContain('SVG nu este acceptat');
@@ -74,7 +77,7 @@ describe('ImageField (request 6)', () => {
       />,
     );
     pick(
-      screen.getByLabelText('Logo'),
+      screen.getByLabelText('Logo', { selector: 'input' }),
       new File([new Uint8Array(MAX_UPLOAD_BYTES + 1)], 'big.png', { type: 'image/png' }),
     );
     expect((await screen.findByRole('alert')).textContent).toContain('512 KB');
@@ -93,7 +96,9 @@ describe('ImageField (request 6)', () => {
       />,
     );
     expect(screen.getByText('Doar administratorii pot încărca imagini.')).toBeTruthy();
-    expect(screen.getByLabelText('Logo').hasAttribute('disabled')).toBe(true);
+    expect(screen.getByLabelText('Logo', { selector: 'input' }).hasAttribute('disabled')).toBe(
+      true,
+    );
     expect(screen.getByRole('img')).toBeTruthy();
   });
 });

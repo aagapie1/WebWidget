@@ -498,4 +498,45 @@ describe.skipIf(!appUrl || !ownerUrl)('admin configuration API (Postgres)', () =
     minutes(11);
     expect(await use()).toBe(404);
   });
+
+  it('records where the widget is installed (allowed sites only, never previews)', async () => {
+    const admin = await as('widget-editor');
+    const list = async () =>
+      (await admin('GET', '/admin/api/tenants/gamma/installations')).json<{
+        installations: { origin: string; lastSeen: string | null }[];
+      }>().installations;
+    expect(await list()).toEqual([{ origin: 'http://localhost:5173', lastSeen: null }]);
+
+    await app.inject({
+      url: '/api/loader-config?tenant=gamma',
+      headers: { origin: 'http://localhost:5173' },
+    });
+    await app.inject({
+      url: '/api/loader-config?tenant=gamma',
+      headers: { origin: 'https://not-allowed.test' },
+    });
+    await vi.waitFor(async () => {
+      expect((await list())[0]?.lastSeen).toMatch(/^[0-9]{4}-[0-9]{2}-[0-9]{2}T/);
+    });
+    expect(await list()).toHaveLength(1);
+    const other = await as('widget-admin', 'delta');
+    expect((await other('GET', '/admin/api/tenants/gamma/installations')).statusCode).toBe(403);
+  });
+
+  it("gives the assistant's own welcome and starter questions (Dify /parameters)", async () => {
+    dify.handler = (_req, res) =>
+      res.writeHead(200, { 'content-type': 'application/json' }).end(
+        JSON.stringify({
+          opening_statement: ' Bună ziua! ',
+          suggested_questions: ['Care e programul?', ' ', 'Cum mă înscriu?'],
+        }),
+      );
+    const editor = await as('widget-editor');
+    expect((await editor('GET', '/admin/api/tenants/gamma/assistant-defaults')).json()).toEqual({
+      welcome: 'Bună ziua!',
+      suggestedQuestions: ['Care e programul?', 'Cum mă înscriu?'],
+      available: true,
+    });
+    dify.handler = (_req, res) => res.writeHead(500).end();
+  });
 });

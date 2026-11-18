@@ -1,5 +1,6 @@
 import type { ComponentChildren } from 'preact';
-import { useId } from 'preact/hooks';
+import { useId, useState } from 'preact/hooks';
+import { useI18n } from '../i18n.js';
 
 export interface FieldProps {
   label: string;
@@ -95,16 +96,23 @@ export function TextField(props: TextFieldProps) {
 interface NumberFieldProps {
   label: string;
   value: number | undefined;
-  placeholder: number;
+  /** The value used when none is set: shown as the value, and named in the help text. */
+  defaultValue: number;
   min: number;
   max: number;
   onChange: (value: number | undefined) => void;
   errors?: readonly string[] | undefined;
 }
 
+/**
+ * Shows the value in effect (set, or the default) as normal text — never a grey placeholder —
+ * and the default only in the help text (E4b.1 UX). Emptying the field returns to the default.
+ */
 export function NumberField(props: NumberFieldProps) {
+  const { t } = useI18n();
+  const [text, setText] = useState(String(props.value ?? props.defaultValue));
   return (
-    <Field label={props.label} errors={props.errors}>
+    <Field label={props.label} errors={props.errors} hint={t.ux.defaultIs(props.defaultValue)}>
       {({ id, describedBy, invalid }) => (
         <input
           id={id}
@@ -113,13 +121,16 @@ export function NumberField(props: NumberFieldProps) {
           min={props.min}
           max={props.max}
           step={1}
-          value={props.value ?? ''}
-          placeholder={String(props.placeholder)}
+          value={text}
           aria-describedby={describedBy}
           aria-invalid={invalid}
           onInput={(event) => {
             const raw = event.currentTarget.value;
+            setText(raw);
             props.onChange(raw === '' ? undefined : Number(raw));
+          }}
+          onBlur={() => {
+            if (text === '') setText(String(props.defaultValue));
           }}
         />
       )}

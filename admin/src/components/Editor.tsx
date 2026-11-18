@@ -7,10 +7,11 @@ import {
   type ConfigState,
   type DraftConflict,
 } from '../api.js';
-import { formatTime, useI18n } from '../i18n.js';
+import { formatDateTime, formatTime, useI18n } from '../i18n.js';
 import {
   changedSections,
   contrastResults,
+  effectiveTheme,
   errorCount,
   serverErrors,
   setIn,
@@ -20,6 +21,7 @@ import {
   type Path,
 } from '../model.js';
 import { ConfigForm } from './ConfigForm.js';
+import { ConfirmDialog } from './ConfirmDialog.js';
 import { PreviewPanel } from './PreviewPanel.js';
 import { PublishBar } from './PublishBar.js';
 import { PublishDialog } from './PublishDialog.js';
@@ -32,6 +34,8 @@ interface EditorProps {
   tenant: string;
   /** Called after unsaved edits were stashed: the app signs in again and comes back. */
   onSessionExpired: () => void;
+  /** Public gateway address, for the integration snippet. */
+  gatewayOrigin?: string | undefined;
 }
 
 interface Base {
@@ -41,7 +45,7 @@ interface Base {
   revision: number | null;
 }
 
-export function Editor({ api, tenant, onSessionExpired }: EditorProps) {
+export function Editor({ api, tenant, onSessionExpired, gatewayOrigin }: EditorProps) {
   const { t, locale } = useI18n();
   const [state, setState] = useState<ConfigState | undefined>();
   const [loadFailed, setLoadFailed] = useState(false);
@@ -83,6 +87,7 @@ export function Editor({ api, tenant, onSessionExpired }: EditorProps) {
       const working = next.draft?.config ?? next.published.config;
       base.current = { version: next.published.version, revision: next.draft?.revision ?? null };
       setState(next);
+      setSave(next.draft ? { kind: 'saved', at: next.draft.updatedAt } : { kind: 'idle' });
       setServerMessages(next.errors);
       setSavedJson(JSON.stringify(working));
       setConflict(undefined);
@@ -179,6 +184,19 @@ export function Editor({ api, tenant, onSessionExpired }: EditorProps) {
   }, [clientErrors, serverMessages]);
   const count = errorCount(errors);
 
+  // The assistant's own starter questions (Dify), suggested when a language has none.
+  const [assistantQuestions, setAssistantQuestions] = useState<readonly string[]>([]);
+  useEffect(() => {
+    api.assistantDefaults(tenant).then(
+      (defaults) => {
+        setAssistantQuestions(defaults.suggestedQuestions);
+      },
+      () => undefined,
+    );
+  }, [api, tenant]);
+  const [discarding, setDiscarding] = useState<{ busy: boolean } | undefined>();
+  const checkInstallations = useCallback(() => api.installations(tenant), [api, tenant]);
+
   const createToken = useCallback(() => api.previewToken(tenant), [api, tenant]);
   const upload = useCallback(
     (file: File) => api.uploadAsset(tenant, file, file.name),
@@ -221,6 +239,7 @@ export function Editor({ api, tenant, onSessionExpired }: EditorProps) {
   };
 
   const failing = contrastResults(config).filter((check) => !check.ok);
+  const theme = effectiveTheme(config);
 
   return (
     <div class="editor">
@@ -275,10 +294,30 @@ export function Editor({ api, tenant, onSessionExpired }: EditorProps) {
           permissions={state.permissions}
           onChange={onChange}
           upload={upload}
+          accent={theme.accent}
+          onAccent={theme.onAccent}
+          assistantQuestions={assistantQuestions}
+          integration={
+            gatewayOrigin
+              ? {
+                  gatewayOrigin,
+                  origins: Array.isArray(state.published.config.allowedOrigins)
+                    ? (state.published.config.allowedOrigins as string[])
+                    : [],
+                  checkInstallations,
+                }
+              : undefined
+          }
         />
       </div>
       <aside class="editor__side">
-        <div class="card">
+        <div class="card status">
+          <p class="status__published">
+            {t.ux.publishedAt(
+              formatDateTime(state.published.createdAt, locale),
+              state.published.createdBy,
+            )}
+          </p>
           <SaveStatus
             state={save}
             onRetry={() => {
@@ -295,6 +334,17 @@ export function Editor({ api, tenant, onSessionExpired }: EditorProps) {
               setPublishing({ busy: false });
             }}
           />
+          {base.current.revision !== null && (
+            <button
+              type="button"
+              class="button button--danger-quiet"
+              onClick={() => {
+                setDiscarding({ busy: false });
+              }}
+            >
+              {t.ux.discard}
+            </button>
+          )}
           <h2 class="small-heading">{t.contrastTitle}</h2>
           {failing.length === 0 ? (
             <p class="ok">{t.contrastOk}</p>
@@ -311,6 +361,35 @@ export function Editor({ api, tenant, onSessionExpired }: EditorProps) {
         </div>
         <PreviewPanel revision={previewRevision} createToken={createToken} show={previewShow} />
       </aside>
+      {discarding && (
+        <ConfirmDialog
+          title={t.ux.discardTitle}
+          body={t.ux.discardBody}
+          confirmLabel={t.ux.discardConfirm}
+          cancelLabel={t.ux.cancel}
+          busy={discarding.busy}
+          onCancel={() => {
+            setDiscarding(undefined);
+          }}
+          onConfirm={() => {
+            setDiscarding({ busy: true });
+            api.discardDraft(tenant).then(
+              async () => {
+                stash.clear(tenant);
+                setDiscarding(undefined);
+                await load();
+                setSave({ kind: 'discarded' });
+                setPreviewRevision((revision) => revision + 1);
+              },
+              (error: unknown) => {
+                setDiscarding(undefined);
+                if (error instanceof ApiError && error.status === 401) expired();
+                else setSave({ kind: 'error' });
+              },
+            );
+          }}
+        />
+      )}
       {publishing && (
         <PublishDialog
           nextVersion={state.published.version + 1}

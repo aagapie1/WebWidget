@@ -485,3 +485,177 @@ summary {
   padding: 0;
   list-style: none;
 }
+
+/* ---------- Visual choices (icons, avatars) ---------- */
+.option-grid__tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 0.5rem;
+}
+.tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.6rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  text-align: center;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.tile:hover {
+  border-color: var(--primary);
+}
+.tile--selected {
+  border: 2px solid var(--primary);
+  background: var(--info-bg);
+  padding: calc(0.6rem - 1px) calc(0.4rem - 1px);
+}
+.tile__input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  margin: 0;
+  cursor: pointer;
+}
+.tile:has(.tile__input:focus-visible) {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+.tile__visual {
+  display: grid;
+  place-items: center;
+  inline-size: 44px;
+  block-size: 44px;
+}
+.swatch {
+  display: grid;
+  place-items: center;
+  inline-size: 44px;
+  block-size: 44px;
+  border-radius: 50%;
+  font-size: 0.95rem;
+}
+.tile__image {
+  inline-size: 44px;
+  block-size: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.tile__upload,
+.tile__none {
+  display: grid;
+  place-items: center;
+  inline-size: 44px;
+  block-size: 44px;
+  border-radius: 50%;
+  border: 1px dashed var(--border);
+  color: var(--muted);
+  font-size: 1.1rem;
+}
+
+/* ---------- Starter questions ---------- */
+.questions__list {
+  list-style: none;
+  margin: 0 0 0.5rem;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+.question {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.question--dragged {
+  opacity: 0.5;
+}
+.question__handle {
+  cursor: grab;
+  color: var(--muted);
+  padding: 0.45rem 0.1rem;
+}
+.question__body {
+  flex: 1;
+}
+.question__actions {
+  display: flex;
+  gap: 0.25rem;
+}
+.icon-button {
+  inline-size: 2rem;
+  block-size: 2rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.icon-button[aria-disabled='true'] {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+.questions__assistant {
+  color: var(--muted);
+  margin: 0.25rem 0 0.5rem;
+}
+.questions__suggested {
+  margin-bottom: 0.5rem;
+}
+
+/* ---------- Integration ---------- */
+.code {
+  margin: 0.25rem 0 0.5rem;
+  padding: 0.75rem;
+  border-radius: 6px;
+  background: #1b1f2a;
+  color: #f5f6f8;
+  font:
+    0.85rem/1.5 ui-monospace,
+    monospace;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+.checklist {
+  padding-left: 1.25rem;
+}
+.checklist li {
+  margin-bottom: 0.5rem;
+}
+.installations {
+  padding-left: 1.25rem;
+}
+
+/* ---------- Status panel ---------- */
+.status__published {
+  margin: 0 0 0.25rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.status .button--danger-quiet {
+  margin-top: 0.5rem;
+}
+.button--danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+.button--danger-quiet {
+  border-color: var(--danger);
+  background: var(--surface);
+  color: var(--danger);
+}

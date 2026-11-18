@@ -7,7 +7,8 @@ export type SaveState =
   | { kind: 'saved'; at: string }
   | { kind: 'error' }
   | { kind: 'conflict' }
-  | { kind: 'published'; version: number };
+  | { kind: 'published'; version: number }
+  | { kind: 'discarded' };
 
 /** Save indicator, announced politely to screen readers (spec §7, request 5). */
 export function SaveStatus({ state, onRetry }: { state: SaveState; onRetry: () => void }) {
@@ -15,7 +16,10 @@ export function SaveStatus({ state, onRetry }: { state: SaveState; onRetry: () =
   let text = '';
   switch (state.kind) {
     case 'idle':
-      text = t.save.idle;
+      text = t.ux.noDraft;
+      break;
+    case 'discarded':
+      text = t.ux.discarded;
       break;
     case 'pending':
       text = t.save.pending;
@@ -24,7 +28,7 @@ export function SaveStatus({ state, onRetry }: { state: SaveState; onRetry: () =
       text = t.save.saving;
       break;
     case 'saved':
-      text = t.save.saved(formatTime(state.at, locale));
+      text = t.ux.draftSavedAt(formatTime(state.at, locale));
       break;
     case 'error':
       text = t.save.error;

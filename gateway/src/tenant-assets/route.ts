@@ -2,7 +2,9 @@ import { createHash } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import * as z from 'zod/mini';
 import type { Tenant, TenantRegistry } from '../config/tenants.js';
+import type { KeyValueStore } from '../admin/kv.js';
 import { replyError } from '../errors/index.js';
+import { recordInstall } from '../installs/index.js';
 import { localeSchema, tenantIdSchema, type LoaderConfig, type Locale } from '../protocol/index.js';
 import { WIDGET_TEXT_KEYS, type WidgetTextKey } from '../protocol/texts.js';
 
@@ -78,7 +80,12 @@ const assetParams = z.object({
 });
 
 /** Tenant images and the loader configuration (ADR 007). */
-export function tenantAssetRoutes(app: FastifyInstance, tenants: TenantRegistry): void {
+export function tenantAssetRoutes(
+  app: FastifyInstance,
+  tenants: TenantRegistry,
+  /** Records where the widget is installed ("Verifică instalarea"); optional. */
+  installs?: KeyValueStore,
+): void {
   /**
    * Read by loader.js on the client's page, i.e. cross-site: CORS only for the tenant's
    * allowedOrigins, short cache with ETag. Public data, no credentials.
@@ -96,6 +103,12 @@ export function tenantAssetRoutes(app: FastifyInstance, tenants: TenantRegistry)
         return replyError(reply, 'forbidden_origin', query.data.locale);
       }
       reply.header('access-control-allow-origin', origin);
+      // The widget is installed on this (allowed) site; previews are the admin's own page.
+      if (installs && !tenant.preview) {
+        recordInstall(installs, tenant.id, origin).catch((error: unknown) => {
+          request.log.warn({ err: String(error) }, 'installation not recorded');
+        });
+      }
     }
 
     const body = JSON.stringify(loaderConfig(tenant, query.data.locale));

@@ -9,6 +9,20 @@ export interface Session {
   tenants: string[];
   csrfToken: string;
   expiresAt: string;
+  /** Public address of the gateway (integration snippet). */
+  gatewayOrigin?: string;
+}
+
+export interface AssistantDefaults {
+  welcome: string;
+  suggestedQuestions: string[];
+  /** False when the assistant could not be reached. */
+  available: boolean;
+}
+
+export interface Installation {
+  origin: string;
+  lastSeen: string | null;
 }
 
 export interface ConfigState {
@@ -55,6 +69,9 @@ export interface AdminApi {
   ): Promise<{ version: number }>;
   uploadAsset(tenant: string, file: Blob, name: string): Promise<{ file: string; url: string }>;
   previewToken(tenant: string): Promise<{ id: string; url: string; expiresAt: string }>;
+  discardDraft(tenant: string): Promise<void>;
+  assistantDefaults(tenant: string): Promise<AssistantDefaults>;
+  installations(tenant: string): Promise<{ installations: Installation[] }>;
   logout(): Promise<{ redirect: string }>;
 }
 
@@ -113,6 +130,9 @@ export function createApi(fetchImpl: Fetch = (...args) => fetch(...args)): Admin
         file.type || undefined,
       ),
     previewToken: (tenant) => call('POST', `${base(tenant)}/preview-token`, {}),
+    discardDraft: (tenant) => call('DELETE', `${base(tenant)}/config/draft`),
+    assistantDefaults: (tenant) => call('GET', `${base(tenant)}/assistant-defaults`),
+    installations: (tenant) => call('GET', `${base(tenant)}/installations`),
     logout: () => call('POST', '/admin/auth/logout', {}),
   };
 }

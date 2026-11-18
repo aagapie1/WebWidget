@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/preact';
+import { fireEvent, screen, waitFor, within } from '@testing-library/preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../api.js';
 import { stash } from '../model.js';
@@ -36,7 +36,7 @@ describe('Editor', () => {
       draftRevision: null,
     });
     await waitFor(() => {
-      expect(screen.getByRole('status').textContent).toMatch(/^Ciornă salvată la/);
+      expect(screen.getByRole('status').textContent).toMatch(/^Ciornă: salvată la/);
     });
 
     // The next save continues from the revision the server returned.
@@ -172,5 +172,60 @@ describe('Editor', () => {
     await waitFor(() => {
       expect(screen.getByRole('status').textContent).toBe('Versiunea 4 a fost publicată.');
     });
+  });
+
+  it('shows when and by whom it was last published, and discards a draft after confirmation', async () => {
+    const draft = {
+      revision: 2,
+      baseVersion: 3,
+      updatedAt: '2026-11-18T10:00:00.000Z',
+      updatedBy: 'Ana',
+      config: { name: 'Pilot nou', allowedOrigins: ['https://www.pilot.ro'] },
+    };
+    const states = [configState({ draft }), configState()];
+    const discardDraft = vi.fn(() => Promise.resolve());
+    const api = fakeApi({
+      config: () => Promise.resolve(states.shift() ?? configState()),
+      discardDraft,
+    });
+    renderWithI18n(<Editor api={api} tenant="pilot" onSessionExpired={vi.fn()} />);
+    expect(await screen.findByText(/^Publicat ultima dată: .+ de Ana$/)).toBeTruthy();
+    expect(screen.getByRole('status').textContent).toMatch(/^Ciornă: salvată la \d{2}:\d{2}$/);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Renunță la modificări' }));
+    const dialog = screen.getByRole('dialog', { name: 'Renunțați la modificări?' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Renunță la modificări' }));
+    await waitFor(() => {
+      expect(discardDraft).toHaveBeenCalledWith('pilot');
+    });
+    await waitFor(() => {
+      expect(screen.getByLabelText<HTMLInputElement>('Numele clientului').value).toBe('Pilot');
+    });
+    expect(screen.getByRole('status').textContent).toMatch(/au fost anulate/);
+    expect(screen.queryByRole('button', { name: 'Renunță la modificări' })).toBeNull();
+  });
+
+  it('shows values (not grey placeholders) and only the fields that make sense', async () => {
+    renderWithI18n(<Editor api={fakeApi()} tenant="pilot" onSessionExpired={vi.fn()} />);
+    const offset = await screen.findByLabelText<HTMLInputElement>(
+      'Distanța față de margine, orizontal (px)',
+    );
+    expect(offset.value).toBe('24');
+    expect(offset.getAttribute('placeholder')).toBeNull();
+    expect(screen.getAllByText('Implicit: 24').length).toBeGreaterThan(0);
+
+    // Proactive message: its settings appear only once it is on.
+    expect(screen.queryByLabelText('Textul mesajului (română)')).toBeNull();
+    fireEvent.click(screen.getByLabelText('Afișează mesajul proactiv'));
+    expect(await screen.findByLabelText('Textul mesajului (română)')).toBeTruthy();
+
+    // Launcher icon: the upload appears only for "Imagine încărcată".
+    const launcherIcons = screen.getByRole('group', { name: 'Iconul butonului' });
+    expect(within(launcherIcons).getAllByRole('radio')).toHaveLength(8);
+    expect(screen.queryByRole('group', { name: 'Imagine încărcată' })).toBeNull();
+    fireEvent.click(within(launcherIcons).getByRole('radio', { name: 'Imagine încărcată' }));
+    expect(await screen.findByRole('group', { name: 'Imagine încărcată' })).toBeTruthy();
+    fireEvent.click(within(launcherIcons).getByRole('radio', { name: 'Căști de suport' }));
+    expect(screen.queryByRole('group', { name: 'Imagine încărcată' })).toBeNull();
   });
 });
