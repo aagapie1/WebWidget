@@ -143,9 +143,12 @@ describe('GET /api/widget-config', () => {
     expect(h.dify.requests[0]?.headers.authorization).toMatch(/^Bearer /);
   });
 
-  it('prefers tenant texts for name and welcome', async () => {
+  it('uses the identity name and the tenant welcome text', async () => {
     h = await startHarness({
-      tenant: { texts: { en: { 'assistant.name': 'Ana', welcome: 'Hello!' } } },
+      tenant: {
+        identity: { assistantName: 'Ana', userAvatar: 'none' },
+        texts: { en: { welcome: 'Hello!' } },
+      },
     });
     h.dify.handler = (_req, res) => res.writeHead(200).end(parameters);
     const response = await fetch(`${h.url}/api/widget-config?tenant=pilot&locale=en`);

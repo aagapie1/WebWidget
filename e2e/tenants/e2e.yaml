@@ -1,4 +1,5 @@
 # Tenant for end-to-end tests: fake Dify on :4010, client site on :5180.
+schemaVersion: 1
 id: e2e
 name: Asistent de test
 difyBaseUrl: ${DIFY_BASE_URL}

@@ -46,7 +46,7 @@ export function chatRoute(app: FastifyInstance, options: ChatRouteOptions): void
     const tenant = tenants.get(tenantId);
     if (!tenant) return replyError(reply, 'tenant_not_found', locale);
 
-    const user = resolveVisitor(request, reply, tenant.visitorCookieDays);
+    const user = resolveVisitor(request, reply, tenant.behavior.visitorCookieDays);
     const log = request.log.child({ tenant: tenant.id, conversationId });
 
     // Aborted when the browser disconnects or the whole answer takes too long.
@@ -134,7 +134,7 @@ export function chatRoute(app: FastifyInstance, options: ChatRouteOptions): void
     if (!tenant) return replyError(reply, 'tenant_not_found', 'ro');
 
     // Dify only stops tasks of the same `user`, so a visitor cannot stop someone else's answer.
-    const user = resolveVisitor(request, reply, tenant.visitorCookieDays);
+    const user = resolveVisitor(request, reply, tenant.behavior.visitorCookieDays);
     const result = await stopTask(tenant, parsed.data.taskId, user);
     if (!result.ok) {
       request.log.warn(

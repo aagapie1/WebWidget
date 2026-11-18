@@ -1,18 +1,23 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { tenantSchema } from '../src/config/schema.js';
 import type { Tenant } from '../src/config/tenants.js';
 
-export const testTenant: Tenant = {
+const parsed = tenantSchema.parse({
+  schemaVersion: 1,
   id: 'pilot',
   name: 'Pilot',
   difyBaseUrl: 'http://dify.test/v1',
-  difyApiKey: 'app-test-secret-key',
+  difyApiKeyEnv: 'DIFY_API_KEY_PILOT',
   allowedOrigins: ['http://localhost:5173'],
-  theme: {},
   texts: { ro: { 'errors.upstream_timeout': 'Text personalizat pentru timeout.' } },
-  visitorCookieDays: 30,
-  feedback: { retentionDays: 90 },
-  citations: { documentTitles: { 'Regulament.pdf': 'Regulamentul intern' }, showSnippets: false },
+  citations: { documentTitles: { 'Regulament.pdf': 'Regulamentul intern' } },
+});
+
+export const testTenant: Tenant = {
+  ...config,
+  difyApiKey: 'app-test-secret-key',
+  assets: new Map(),
 };
 
 export function fixture(name: string): string {

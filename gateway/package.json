@@ -10,7 +10,8 @@
     "build": "tsc -p tsconfig.build.json",
     "start": "node --env-file-if-exists=.env dist/index.js",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "config:check": "tsx src/cli/config-check.ts ../config/tenants ../e2e/tenants"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.5",

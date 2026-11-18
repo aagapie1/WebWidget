@@ -1,11 +1,16 @@
 import { resolve } from 'node:path';
 import { buildApp } from './app.js';
 import { loadEnv } from './config/env.js';
-import { loadTenants } from './config/tenants.js';
+import { FileTenantSource } from './config/tenants.js';
+import pino from 'pino';
 import { MemoryFeedbackStore, RedisFeedbackStore, type FeedbackStore } from './feedback/store.js';
 
 const env = loadEnv(process.env);
-const tenants = await loadTenants(resolve(env.TENANTS_DIR), process.env);
+// Tenant configuration: per-tenant validation, fallback and hot reload (ADR 007).
+const configLog = pino({ level: env.LOG_LEVEL, name: 'tenant-config' });
+const tenantSource = new FileTenantSource(resolve(env.TENANTS_DIR), process.env, configLog);
+const tenants = await tenantSource.load();
+const stopWatching = tenantSource.watch(tenants);
 let feedbackStore: FeedbackStore;
 if (env.REDIS_URL) {
   feedbackStore = await RedisFeedbackStore.connect(env.REDIS_URL);
@@ -20,6 +25,7 @@ if (!env.REDIS_URL) {
   app.log.warn('REDIS_URL not set: closing feedback is kept in memory (development only)');
 }
 app.addHook('onClose', async () => {
+  stopWatching();
   await feedbackStore.close();
 });
 

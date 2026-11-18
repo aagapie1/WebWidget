@@ -10,6 +10,7 @@ import {
   type Locale,
   type WidgetConfig,
 } from '../protocol/index.js';
+import type { TextKey } from '../protocol/texts.js';
 
 const querySchema = z.object({
   tenant: tenantIdSchema,
@@ -75,7 +76,7 @@ export function widgetConfigRoute(app: FastifyInstance, tenants: TenantRegistry)
     const config: WidgetConfig = {
       tenant: tenant.id,
       locale,
-      assistantName: text(tenant, locale, 'assistant.name') ?? tenant.name,
+      assistantName: tenant.identity.assistantName ?? tenant.name,
       welcomeMessage: text(tenant, locale, 'welcome') ?? defaults.welcome,
       suggestedQuestions: defaults.suggestedQuestions,
     };
@@ -83,7 +84,7 @@ export function widgetConfigRoute(app: FastifyInstance, tenants: TenantRegistry)
   });
 }
 
-function text(tenant: Tenant, locale: Locale, key: string): string | undefined {
+function text(tenant: Tenant, locale: Locale, key: TextKey): string | undefined {
   const value = tenant.texts[locale]?.[key]?.trim();
   return value === '' ? undefined : value;
 }
