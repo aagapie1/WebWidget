@@ -268,19 +268,21 @@ export function ConfigForm({
   return (
     <div class="form">
       <Section id="identity" title={t.sections.identity ?? ''}>
-        <TextField
-          label={t.fields.name}
-          value={str(value('name'))}
-          onChange={set('name')}
-          errors={errorsFor('name')}
-        />
-        <TextField
-          label={t.fields.assistantName}
-          hint={t.fields.assistantNameHint}
-          value={str(value('identity.assistantName'))}
-          onChange={set('identity.assistantName')}
-          errors={errorsFor('identity.assistantName')}
-        />
+        <div class="row">
+          <TextField
+            label={t.fields.name}
+            value={str(value('name'))}
+            onChange={set('name')}
+            errors={errorsFor('name')}
+          />
+          <TextField
+            label={t.fields.assistantName}
+            hint={t.fields.assistantNameHint}
+            value={str(value('identity.assistantName'))}
+            onChange={set('identity.assistantName')}
+            errors={errorsFor('identity.assistantName')}
+          />
+        </div>
         <ImageField
           label={t.fields.logo}
           tenant={tenant}

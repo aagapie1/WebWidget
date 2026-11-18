@@ -16,6 +16,40 @@ interface PreviewPanelProps {
   keepAlive?: (id: string) => Promise<unknown>;
   /** What to show: follows the section being edited (launcher, proactive bubble, window). */
   show?: PreviewState;
+  /** Window and launcher geometry of the draft: the desktop canvas is just big enough for them. */
+  widget?: WidgetGeometry;
+}
+
+export interface WidgetGeometry {
+  width: number;
+  height: number;
+  offsetX: number;
+  offsetY: number;
+}
+
+const DEFAULT_GEOMETRY: WidgetGeometry = { width: 380, height: 640, offsetX: 24, offsetY: 24 };
+/** Phone frame (a common modern phone in CSS pixels). */
+export const PHONE = { width: 390, height: 844 };
+
+/**
+ * The page size at which the widget shows at its real size (loader.js geometry): the window sits
+ * 76 px above the bottom offset (launcher + gap) and keeps 130 px of the page height free.
+ */
+export function desktopCanvas(widget: WidgetGeometry): { width: number; height: number } {
+  return {
+    // Wider than the loader's phone breakpoint (480 px), which would make the window full screen.
+    width: Math.max(widget.width + 2 * widget.offsetX + 40, 560),
+    height: Math.max(widget.height + 130, widget.height + widget.offsetY + 76 + 32),
+  };
+}
+
+/** Largest scale (at most 1) at which the canvas fits the available area. */
+export function fitScale(
+  canvas: { width: number; height: number },
+  area: { width: number; height: number },
+): number {
+  if (area.width <= 0 || area.height <= 0) return 1;
+  return Math.min(1, area.width / canvas.width, area.height / canvas.height);
 }
 
 /** Live preview of the draft in the real widget, desktop or phone width (spec §5.2). */
@@ -24,6 +58,7 @@ export function PreviewPanel({
   createToken,
   keepAlive = touchPreview,
   show = 'window',
+  widget = DEFAULT_GEOMETRY,
 }: PreviewPanelProps) {
   const { t, locale } = useI18n();
   const [mode, setMode] = useState<'desktop' | 'mobile'>('desktop');
@@ -32,6 +67,22 @@ export function PreviewPanel({
   // The pending or obtained token request, shared by overlapping reloads.
   const token = useRef<{ url: Promise<string>; at: number } | undefined>(undefined);
   const frame = useRef<HTMLIFrameElement>(null);
+  const stage = useRef<HTMLDivElement>(null);
+  const [area, setArea] = useState({ width: 0, height: 0 });
+
+  // The canvas is scaled down to fit the column (never cut off); the size of the column changes
+  // with the window, the side panel and the switch between desktop and phone.
+  useEffect(() => {
+    const element = stage.current;
+    if (!element || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) setArea({ width: entry.contentRect.width, height: entry.contentRect.height });
+    });
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
   // Reloads start in the current state; changing the state itself does not reload.
   const showRef = useRef(show);
   showRef.current = show;
@@ -87,10 +138,16 @@ export function PreviewPanel({
     };
   }, [keepAlive]);
 
+  const canvas = mode === 'mobile' ? PHONE : desktopCanvas(widget);
+  const scale = fitScale(canvas, area);
+  const percent = Math.round(scale * 100);
+
   return (
     <section class="preview" aria-labelledby="preview-title">
       <div class="preview__head">
-        <h2 id="preview-title">{t.preview.title}</h2>
+        <h2 id="preview-title" class="visually-hidden">
+          {t.preview.title}
+        </h2>
         <div class="segmented" role="group" aria-label={t.preview.title}>
           {(['desktop', 'mobile'] as const).map((value) => (
             <button
@@ -106,13 +163,37 @@ export function PreviewPanel({
             </button>
           ))}
         </div>
+        {percent < 100 && (
+          <span class="preview__scale" aria-live="polite">
+            {t.ux.scaledTo(percent)}
+          </span>
+        )}
       </div>
-      <p class="field__hint">{t.preview.note}</p>
-      <div class={`preview__stage preview__stage--${mode}`}>
+      <div class="preview__stage" ref={stage}>
         {failed ? (
           <p role="alert">{t.preview.unavailable}</p>
         ) : (
-          src && <iframe ref={frame} class="preview__frame" title={t.preview.frame} src={src} />
+          src && (
+            <div
+              class={`preview__canvas preview__canvas--${mode}`}
+              style={{
+                width: `${String(canvas.width * scale)}px`,
+                height: `${String(canvas.height * scale)}px`,
+              }}
+            >
+              <iframe
+                ref={frame}
+                class="preview__frame"
+                title={t.preview.frame}
+                src={src}
+                style={{
+                  width: `${String(canvas.width)}px`,
+                  height: `${String(canvas.height)}px`,
+                  transform: `scale(${String(scale)})`,
+                }}
+              />
+            </div>
+          )
         )}
       </div>
     </section>

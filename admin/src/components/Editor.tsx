@@ -22,6 +22,7 @@ import {
 } from '../model.js';
 import { ConfigForm } from './ConfigForm.js';
 import { ConfirmDialog } from './ConfirmDialog.js';
+import { useFitToViewport, useMediaQuery } from '../fit-viewport.js';
 import { PreviewPanel } from './PreviewPanel.js';
 import { PublishBar } from './PublishBar.js';
 import { PublishDialog } from './PublishDialog.js';
@@ -57,6 +58,15 @@ export function Editor({ api, tenant, onSessionExpired, gatewayOrigin }: EditorP
   const [restored, setRestored] = useState(false);
   const [previewRevision, setPreviewRevision] = useState(0);
   const [formKey, setFormKey] = useState(0);
+  // The preview column always fits the visible screen (launcher in view, no scrolling).
+  const side = useRef<HTMLElement>(null);
+  const bar = useRef<HTMLDivElement>(null);
+  // The preview column starts below the sticky status bar and reaches the bottom of the window.
+  const barBottom = useCallback(() => bar.current?.getBoundingClientRect().bottom ?? 0, []);
+  useFitToViewport(side, state !== undefined, barBottom);
+  // Below 1280 px the preview is a side panel opened from the status bar (never squeezed).
+  const narrow = useMediaQuery('(max-width: 1279px)');
+  const [previewOpen, setPreviewOpen] = useState(false);
   // The preview follows the section being edited (launcher, proactive bubble, open window).
   const [previewShow, setPreviewShow] = useState<PreviewState>('window');
   const followSection = (event: FocusEvent) => {
@@ -241,77 +251,28 @@ export function Editor({ api, tenant, onSessionExpired, gatewayOrigin }: EditorP
   const failing = contrastResults(config).filter((check) => !check.ok);
   const theme = effectiveTheme(config);
 
+  const num = (value: unknown, fallback: number) => (typeof value === 'number' ? value : fallback);
+  const windowConfig = (config.window ?? {}) as Record<string, unknown>;
+  const launcherConfig = (config.launcher ?? {}) as Record<string, unknown>;
+  const widget = {
+    width: num(windowConfig.width, 380),
+    height: num(windowConfig.height, 640),
+    offsetX: num(launcherConfig.offsetX, 24),
+    offsetY: num(launcherConfig.offsetY, 24),
+  };
+  const showContrastProblem = (event: Event) => {
+    event.preventDefault();
+    const section = document.getElementById('section-window')?.closest('section');
+    const field = section?.querySelector<HTMLElement>('[aria-invalid="true"]');
+    (field ?? section)?.scrollIntoView({ block: 'center' });
+    field?.focus();
+  };
+
   return (
-    <div class="editor">
-      <div class="editor__form" onFocusIn={followSection}>
-        {restored && (
-          <p class="notice" role="status">
-            {t.save.restored}
-          </p>
-        )}
-        {conflict && (
-          <div class="notice notice--error" role="alert">
-            <h2>{t.conflict.title}</h2>
-            <p>
-              {conflict.draft
-                ? t.conflict.byUser(
-                    conflict.draft.updatedBy,
-                    formatTime(conflict.draft.updatedAt, locale),
-                  )
-                : t.conflict.published(conflict.publishedVersion)}
-            </p>
-            <button
-              type="button"
-              class="button"
-              onClick={() => {
-                stash.clear(tenant);
-                void load();
-              }}
-            >
-              {t.conflict.reload}
-            </button>
-          </div>
-        )}
-        {count > 0 && (
-          <div class="notice notice--error">
-            <h2>{t.errors.summary(count)}</h2>
-            <ul>
-              {Object.entries(errors).flatMap(([path, list]) =>
-                list.map((message) => (
-                  <li key={`${path}:${message}`}>
-                    <code>{path}</code> — {message}
-                  </li>
-                )),
-              )}
-            </ul>
-          </div>
-        )}
-        <ConfigForm
-          key={formKey}
-          tenant={tenant}
-          config={config}
-          errors={errors}
-          permissions={state.permissions}
-          onChange={onChange}
-          upload={upload}
-          accent={theme.accent}
-          onAccent={theme.onAccent}
-          assistantQuestions={assistantQuestions}
-          integration={
-            gatewayOrigin
-              ? {
-                  gatewayOrigin,
-                  origins: Array.isArray(state.published.config.allowedOrigins)
-                    ? (state.published.config.allowedOrigins as string[])
-                    : [],
-                  checkInstallations,
-                }
-              : undefined
-          }
-        />
-      </div>
-      <aside class="editor__side">
-        <div class="card status">
+    <div class="workspace">
+      {/* Always visible while editing (sticky): state, checks and the actions, like Dify. */}
+      <div class="statusbar" ref={bar}>
+        <div class="statusbar__state">
           <p class="status__published">
             {t.ux.publishedAt(
               formatDateTime(state.published.createdAt, locale),
@@ -324,16 +285,30 @@ export function Editor({ api, tenant, onSessionExpired, gatewayOrigin }: EditorP
               void saveNow();
             }}
           />
-          <PublishBar
-            canPublish={state.permissions.publish}
-            errorCount={count}
-            hasChanges={hasChanges}
-            saving={pendingSave}
-            conflict={conflict !== undefined}
-            onPublish={() => {
-              setPublishing({ busy: false });
-            }}
-          />
+        </div>
+        <div class="statusbar__checks">
+          {failing.length === 0 ? (
+            <span class="badge badge--ok">✓ {t.ux.contrastOk}</span>
+          ) : (
+            <a class="badge badge--error" href="#section-window" onClick={showContrastProblem}>
+              ⚠ {t.ux.contrastProblems(failing.length)}
+            </a>
+          )}
+        </div>
+        <div class="statusbar__actions">
+          {narrow && (
+            <button
+              type="button"
+              class="button"
+              aria-expanded={previewOpen}
+              aria-controls="preview-column"
+              onClick={() => {
+                setPreviewOpen((open) => !open);
+              }}
+            >
+              {t.ux.previewButton}
+            </button>
+          )}
           {base.current.revision !== null && (
             <button
               type="button"
@@ -345,22 +320,121 @@ export function Editor({ api, tenant, onSessionExpired, gatewayOrigin }: EditorP
               {t.ux.discard}
             </button>
           )}
-          <h2 class="small-heading">{t.contrastTitle}</h2>
-          {failing.length === 0 ? (
-            <p class="ok">{t.contrastOk}</p>
-          ) : (
-            <ul class="contrast">
-              {failing.map((check) => (
-                <li key={`${check.foreground}/${check.background}`}>
-                  {t.fields.color[check.foreground]} / {t.fields.color[check.background]}:{' '}
-                  {check.ratio.toFixed(2)}:1 (min. {check.minimum}:1)
-                </li>
-              ))}
-            </ul>
-          )}
+          <PublishBar
+            canPublish={state.permissions.publish}
+            errorCount={count}
+            hasChanges={hasChanges}
+            saving={pendingSave}
+            conflict={conflict !== undefined}
+            onPublish={() => {
+              setPublishing({ busy: false });
+            }}
+          />
         </div>
-        <PreviewPanel revision={previewRevision} createToken={createToken} show={previewShow} />
-      </aside>
+      </div>
+
+      <div class="editor">
+        <div class="editor__form" onFocusIn={followSection}>
+          {restored && (
+            <p class="notice" role="status">
+              {t.save.restored}
+            </p>
+          )}
+          {conflict && (
+            <div class="notice notice--error" role="alert">
+              <h2>{t.conflict.title}</h2>
+              <p>
+                {conflict.draft
+                  ? t.conflict.byUser(
+                      conflict.draft.updatedBy,
+                      formatTime(conflict.draft.updatedAt, locale),
+                    )
+                  : t.conflict.published(conflict.publishedVersion)}
+              </p>
+              <button
+                type="button"
+                class="button"
+                onClick={() => {
+                  stash.clear(tenant);
+                  void load();
+                }}
+              >
+                {t.conflict.reload}
+              </button>
+            </div>
+          )}
+          {count > 0 && (
+            <div class="notice notice--error">
+              <h2>{t.errors.summary(count)}</h2>
+              <ul>
+                {Object.entries(errors).flatMap(([path, list]) =>
+                  list.map((message) => (
+                    <li key={`${path}:${message}`}>
+                      <code>{path}</code> — {message}
+                    </li>
+                  )),
+                )}
+              </ul>
+            </div>
+          )}
+          <ConfigForm
+            key={formKey}
+            tenant={tenant}
+            config={config}
+            errors={errors}
+            permissions={state.permissions}
+            onChange={onChange}
+            upload={upload}
+            accent={theme.accent}
+            onAccent={theme.onAccent}
+            assistantQuestions={assistantQuestions}
+            integration={
+              gatewayOrigin
+                ? {
+                    gatewayOrigin,
+                    origins: Array.isArray(state.published.config.allowedOrigins)
+                      ? (state.published.config.allowedOrigins as string[])
+                      : [],
+                    checkInstallations,
+                  }
+                : undefined
+            }
+          />
+        </div>
+        <aside
+          id="preview-column"
+          ref={side}
+          class={
+            narrow
+              ? previewOpen
+                ? 'preview-column preview-column--drawer preview-column--open'
+                : 'preview-column preview-column--drawer'
+              : 'preview-column'
+          }
+          aria-label={t.preview.title}
+          onKeyDown={(event) => {
+            if (narrow && event.key === 'Escape') setPreviewOpen(false);
+          }}
+        >
+          {narrow && (
+            <button
+              type="button"
+              class="button preview-column__close"
+              onClick={() => {
+                setPreviewOpen(false);
+              }}
+            >
+              {t.ux.closePreview}
+            </button>
+          )}
+          <PreviewPanel
+            revision={previewRevision}
+            createToken={createToken}
+            show={previewShow}
+            widget={widget}
+          />
+        </aside>
+      </div>
       {discarding && (
         <ConfirmDialog
           title={t.ux.discardTitle}

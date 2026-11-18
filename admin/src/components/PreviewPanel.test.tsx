@@ -1,7 +1,7 @@
 import { fireEvent, screen, waitFor } from '@testing-library/preact';
 import { describe, expect, it, vi } from 'vitest';
 import { renderWithI18n } from '../test-utils.js';
-import { KEEP_ALIVE_MS, PreviewPanel } from './PreviewPanel.js';
+import { desktopCanvas, fitScale, KEEP_ALIVE_MS, PHONE, PreviewPanel } from './PreviewPanel.js';
 
 describe('PreviewPanel', () => {
   it('reloads the preview after each saved draft, reusing the short-lived token', async () => {
@@ -31,7 +31,9 @@ describe('PreviewPanel', () => {
     const phone = screen.getByRole('button', { name: 'Telefon' });
     fireEvent.click(phone);
     expect(phone.getAttribute('aria-pressed')).toBe('true');
-    expect(document.querySelector('.preview__stage--mobile')).toBeTruthy();
+    expect(document.querySelector('.preview__canvas--mobile')).toBeTruthy();
+    const frame = screen.getByTitle<HTMLIFrameElement>('Previzualizarea widget-ului cu ciorna');
+    expect([frame.style.width, frame.style.height]).toEqual(['390px', '844px']);
   });
 
   it('says when the preview is unavailable', async () => {
@@ -83,5 +85,24 @@ describe('PreviewPanel', () => {
     );
     // Same document: the change did not reload the frame.
     expect(frame.getAttribute('src')).toMatch(/show=launcher/);
+  });
+});
+
+describe('real size and scaling', () => {
+  it('sizes the desktop canvas for the configured window, launcher and offsets', () => {
+    expect(desktopCanvas({ width: 380, height: 640, offsetX: 24, offsetY: 24 })).toEqual({
+      width: 560,
+      height: 772,
+    });
+    expect(desktopCanvas({ width: 520, height: 800, offsetX: 40, offsetY: 100 })).toEqual({
+      width: 640,
+      height: 1008,
+    });
+  });
+
+  it('scales down to fit, never up, and keeps the proportions', () => {
+    expect(fitScale({ width: 560, height: 772 }, { width: 1120, height: 1544 })).toBe(1);
+    expect(fitScale({ width: 560, height: 772 }, { width: 560, height: 386 })).toBe(0.5);
+    expect(fitScale(PHONE, { width: 195, height: 2000 })).toBe(0.5);
   });
 });

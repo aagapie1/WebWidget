@@ -99,9 +99,7 @@ code {
 }
 
 .page {
-  padding: 1.5rem;
-  max-width: 1400px;
-  margin: 0 auto;
+  padding: 1rem 1.5rem 0;
 }
 
 .card {
@@ -112,35 +110,117 @@ code {
   margin-bottom: 1rem;
 }
 
+/* ---------- Workspace: sticky status bar, form, preview column ---------- */
+.statusbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.25rem;
+  margin: 0 -1.5rem 1rem;
+  padding: 0.6rem 1.5rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 2px 8px rgb(16 24 40 / 0.06);
+}
+.statusbar__state {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.statusbar__state .status__published {
+  margin: 0;
+}
+.statusbar__state .save-status {
+  min-height: 0;
+}
+.statusbar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+.statusbar .publish-bar {
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+}
+.statusbar .publish-bar__reason {
+  margin: 0;
+  max-width: 22rem;
+  text-align: right;
+}
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.badge--ok {
+  background: #ecfdf3;
+  color: var(--ok);
+}
+.badge--error {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+/* Form ~55% / preview ~45% on wide screens; the preview always gets its own column. */
 .editor {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 440px);
-  gap: 1.25rem;
+  grid-template-columns: minmax(0, 55fr) minmax(0, 45fr);
+  gap: 1.5rem;
   align-items: start;
 }
-/* The preview stays in view next to the form: launcher, bubble and window without scrolling. */
-.editor__side {
+@media (max-width: 1439px) {
+  .editor {
+    grid-template-columns: minmax(0, 58fr) minmax(0, 42fr);
+  }
+}
+.editor__form {
+  padding-bottom: 2rem;
+}
+.preview-column {
   position: sticky;
-  top: 1rem;
+  top: var(--column-top, 0);
+  /* Set by the editor: from below the status bar to the bottom of the window. */
+  block-size: var(--column-height, calc(100vh - 4rem));
   display: flex;
   flex-direction: column;
-  block-size: calc(100vh - 2rem);
-  min-block-size: 560px;
+  padding-bottom: 0.75rem;
 }
-.editor__side > .card {
-  flex: none;
-}
-@media (max-width: 960px) {
+/* Below 1280 px: a side panel opened from the status bar, never squeezed next to the form. */
+@media (max-width: 1279px) {
   .editor {
     grid-template-columns: 1fr;
   }
-  .editor__side {
-    position: static;
-    block-size: auto;
-  }
-  .preview__stage {
-    block-size: 75vh;
-  }
+}
+.preview-column--drawer {
+  position: fixed;
+  top: var(--column-top, 0);
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  inline-size: min(560px, 100vw);
+  block-size: auto;
+  padding: 0.75rem 1rem;
+  background: var(--bg);
+  border-left: 1px solid var(--border);
+  box-shadow: -12px 0 30px rgb(16 24 40 / 0.18);
+  display: none;
+}
+.preview-column--open {
+  display: flex;
+}
+.preview-column__close {
+  align-self: flex-end;
+  margin-bottom: 0.5rem;
 }
 
 .field {
@@ -426,31 +506,39 @@ summary {
 }
 .preview__stage {
   flex: 1;
-  min-block-size: 420px;
-  margin-top: 0.75rem;
+  min-block-size: 0;
+  margin-top: 0.5rem;
+  /* Room for the phone frame ring, drawn outside the canvas. */
+  padding: 8px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  overflow: hidden;
+}
+.preview__canvas {
+  position: relative;
+  flex: none;
+  overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: #e9ecf1;
-  overflow: hidden;
-  display: flex;
-  justify-content: center;
+}
+.preview__canvas--mobile {
+  border: 0;
+  border-radius: 1.25rem;
+  box-shadow: 0 0 0 6px #1b1f2a;
+}
+.preview__scale {
+  color: var(--muted);
+  font-size: 0.85rem;
 }
 .preview__frame {
+  position: absolute;
+  top: 0;
+  left: 0;
   border: 0;
   background: #fff;
-  inline-size: 100%;
-  block-size: 100%;
-}
-.preview__stage--mobile {
-  align-items: center;
-  padding: 0.5rem 0;
-}
-.preview__stage--mobile .preview__frame {
-  inline-size: 375px;
-  max-inline-size: 100%;
-  block-size: min(100%, 667px);
-  border-radius: 1.25rem;
-  box-shadow: 0 0 0 8px #1b1f2a;
+  transform-origin: top left;
 }
 
 .dialog {

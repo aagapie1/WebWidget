@@ -399,8 +399,8 @@ test('site integration: the code to copy, and the installation check', async ({ 
   await section.getByLabel('Engleză (data-locale="en")').check();
   await expect(section.locator('pre').first()).toContainText('data-locale="en"');
 
-  await section.getByRole('button', { name: 'Verifică instalarea' }).click();
-  await expect(section.getByText('Încă nu a fost detectat pe http://127.0.0.1:5180')).toBeVisible();
+  // Installation records live in Redis (not reset between local runs): no assumption about the
+  // state before; after loader.js loads on the site, the check reports it.
   // loader.js on the client's site asks for its configuration (an allowed origin).
   await page.request.get(`${ADMIN}/api/loader-config?tenant=pilot`, {
     headers: { origin: 'http://127.0.0.1:5180' },
@@ -425,7 +425,7 @@ const EDITOR_REGIONS = [
   '#section-behavior',
   '#section-allowedOrigins',
   '#section-integration',
-  '.editor__side > .card',
+  '.statusbar',
   '.preview__head',
 ];
 

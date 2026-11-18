@@ -188,6 +188,12 @@ const ro = {
   contrastTitle: 'Contrast (WCAG 2.1 AA)',
   ux: {
     defaultIs: (value: string | number) => `Implicit: ${String(value)}`,
+    scaledTo: (percent: number) => `Scalat la ${String(percent)}%`,
+    previewButton: 'Previzualizare',
+    closePreview: 'Închide previzualizarea',
+    contrastOk: 'Contrast OK',
+    contrastProblems: (n: number) =>
+      n === 1 ? '1 problemă de contrast' : `${String(n)} probleme de contrast`,
     publishedAt: (date: string, name: string) => `Publicat ultima dată: ${date} de ${name}`,
     neverPublished: 'Încă nepublicat',
     draftSavedAt: (time: string) => `Ciornă: salvată la ${time}`,
@@ -457,6 +463,12 @@ const en: Dictionary = {
   contrastTitle: 'Contrast (WCAG 2.1 AA)',
   ux: {
     defaultIs: (value: string | number) => `Default: ${String(value)}`,
+    scaledTo: (percent: number) => `Scaled to ${String(percent)}%`,
+    previewButton: 'Preview',
+    closePreview: 'Close the preview',
+    contrastOk: 'Contrast OK',
+    contrastProblems: (n: number) =>
+      n === 1 ? '1 contrast problem' : `${String(n)} contrast problems`,
     publishedAt: (date: string, name: string) => `Last published: ${date} by ${name}`,
     neverPublished: 'Not published yet',
     draftSavedAt: (time: string) => `Draft: saved at ${time}`,
