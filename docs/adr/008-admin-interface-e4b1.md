@@ -49,6 +49,20 @@ records (no audit screen), the security of §6. Everything else of E4b is E4b.2 
 - CSP for `/admin`: `default-src 'self'; frame-ancestors 'none'`; `frame-src 'self'` only for the
   preview page, which itself allows `frame-ancestors 'self'`.
 - Rate limits (Redis) on the login endpoints and the admin API.
+- Implementation notes (step 2):
+  - Login is started per organisation: `GET /admin/auth/login?org=<tenant|platform>`. The callback
+    accepts only an ID token whose `iss` maps to that same organisation (`wrong_realm` otherwise).
+  - Login state (PKCE verifier, nonce, return path) lives in Redis for 10 minutes and is single
+    use. It is bound to the browser by a `__Secure-admin-login` cookie (`SameSite=Lax`, because
+    the IdP returns with a top-level redirect; `Path=/admin/auth`).
+  - Redis keys hold a SHA-256 of the session cookie, so a Redis dump yields no usable cookie.
+  - Only the session cookie authenticates. An `Authorization` header is ignored, so a bearer
+    token from any realm gets `401`.
+  - Logout is a CSRF-protected `POST` that returns the Keycloak end-session URL (with
+    `id_token_hint`) for the interface to navigate to.
+  - Plain-HTTP issuers are allowed only outside production (local Keycloak).
+  - Failed logins redirect to `/admin/?error=<code>`. Logs carry only the reason, the
+    organisation and the role, never names.
 - Dify keys never appear in the admin API, UI or export.
 
 ## Storage: Postgres as a second `TenantSource`

@@ -1,5 +1,8 @@
 import { resolve } from 'node:path';
-import { buildApp } from './app.js';
+import { buildApp, type BuildAppOptions } from './app.js';
+import { loadAdminAuthConfig } from './admin/auth-config.js';
+import { RedisKeyValueStore, type KeyValueStore } from './admin/kv.js';
+import { OpenIdClient } from './admin/oidc.js';
 import { loadEnv } from './config/env.js';
 import pg from 'pg';
 import pino from 'pino';
@@ -32,13 +35,28 @@ if (env.REDIS_URL) {
   feedbackStore = new MemoryFeedbackStore();
 }
 
-const app = await buildApp({ env, tenants, feedbackStore });
+// Admin interface (ADR 008): only with a server auth configuration; sessions need Redis.
+let adminStore: KeyValueStore | undefined;
+let admin: BuildAppOptions['admin'];
+if (env.ADMIN_AUTH_CONFIG) {
+  if (!env.REDIS_URL) throw new Error('ADMIN_AUTH_CONFIG requires REDIS_URL (admin sessions)');
+  adminStore = await RedisKeyValueStore.connect(env.REDIS_URL);
+  admin = {
+    auth: await loadAdminAuthConfig(resolve(env.ADMIN_AUTH_CONFIG), process.env),
+    store: adminStore,
+    oidc: new OpenIdClient(env.NODE_ENV !== 'production'),
+  };
+}
+
+const app = await buildApp({ env, tenants, feedbackStore, ...(admin ? { admin } : {}) });
+app.log.info({ admin: admin ? [...admin.auth.realms.keys()] : false }, 'admin interface');
 if (!env.REDIS_URL) {
   app.log.warn('REDIS_URL not set: closing feedback is kept in memory (development only)');
 }
 app.addHook('onClose', async () => {
   stopWatching();
   await feedbackStore.close();
+  await adminStore?.close();
   await database?.end();
 });
 

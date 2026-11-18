@@ -31,3 +31,25 @@ describe.skipIf(!url)('RedisFeedbackStore (real Redis)', () => {
     }
   });
 });
+
+describe.skipIf(!url)('RedisKeyValueStore (real Redis, admin sessions)', () => {
+  it('stores with a TTL, takes once and counts within a window', async () => {
+    const { RedisKeyValueStore } = await import('../src/admin/kv.js');
+    const store = await RedisKeyValueStore.connect(url ?? '');
+    const key = `test:admin:${String(Date.now())}`;
+    try {
+      await store.set(key, 'v', 60);
+      expect(await store.get(key)).toBe('v');
+      expect(await store.take(key)).toBe('v');
+      expect(await store.take(key)).toBeUndefined();
+
+      expect(await store.incr(`${key}:n`, 1)).toBe(1);
+      expect(await store.incr(`${key}:n`, 1)).toBe(2);
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      expect(await store.incr(`${key}:n`, 1)).toBe(1);
+      await store.del(`${key}:n`);
+    } finally {
+      await store.close();
+    }
+  });
+});

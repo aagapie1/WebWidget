@@ -2,6 +2,10 @@ import { randomUUID } from 'node:crypto';
 import cookie from '@fastify/cookie';
 import Fastify, { type FastifyInstance } from 'fastify';
 import type { Dispatcher } from 'undici';
+import type { AdminAuthConfig } from './admin/auth-config.js';
+import type { KeyValueStore } from './admin/kv.js';
+import type { OidcClient } from './admin/oidc.js';
+import { adminRoutes } from './admin/routes.js';
 import { chatRoute } from './chat/route.js';
 import type { AppEnv } from './config/env.js';
 import type { TenantRegistry } from './config/tenants.js';
@@ -18,6 +22,8 @@ export interface BuildAppOptions {
   tenants: TenantRegistry;
   /** Closing feedback storage (Redis in production, ADR 005). Defaults to in-memory. */
   feedbackStore?: FeedbackStore;
+  /** Admin interface (ADR 008); omitted when ADMIN_AUTH_CONFIG is not set. */
+  admin?: { auth: AdminAuthConfig; store: KeyValueStore; oidc: OidcClient };
   /** Test hook: route Dify requests through a custom undici dispatcher. */
   difyDispatcher?: Dispatcher;
 }
@@ -120,6 +126,10 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     tenants: options.tenants,
     ...(options.difyDispatcher ? { difyDispatcher: options.difyDispatcher } : {}),
   });
+
+  if (options.admin) {
+    adminRoutes(app, { env: options.env, tenants: options.tenants, ...options.admin });
+  }
 
   return app;
 }

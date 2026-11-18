@@ -15,6 +15,8 @@ const envSchema = z.object({
   TENANT_SOURCE: z.enum(['file', 'postgres']).default('file'),
   /** Application role connection (Postgres source, admin interface). */
   DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }).optional(),
+  /** Server-only admin login configuration (ADR 008): issuer → tenant map. Admin is off without it. */
+  ADMIN_AUTH_CONFIG: z.string().min(1).optional(),
   VISITOR_COOKIE_SECRET: z.string().min(32, 'must be at least 32 characters'),
   /** Time allowed for Dify to answer with response headers. */
   DIFY_CONNECT_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),
