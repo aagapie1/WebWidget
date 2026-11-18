@@ -105,38 +105,122 @@ versions stay valid.
   - the screen shows "Widget detectat pe … la …" or "Încă nu a fost detectat".
 - No separate CSS: the look comes from the configuration.
 
-## P2 — simplification and design (after P1 review)
+## P2 — simplification and design (detailed plan, after the layout change of 0743313)
 
-8. **Layout like the Dify console** (no copied code, icons or branding):
-   - left sidebar with an icon and a name per area: Aspect, Texte și întrebări, Mesaj proactiv,
-     Citări, Comportament, Domenii permise, Integrare pe site;
-   - a marker on areas with unpublished changes or errors;
-   - header with the assistant's name and logo, and the status plus "Publică" on the right;
-   - preview as a fixed panel on the right;
-   - light grey background, white cards, Inter (bundled locally), one accent color.
-9. **Colors:**
-   - the default view shows the main color and an optional second color; the rest are computed
-     automatically, with white or black text chosen by contrast;
-   - the other colors go into a folded "Culori avansate" section;
-   - a "Resetează" button appears only when the value differs from the default;
-   - the contrast error appears next to the affected pair, with a link to it from the status
-     panel.
-   - **[SCHEMA]** none: the derived colors are written into `theme` when saving.
-10. **Every element in one place:** the launcher color moves to "Buton de pornire".
-    - **[SCHEMA]** `launcher.color` (optional, default `theme.accent`), checked for 3:1 contrast
-      against white.
-11. **Texts:** Română / English tabs; under each image, where it appears.
-12. **Plain language:** the wording from the feedback.
-13. **Citations:**
-    - documents to choose from: the knowledge base via the Dify Knowledge API if the key allows
-      it, otherwise the recent citations recorded by the gateway;
-    - the administrator types only the display title;
-    - "fragment" stays off by default.
-14. **Allowed domains:**
-    - a list with "Adaugă" / "Elimină" and validation on every line (https outside development);
-    - removing a domain asks for confirmation;
-    - the section is hidden from `widget-editor`.
-15. **"Numele clientului":** only `super-admin` can edit it (checked on the server too).
+Already done in the layout change: the sticky status bar (state, contrast indicator, "Renunță",
+"Publică"), the preview column at real size scaled to fit, the side panel under 1280 px, and
+the names on two columns.
+
+**[SCHEMA]** marks configuration changes. **[DECIDE]** marks a choice to confirm before
+implementing.
+
+### 8. Structure and look inspired by the Dify console (no code, icons or branding copied)
+
+- **One header:** the logo and name of the client's assistant (not the code "pilot"), the tenant
+  switcher for super-admin, the user and the language. The status bar (state, contrast,
+  "Renunță", "Publică") stays sticky right below it.
+- **Left sidebar** with an icon and a name per area:
+  - Aspect: identity, launcher, window and colors;
+  - Texte și întrebări;
+  - Mesaj proactiv;
+  - Citări;
+  - Comportament;
+  - Domenii permise;
+  - Integrare pe site.
+
+  One area is shown at a time, so there is less scrolling; the URL keeps the area (`#aspect`…).
+  The sidebar marks:
+  - a dot on areas with unpublished changes (sections that differ from the published version);
+  - a red marker with the number of errors.
+
+  Keyboard: the sidebar is a list of links; the current one has `aria-current="page"`.
+
+- **Optional features as rows:** icon, title, one sentence of description, and a switch
+  (`role="switch"`). This covers the proactive message, questions after the answer and
+  fragments in citations. The settings of a feature open under its row only when it is on.
+- **Visual:**
+  - very light grey background, white cards with rounded corners and a subtle shadow;
+  - compact controls and a single accent color, AA contrast checked with axe;
+  - **Inter** (SIL OFL license, woff2 file served from `/admin/assets`, license in the repo).
+    It is used only by the admin interface; the widget is unchanged.
+
+### 9. Colors
+
+- **Default view:**
+  - "Culoarea principală" plus an optional "A doua culoare a antetului (gradient)".
+  - The text on the main color, the links and the buttons are computed automatically: white or
+    black text, whichever has more contrast; links darkened until they reach 4.5:1 on white.
+- **"Culori avansate"** (folded): the other colors. "Resetează" appears only when a value differs
+  from the computed or default one.
+- The contrast error appears next to the affected pair; the link from the status bar (already
+  there) leads to it.
+- **[SCHEMA] [DECIDE]** where the automatic colors are computed:
+  - **A — in the gateway** (shared schema code). Colors that are not set are derived from the
+    main color at load time.
+    - Cost: tenants that set only `accent` change their links/text after deploy (today they get
+      the fixed defaults).
+    - Benefit: always consistent, and the same code in the admin interface and the gateway.
+  - **B — in the admin interface:** when the main color changes, it writes the derived colors
+    into the draft (except the ones changed by hand in "Culori avansate").
+    - Cost: what was derived and what was chosen by hand is not stored; to remember it, the
+      draft would need an extra field.
+
+  **Recommendation: A**, with an entry in the release notes; existing tenants keep their
+  explicit colors.
+
+### 10. Every element configured in one place
+
+- **[SCHEMA]** `launcher.color` (optional; default `theme.accent`).
+  - Checked for 3:1 against white (the button on a page) and for 4.5:1 for its icon.
+  - The loader receives it in `loader-config`.
+- The launcher color moves into "Buton de pornire"; "Culoare principală" applies only to the
+  window.
+
+### 11. Texts
+
+- Română / English as tabs (a `tablist` with arrow keys) instead of two blocks.
+- Under each image, where it appears: "Logo: în antetul ferestrei", "Avatarul asistentului:
+  lângă răspunsuri", "Avatarul utilizatorului: lângă întrebările vizitatorului".
+
+### 12. Language for civil servants
+
+- The 4 phrasings from the feedback, plus a pass over all the texts. No "Dify", "cookie",
+  "model" or "CSP" in labels; technical details only where needed, in the integration
+  checklist.
+
+### 13. Citations
+
+- **Documents to choose from:** the app key has no access to the Dify Knowledge API (that needs
+  a separate dataset key). Proposal:
+  - the gateway records the names of the cited documents (from the answers, in the
+    normalization) per tenant in Redis. These are document names, not personal data; 90 days.
+  - A search field offers them; the administrator writes only the displayed title.
+  - **[DECIDE]** whether a knowledge-base key per tenant is also wanted (server configuration,
+    like the Dify key) for the full list.
+- "Afișează fragmentul" stays off by default, as it already is.
+
+### 14. Allowed domains
+
+- A list with "Adaugă" and "Elimină" on each row, validated on each row (bare domain, no path).
+- **[SCHEMA]** `https` is mandatory, except `http://localhost` / `127.0.0.1`.
+  - Checked in the gateway: validation only, existing YAML files stay valid if they comply.
+  - The e2e and dev tenants use localhost.
+- Confirmation on removal: "asistentul se va opri pe <domeniu>".
+- `widget-editor` no longer sees the section (today it is read-only). The server already refuses
+  changes from an editor (tested).
+
+### 15. "Numele clientului"
+
+- Only `super-admin` can edit it: read-only text for the others, and the server refuses a change
+  from another role (403, like the domains). Tests on the API and in e2e.
+
+### P2 order (one commit per item, with tests; screenshots in docs/review/admin updated)
+
+1. 12 and 11 (texts and tabs: small, low risk).
+2. 15 and 14 (rights and domains: server + interface).
+3. 10 and 9 (colors: after decision A/B).
+4. 13 (citations: after the knowledge-base key decision).
+5. 8 (sidebar, header, rows with switches, Inter), last: it moves all the content around.
 
 ## Order of work
 
