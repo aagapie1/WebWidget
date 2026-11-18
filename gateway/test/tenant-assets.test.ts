@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { parseTenant } from '../src/config/tenants.js';
+import { loaderConfig } from '../src/tenant-assets/route.js';
 import { loaderConfigSchema, widgetConfigSchema } from '../src/protocol/index.js';
 import { startHarness, type Harness } from './harness.js';
 
@@ -94,6 +95,21 @@ describe('GET /api/loader-config', () => {
       },
       texts: { 'launcher.open': 'Deschide chatul primăriei' },
     });
+  });
+
+  it("sends the launcher's own color with an automatic icon color (E4b.1 UX 10)", async () => {
+    const colored = await parseTenant(
+      yaml.replace('  position: bottom-left\n', "  position: bottom-left\n  color: '#d97706'\n"),
+      { KEY: 'app-x' },
+      'pilot.yaml',
+      dir,
+    );
+    expect(loaderConfig(colored, 'ro').launcher).toMatchObject({
+      color: '#d97706',
+      onColor: '#000000',
+    });
+    const plain = await parseTenant(yaml, { KEY: 'app-x' }, 'pilot.yaml', dir);
+    expect(loaderConfig(plain, 'ro').launcher).not.toHaveProperty('color');
   });
 
   it('allows CORS only for the tenant origins, with Vary: Origin', async () => {

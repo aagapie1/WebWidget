@@ -68,8 +68,8 @@ const ro = {
     windowPosition: 'Poziția ferestrei',
     colors: 'Culori',
     color: {
-      accent: 'Culoare principală (antet, buton)',
-      accentEnd: 'Culoare principală, a doua nuanță (degradeu)',
+      accent: 'Culoarea principală',
+      accentEnd: 'A doua culoare a antetului (degradeu)',
       onAccent: 'Text pe culoarea principală',
       text: 'Text',
       textMuted: 'Text secundar',
@@ -82,6 +82,15 @@ const ro = {
       onButton: 'Text pe butoane (opțional)',
     } as Record<string, string>,
     colorDefault: 'Implicit',
+    colorAuto: 'Automat',
+    pinColor: 'Fixează valoarea',
+    backToAuto: 'Revino la automat',
+    advancedColors: 'Culori avansate',
+    colorsIntro:
+      'Textul pe culoarea principală și linkurile se calculează automat, cu contrast suficient. Le puteți schimba în „Culori avansate”.',
+    launcherColor: 'Culoarea butonului',
+    launcherColorHint:
+      'Fără valoare, butonul are culoarea principală (cu degradeu). Iconul devine alb sau negru, după contrast.',
     reset: 'Revino la implicit',
     welcome: 'Mesaj de întâmpinare',
     welcomeHint: 'Dacă lăsați gol, se folosește mesajul configurat în asistent.',
@@ -408,8 +417,8 @@ const en: Dictionary = {
     windowPosition: 'Window position',
     colors: 'Colors',
     color: {
-      accent: 'Main color (header, launcher)',
-      accentEnd: 'Main color, second shade (gradient)',
+      accent: 'Main color',
+      accentEnd: 'Second header color (gradient)',
       onAccent: 'Text on the main color',
       text: 'Text',
       textMuted: 'Secondary text',
@@ -422,6 +431,15 @@ const en: Dictionary = {
       onButton: 'Text on buttons (optional)',
     },
     colorDefault: 'Default',
+    colorAuto: 'Automatic',
+    pinColor: 'Keep this value',
+    backToAuto: 'Back to automatic',
+    advancedColors: 'Advanced colors',
+    colorsIntro:
+      'The text on the main color and the links are computed automatically, with enough contrast. You can change them in “Advanced colors”.',
+    launcherColor: 'Launcher color',
+    launcherColorHint:
+      'Without a value, the launcher has the main color (with its gradient). The icon turns white or black, for contrast.',
     reset: 'Reset to default',
     welcome: 'Welcome message',
     welcomeHint: 'If left empty, the message configured in the assistant is used.',

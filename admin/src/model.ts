@@ -1,10 +1,11 @@
 import { contrastRatio } from 'gateway/contrast';
 import {
   contrastChecks,
-  DEFAULT_THEME,
   ORIGIN_HTTPS_MESSAGE,
+  resolveTheme,
   tenantSchema,
   type Theme,
+  type ThemeInput,
 } from 'gateway/config-schema';
 import type { Config } from './api.js';
 import type { Dictionary } from './i18n.js';
@@ -79,16 +80,21 @@ export function changedSections(published: Config, draft: Config): string[] {
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
-/** The colors the widget will use: valid values from the draft, defaults otherwise. */
-export function effectiveTheme(config: Config): Theme {
+/** The colors set in the draft (valid #rrggbb values only), as the gateway reads them. */
+export function themeInput(config: Config): ThemeInput {
   const theme = getIn(config, ['theme']);
-  const result: Record<string, string> = { ...DEFAULT_THEME };
+  const result: Record<string, string> = {};
   if (isObject(theme)) {
     for (const [key, value] of Object.entries(theme)) {
       if (typeof value === 'string' && HEX.test(value)) result[key] = value;
     }
   }
-  return result as Theme;
+  return result;
+}
+
+/** The colors the widget will use: the ones set, plus the gateway's automatic ones. */
+export function effectiveTheme(config: Config): Theme {
+  return resolveTheme(themeInput(config));
 }
 
 export interface ContrastResult {

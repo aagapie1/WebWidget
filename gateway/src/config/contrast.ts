@@ -15,3 +15,39 @@ function luminance(hex: string): number {
   const [r = 0, g = 0, b = 0] = channels;
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
+
+const WHITE = '#ffffff';
+const BLACK = '#000000';
+
+/**
+ * White or black, whichever keeps the most contrast against every given background (text and
+ * icons on the accent colors). Any single color reaches at least 4.58:1 with one of the two.
+ */
+export function textOn(backgrounds: readonly string[]): string {
+  const worst = (color: string) =>
+    Math.min(...backgrounds.map((background) => contrastRatio(color, background)));
+  return worst(WHITE) >= worst(BLACK) ? WHITE : BLACK;
+}
+
+/**
+ * The color itself if it reaches `minimum` against every background, otherwise the same hue
+ * darkened in 5% steps until it does (links from the accent color). Black as the last resort.
+ */
+export function readableOn(color: string, backgrounds: readonly string[], minimum = 4.5): string {
+  const enough = (candidate: string) =>
+    backgrounds.every((background) => contrastRatio(candidate, background) >= minimum);
+  const value = Number.parseInt(color.slice(1), 16);
+  const channels = [(value >> 16) & 0xff, (value >> 8) & 0xff, value & 0xff];
+  for (let step = 0; step <= 20; step += 1) {
+    const factor = 1 - step * 0.05;
+    const candidate = `#${channels
+      .map((channel) =>
+        Math.round(channel * factor)
+          .toString(16)
+          .padStart(2, '0'),
+      )
+      .join('')}`;
+    if (enough(candidate)) return candidate;
+  }
+  return BLACK;
+}

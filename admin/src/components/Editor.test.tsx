@@ -246,6 +246,40 @@ describe('Editor', () => {
     ).toBeTruthy();
   });
 
+  it('colors: main color first, the rest folded and automatic, computed like the gateway', async () => {
+    const api = fakeApi({
+      config: () =>
+        Promise.resolve(
+          configState({
+            draft: {
+              revision: 1,
+              baseVersion: 3,
+              updatedAt: '2026-11-18T10:00:00.000Z',
+              updatedBy: 'Ana',
+              config: {
+                name: 'Pilot',
+                allowedOrigins: ['https://www.pilot.ro'],
+                theme: { accent: '#2f9e44' },
+              },
+            },
+          }),
+        ),
+    });
+    renderWithI18n(<Editor api={api} tenant="pilot" onSessionExpired={vi.fn()} />);
+    fireEvent.click(await screen.findByRole('link', { name: 'Culori' }));
+    expect(screen.getByLabelText<HTMLInputElement>('Culoarea principală').value).toBe('#2f9e44');
+    const advanced = screen.getByText('Culori avansate').closest('details');
+    expect(advanced?.open).toBe(false);
+    // A medium green: black text on it, links darkened to 4.5:1, a flat header.
+    expect(screen.getAllByText('Automat: #000000').length).toBeGreaterThanOrEqual(3);
+    expect(screen.getByText('Automat: #267e36')).toBeTruthy();
+    expect(screen.getAllByText('Automat: #2f9e44').length).toBeGreaterThan(0);
+    // The launcher: its own color, automatically the main one.
+    expect(screen.getByLabelText<HTMLInputElement>('Culoarea butonului').placeholder).toBe(
+      '#2f9e44',
+    );
+  });
+
   it('says under each image where it appears', async () => {
     renderWithI18n(<Editor api={fakeApi()} tenant="pilot" onSessionExpired={vi.fn()} />);
     expect(await screen.findByText('Apare în antetul ferestrei.')).toBeTruthy();

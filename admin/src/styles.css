@@ -1327,3 +1327,37 @@ a.badge {
 .origins__row.field--invalid input {
   border-color: var(--danger, #b42318);
 }
+
+/* "Fixează valoarea" / "Revino la automat": a small action under the color field. */
+.color__action {
+  margin-top: 4px;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--primary);
+  font: inherit;
+  font-size: 13px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.color__action:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+details.advanced {
+  margin-top: 16px;
+}
+details.advanced > summary {
+  font-weight: 600;
+  cursor: pointer;
+}
+.color__note {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: baseline;
+}
+.color__note .color__action {
+  margin-top: 0;
+}

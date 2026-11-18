@@ -200,7 +200,7 @@ test('changes show in the preview at once and publicly only after publishing', a
   const previewConfig = page.waitForResponse(
     (r) => r.url().includes('/api/loader-config') && r.url().includes('--p-'),
   );
-  await color(page, 'Culoare principală (antet, buton)').fill('#0b6e4f');
+  await color(page, 'Culoarea principală').fill('#0b6e4f');
   await page.getByLabel('Poziție', { exact: true }).selectOption('bottom-left');
   await saved(page);
   await previewConfig;
@@ -226,8 +226,27 @@ test('changes show in the preview at once and publicly only after publishing', a
   await expect.poll(() => publicAccent(page, 'pilot')).toBe('#0b6e4f');
 });
 
+test("the launcher's own color shows in the preview, its icon color is automatic", async ({
+  page,
+}) => {
+  await openEditor(page, PILOT_ADMIN);
+  const previewConfig = page.waitForResponse(
+    (r) => r.url().includes('/api/loader-config') && r.url().includes('--p-'),
+  );
+  await color(page, 'Culoarea butonului').fill('#d97706');
+  await saved(page);
+  await previewConfig;
+  const preview = page.frameLocator('iframe[title="Previzualizarea asistentului cu ciorna"]');
+  const launcher = preview.locator('[data-chat-widget^="pilot--p-"] .launcher');
+  await expect(launcher).toHaveCSS('background-color', 'rgb(217, 119, 6)');
+  await expect(launcher).toHaveCSS('color', 'rgb(0, 0, 0)');
+  expect((await discardDraft(page, 'pilot')).status).toBe(204);
+});
+
 test('a color pair below the AA contrast blocks publishing', async ({ page }) => {
   await openEditor(page, PILOT_ADMIN);
+  // The text colors are folded under Culori avansate.
+  await page.getByText('Culori avansate', { exact: true }).click();
   const text = color(page, 'Text');
   await text.fill('#eeeeee');
   await expect(text).toHaveAttribute('aria-invalid', 'true');

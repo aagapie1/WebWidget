@@ -176,6 +176,9 @@ export const loaderConfigSchema = z.object({
     position: z.enum(['bottom-right', 'bottom-left']),
     offsetX: z.number(),
     offsetY: z.number(),
+    /** The launcher's own flat color and its icon color (E4b.1 UX 10); unset: the accent. */
+    color: z.optional(hexColorSchema),
+    onColor: z.optional(hexColorSchema),
     iconUrl: z.optional(assetUrlSchema),
     /** Built-in icon (when there is no uploaded image). */
     icon: z.optional(z.enum(LAUNCHER_ICON_NAMES)),

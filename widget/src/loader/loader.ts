@@ -289,6 +289,11 @@ export function mountLoader(options: LoaderOptions, doc: Document = document): L
       set('--cw-accent', config.theme.accent);
       set('--cw-accent-2', config.theme.accentEnd);
       set('--cw-on-accent', config.theme.onAccent);
+      // The launcher's own color, if any (flat); otherwise it keeps the accent gradient.
+      if (config.launcher.color) set('--cw-launcher', config.launcher.color);
+      else host.style.removeProperty('--cw-launcher');
+      if (config.launcher.onColor) set('--cw-on-launcher', config.launcher.onColor);
+      else host.style.removeProperty('--cw-on-launcher');
       set('--cw-offset-x', `${String(config.launcher.offsetX)}px`);
       set('--cw-offset-y', `${String(config.launcher.offsetY)}px`);
       set('--cw-width', `${String(config.window.width)}px`);

@@ -69,6 +69,21 @@ describe('loader configuration (E4)', () => {
     expect(icon?.alt).toBe('');
   });
 
+  it('gives the launcher its own flat color when the tenant sets one (E4b.1 UX 10)', async () => {
+    const handle = mount({
+      ...config,
+      launcher: { ...config.launcher, color: '#ffb000', onColor: '#000000' },
+    });
+    await handle.configured;
+    const host = hostOf(handle);
+    expect(host.style.getPropertyValue('--cw-launcher')).toBe('#ffb000');
+    expect(host.style.getPropertyValue('--cw-on-launcher')).toBe('#000000');
+    // Without it, the launcher keeps the accent gradient.
+    const plain = mount();
+    await plain.configured;
+    expect(hostOf(plain).style.getPropertyValue('--cw-launcher')).toBe('');
+  });
+
   it('shows itself with the defaults when the configuration cannot be loaded', async () => {
     const handle = mount(null);
     await handle.configured;

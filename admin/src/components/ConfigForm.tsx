@@ -1,11 +1,11 @@
 import type { ComponentChildren } from 'preact';
 import { useState } from 'preact/hooks';
-import { DEFAULT_THEME } from 'gateway/config-schema';
+import { resolveTheme, type Theme } from 'gateway/config-schema';
 import { ERROR_TEXTS, TEXT_KEYS } from 'gateway/texts';
 import { texts as widgetTexts } from 'widget/i18n';
 import type { Config, ConfigState } from '../api.js';
 import { useI18n } from '../i18n.js';
-import { getIn, type FieldErrors, type Path } from '../model.js';
+import { getIn, themeInput, type FieldErrors, type Path } from '../model.js';
 import { ColorField } from './ColorField.js';
 import { CheckboxField, NumberField, SelectField, TextField } from './Field.js';
 import { ImageField } from './ImageField.js';
@@ -62,23 +62,33 @@ function setting(value: unknown): { type?: string; name?: string; file?: string 
   return {};
 }
 
-const COLOR_KEYS = [
-  'accent',
-  'accentEnd',
+/** Shown at once: the main color and the header's second color. */
+const MAIN_COLORS = ['accent', 'accentEnd'] as const;
+/** Folded under "Culori avansate". */
+const ADVANCED_COLORS = [
   'onAccent',
+  'link',
   'text',
   'textMuted',
   'background',
   'assistantBubble',
-  'link',
   'userBubble',
   'onUserBubble',
   'button',
   'onButton',
 ] as const;
-
+/** Computed from other colors when unset (resolveTheme in the gateway). */
+const AUTOMATIC_COLORS = new Set([
+  'accentEnd',
+  'onAccent',
+  'link',
+  'userBubble',
+  'onUserBubble',
+  'button',
+  'onButton',
+]);
 /** Optional colors fall back to these when unset (gateway contrastChecks rules). */
-const COLOR_FALLBACK: Record<string, keyof typeof DEFAULT_THEME> = {
+const COLOR_FALLBACK: Record<string, keyof Theme> = {
   userBubble: 'accent',
   onUserBubble: 'onAccent',
   button: 'accent',
@@ -217,11 +227,25 @@ export function ConfigForm({
   ];
   const proactiveOn = value('proactive.enabled') === true;
   const theme = (key: string) => str(value(`theme.${key}`));
+  // What a color would be without its own value: the gateway's default or automatic color.
+  const colorsSet = themeInput(config);
   const fallbackColor = (key: string): string => {
+    const resolved = resolveTheme({ ...colorsSet, [key]: undefined });
     const base = COLOR_FALLBACK[key];
-    if (base) return theme(base) ?? DEFAULT_THEME[base];
-    return DEFAULT_THEME[key as keyof typeof DEFAULT_THEME];
+    return resolved[key as keyof Theme] ?? (base ? resolved[base] : undefined) ?? '';
   };
+  const colorField = (key: string) => (
+    <ColorField
+      key={key}
+      label={t.fields.color[key] ?? key}
+      value={theme(key)}
+      fallback={fallbackColor(key)}
+      automatic={AUTOMATIC_COLORS.has(key)}
+      onChange={set(`theme.${key}`)}
+      errors={errorsFor(`theme.${key}`)}
+    />
+  );
+  const advancedErrors = ADVANCED_COLORS.some((key) => errorsFor(`theme.${key}`));
   const origins = Array.isArray(value('allowedOrigins'))
     ? (value('allowedOrigins') as string[])
     : [];
@@ -361,6 +385,16 @@ export function ConfigForm({
               errors={errorsFor('launcher.icon')}
             />
           )}
+          {/* The launcher's own color (E4b.1 UX 10): automatic = the main color's gradient. */}
+          <ColorField
+            label={t.fields.launcherColor}
+            value={str(value('launcher.color'))}
+            fallback={resolveTheme(colorsSet).accent}
+            automatic
+            onChange={set('launcher.color')}
+            errors={errorsFor('launcher.color')}
+          />
+          <p class="field__hint">{t.fields.launcherColorHint}</p>
           <SelectField
             label={t.fields.position}
             value={str(value('launcher.position')) ?? 'bottom-right'}
@@ -393,7 +427,7 @@ export function ConfigForm({
         </Section>
       )}
       {area === 'aspect' && (
-        <Section id="window" title={t.sections.window ?? ''}>
+        <Section id="window" title={t.ux.subsections.window ?? ''}>
           <div class="row">
             <NumberField
               label={t.fields.width}
@@ -442,18 +476,13 @@ export function ConfigForm({
 
       {area === 'aspect' && (
         <Section id="colors" title={t.fields.colors}>
-          <div class="grid">
-            {COLOR_KEYS.map((key) => (
-              <ColorField
-                key={key}
-                label={t.fields.color[key] ?? key}
-                value={theme(key)}
-                fallback={fallbackColor(key)}
-                onChange={set(`theme.${key}`)}
-                errors={errorsFor(`theme.${key}`)}
-              />
-            ))}
-          </div>
+          <p class="field__hint">{t.fields.colorsIntro}</p>
+          <div class="grid">{MAIN_COLORS.map(colorField)}</div>
+          {/* Open by itself when one of its colors has an error (the status bar links to it). */}
+          <details class="advanced" open={advancedErrors || undefined}>
+            <summary>{t.fields.advancedColors}</summary>
+            <div class="grid">{ADVANCED_COLORS.map(colorField)}</div>
+          </details>
         </Section>
       )}
       {area === 'texts' && (

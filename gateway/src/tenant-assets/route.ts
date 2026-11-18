@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import * as z from 'zod/mini';
 import type { Tenant, TenantRegistry } from '../config/tenants.js';
+import { textOn } from '../config/contrast.js';
 import type { KeyValueStore } from '../admin/kv.js';
 import { replyError } from '../errors/index.js';
 import { recordInstall } from '../installs/index.js';
@@ -51,6 +52,9 @@ export function loaderConfig(tenant: Tenant, locale: Locale): LoaderConfig {
       position: tenant.launcher.position,
       offsetX: tenant.launcher.offsetX,
       offsetY: tenant.launcher.offsetY,
+      ...(tenant.launcher.color
+        ? { color: tenant.launcher.color, onColor: textOn([tenant.launcher.color]) }
+        : {}),
       ...(iconUrl ? { iconUrl } : {}),
       ...(builtin ? { icon: builtin } : {}),
     },

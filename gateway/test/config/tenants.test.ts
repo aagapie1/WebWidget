@@ -79,10 +79,48 @@ describe('validateTenant / parseTenant', () => {
   });
 
   it('rejects colors below WCAG AA and names the pair and ratio', async () => {
-    const yaml = `${validYaml}theme:\n  accent: '#9fa8ff'\n  accentEnd: '#9fa8ff'\n`;
+    const yaml = `${validYaml}theme:\n  accent: '#9fa8ff'\n  accentEnd: '#9fa8ff'\n  onAccent: '#ffffff'\n`;
     const errors = await errorsOf(yaml);
     expect(errors).toMatch(/onAccent #ffffff and accent #9fa8ff/);
     expect(errors).toMatch(/below 4\.5:1/);
+  });
+
+  it('derives the colors that are not set (E4b.1 UX 9): text on the accent, links, flat header', async () => {
+    const parse = (extra: string) => parseTenant(`${validYaml}${extra}`, env, 'pilot.yaml');
+    // Nothing set: the defaults, as before.
+    expect((await parse('')).theme).toMatchObject({
+      accent: '#3a36d0',
+      accentEnd: '#1166c4',
+      onAccent: '#ffffff',
+      link: '#2c2aa8',
+    });
+    // A light accent: black text on it, links darkened to 4.5:1, a flat header.
+    const light = (await parse("theme:\n  accent: '#2f9e44'\n")).theme;
+    expect(light.onAccent).toBe('#000000');
+    expect(light.accentEnd).toBe('#2f9e44');
+    expect(contrastRatio(light.link, light.background)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(light.link, light.assistantBubble)).toBeGreaterThanOrEqual(4.5);
+    // A dark accent is readable as it is: it is also the link color.
+    expect((await parse("theme:\n  accent: '#0b6e4f'\n")).theme).toMatchObject({
+      onAccent: '#ffffff',
+      link: '#0b6e4f',
+    });
+    // Values that are set win.
+    const set = await parse("theme:\n  accent: '#0b6e4f'\n  link: '#123456'\n");
+    expect(set.theme.link).toBe('#123456');
+  });
+
+  it('launcher.color: its own flat color, at least 3:1 against a white page', async () => {
+    const tenant = await parseTenant(
+      `${validYaml}launcher:\n  color: '#0b6e4f'\n`,
+      env,
+      'pilot.yaml',
+    );
+    expect(tenant.launcher.color).toBe('#0b6e4f');
+    const errors = await errorsOf(`${validYaml}launcher:\n  color: '#ffd400'\n`);
+    expect(errors).toMatch(
+      /launcher\.color: contrast 1\.\d+:1 between the launcher #ffd400 and a white page is below 3:1/,
+    );
   });
 
   it('requires the proactive text when enabled and rejects the unimplemented daily frequency', async () => {

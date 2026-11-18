@@ -74,7 +74,7 @@ describe('form fields (spec §7)', () => {
       />,
     );
     expect(screen.getByLabelText('Fundal').getAttribute('aria-invalid')).toBe('true');
-    fireEvent.click(screen.getByRole('button', { name: 'Revino la implicit' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Revino la implicit/ }));
     expect(onChange).toHaveBeenLastCalledWith(undefined);
   });
 });

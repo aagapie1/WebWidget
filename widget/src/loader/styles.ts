@@ -27,8 +27,8 @@ export const LOADER_CSS = `
   border-radius: 50%;
   display: grid;
   place-items: center;
-  color: var(--cw-on-accent);
-  background: var(--cw-gradient);
+  color: var(--cw-on-launcher, var(--cw-on-accent));
+  background: var(--cw-launcher, var(--cw-gradient));
   box-shadow: 0 8px 24px rgb(0 0 0 / 0.25), 0 2px 6px rgb(0 0 0 / 0.15);
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;

@@ -5,7 +5,7 @@ import {
   USER_AVATAR_ICON_NAMES,
 } from '../protocol/icons.js';
 import { TEXT_KEYS } from '../protocol/texts.js';
-import { contrastRatio } from './contrast.js';
+import { contrastRatio, readableOn, textOn } from './contrast.js';
 
 /**
  * Tenant configuration, schema version 1 (ADR 007). Single source of truth for the YAML files
@@ -73,18 +73,19 @@ export const DEFAULT_THEME = {
   link: '#2c2aa8',
 } as const;
 
-const themeSchema = z.strictObject({
+const themeInputSchema = z.strictObject({
   /** Header gradient start, launcher; default for user bubbles and buttons. */
-  accent: hexColor.default(DEFAULT_THEME.accent),
-  /** Header gradient end (use the same value as `accent` for a flat color). */
-  accentEnd: hexColor.default(DEFAULT_THEME.accentEnd),
-  /** Text and icons on the accent colors. */
-  onAccent: hexColor.default(DEFAULT_THEME.onAccent),
-  text: hexColor.default(DEFAULT_THEME.text),
-  textMuted: hexColor.default(DEFAULT_THEME.textMuted),
-  background: hexColor.default(DEFAULT_THEME.background),
-  assistantBubble: hexColor.default(DEFAULT_THEME.assistantBubble),
-  link: hexColor.default(DEFAULT_THEME.link),
+  accent: hexColor.optional(),
+  /** Header gradient end. Unset: the accent (a flat header), or the default pair. */
+  accentEnd: hexColor.optional(),
+  /** Text and icons on the accent colors. Unset: white or black, whichever contrasts more. */
+  onAccent: hexColor.optional(),
+  text: hexColor.optional(),
+  textMuted: hexColor.optional(),
+  background: hexColor.optional(),
+  assistantBubble: hexColor.optional(),
+  /** Unset: the accent, darkened until it reaches 4.5:1 (or the default link color). */
+  link: hexColor.optional(),
   /** Optional: user message bubbles (default: the accent gradient). */
   userBubble: hexColor.optional(),
   /** Optional: text on user bubbles (default: onAccent). */
@@ -94,7 +95,52 @@ const themeSchema = z.strictObject({
   /** Optional: text and icons on primary buttons (default: onAccent). */
   onButton: hexColor.optional(),
 });
-export type Theme = z.infer<typeof themeSchema>;
+export type ThemeInput = z.infer<typeof themeInputSchema>;
+
+export interface Theme {
+  accent: string;
+  accentEnd: string;
+  onAccent: string;
+  text: string;
+  textMuted: string;
+  background: string;
+  assistantBubble: string;
+  link: string;
+  userBubble?: string | undefined;
+  onUserBubble?: string | undefined;
+  button?: string | undefined;
+  onButton?: string | undefined;
+}
+
+/**
+ * The colors the widget uses (E4b.1 UX 9, option A): the values set, and for the others the
+ * defaults or colors derived from the accent. The same code runs in the gateway and in the admin
+ * preview, so "automatic" values match what visitors see.
+ */
+export function resolveTheme(input: ThemeInput): Theme {
+  const accent = input.accent ?? DEFAULT_THEME.accent;
+  const background = input.background ?? DEFAULT_THEME.background;
+  const assistantBubble = input.assistantBubble ?? DEFAULT_THEME.assistantBubble;
+  const accentEnd = input.accentEnd ?? (input.accent ? accent : DEFAULT_THEME.accentEnd);
+  return {
+    accent,
+    accentEnd,
+    onAccent: input.onAccent ?? textOn([accent, accentEnd]),
+    text: input.text ?? DEFAULT_THEME.text,
+    textMuted: input.textMuted ?? DEFAULT_THEME.textMuted,
+    background,
+    assistantBubble,
+    link:
+      input.link ??
+      (input.accent ? readableOn(accent, [background, assistantBubble]) : DEFAULT_THEME.link),
+    ...(input.userBubble ? { userBubble: input.userBubble } : {}),
+    ...(input.onUserBubble ? { onUserBubble: input.onUserBubble } : {}),
+    ...(input.button ? { button: input.button } : {}),
+    ...(input.onButton ? { onButton: input.onButton } : {}),
+  };
+}
+
+const themeSchema = themeInputSchema.transform(resolveTheme);
 
 export interface ContrastCheck {
   foreground: keyof Theme;
@@ -239,6 +285,8 @@ export const tenantSchema = z
     launcher: z
       .strictObject({
         icon: launcherIconSchema.optional(),
+        /** The launcher's own color (flat). Unset: the accent gradient. Its icon is automatic. */
+        color: hexColor.optional(),
         position: z.enum(['bottom-right', 'bottom-left']).default('bottom-right'),
         offsetX: z.number().int().min(0).max(200).default(24),
         offsetY: z.number().int().min(0).max(200).default(24),
@@ -252,7 +300,7 @@ export const tenantSchema = z
         position: z.enum(['auto', 'bottom-right', 'bottom-left']).default('auto'),
       })
       .default({ width: 380, height: 640, position: 'auto' }),
-    theme: themeSchema.default(DEFAULT_THEME),
+    theme: themeSchema.default(resolveTheme({})),
     texts: z.strictObject({ ro: textsSchema.optional(), en: textsSchema.optional() }).default({}),
     proactive: z
       .strictObject({
@@ -286,6 +334,14 @@ export const tenantSchema = z
       .default({ retentionDays: 90 }),
   })
   .superRefine((tenant, context) => {
+    // The launcher sits on the client's page: 3:1 against white (WCAG 1.4.11).
+    if (tenant.launcher.color && contrastRatio(tenant.launcher.color, '#ffffff') < 3) {
+      context.addIssue({
+        code: 'custom',
+        path: ['launcher', 'color'],
+        message: `contrast ${contrastRatio(tenant.launcher.color, '#ffffff').toFixed(2)}:1 between the launcher ${tenant.launcher.color} and a white page is below 3:1`,
+      });
+    }
     for (const check of contrastChecks(tenant.theme)) {
       const ratio = contrastRatio(check.foregroundColor, check.backgroundColor);
       if (ratio < check.minimum) {
