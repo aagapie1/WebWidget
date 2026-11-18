@@ -1,9 +1,11 @@
-import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import type { FastifyError, FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import type { AppEnv } from '../config/env.js';
 import type { TenantRegistry } from '../config/tenants.js';
+import { adminConfigRoutes, type AdminApiOptions } from './api.js';
 import type { AdminAuthConfig } from './auth-config.js';
-import { can, identityFromClaims, type AdminAction } from './identity.js';
+import { adminError, attachSession, sessionOf } from './guard.js';
+import { identityFromClaims } from './identity.js';
 import type { KeyValueStore } from './kv.js';
 import { pkce, type OidcClient } from './oidc.js';
 import {
@@ -14,7 +16,6 @@ import {
   randomToken,
   safeEqual,
   withinLimit,
-  type AdminSession,
 } from './sessions.js';
 
 export interface AdminRouteOptions {
@@ -23,30 +24,8 @@ export interface AdminRouteOptions {
   store: KeyValueStore;
   oidc: OidcClient;
   tenants: TenantRegistry;
-}
-
-export type AdminErrorCode =
-  | 'unauthenticated'
-  | 'forbidden'
-  | 'forbidden_origin'
-  | 'csrf'
-  | 'rate_limited'
-  | 'not_found'
-  | 'invalid_request';
-
-const STATUS: Record<AdminErrorCode, number> = {
-  unauthenticated: 401,
-  forbidden: 403,
-  forbidden_origin: 403,
-  csrf: 403,
-  rate_limited: 429,
-  not_found: 404,
-  invalid_request: 400,
-};
-
-/** Admin API errors: a stable code; the admin interface translates it (ro/en). */
-export function adminError(reply: FastifyReply, code: AdminErrorCode): FastifyReply {
-  return reply.code(STATUS[code]).send({ error: { code } });
+  /** Configuration API (Postgres, ADR 008); only the session endpoints without it. */
+  api?: AdminApiOptions;
 }
 
 const LIMITS = {
@@ -55,27 +34,6 @@ const LIMITS = {
   /** Admin API calls per session. */
   api: { limit: 600, windowSeconds: 60 },
 };
-
-const sessions = new WeakMap<FastifyRequest, AdminSession>();
-
-/** The session of an authenticated admin request (set by the guard). */
-export function sessionOf(request: FastifyRequest): AdminSession {
-  const session = sessions.get(request);
-  if (!session) throw new Error('admin route without the session guard');
-  return session;
-}
-
-/** Server-side authorization for a tenant (spec §4.3). Replies 403 and returns false if denied. */
-export function authorize(
-  request: FastifyRequest,
-  reply: FastifyReply,
-  tenant: string,
-  action: AdminAction,
-): boolean {
-  if (can(sessionOf(request).identity, tenant, action)) return true;
-  void adminError(reply, 'forbidden');
-  return false;
-}
 
 const loginQuery = z.object({
   org: z.string().max(64),
@@ -99,6 +57,18 @@ export function adminRoutes(app: FastifyInstance, options: AdminRouteOptions): v
 
   void app.register(
     (admin, _opts, done) => {
+      // Admin answers always use the admin error format.
+      admin.setErrorHandler((error: FastifyError, request, reply) => {
+        if (error.code === 'FST_ERR_CTP_BODY_TOO_LARGE') return adminError(reply, 'too_large');
+        if (error.code === 'FST_ERR_CTP_INVALID_MEDIA_TYPE') {
+          return adminError(reply, 'unsupported_type');
+        }
+        const status = error.statusCode ?? 500;
+        if (status >= 400 && status < 500) return adminError(reply, 'invalid_request');
+        request.log.error({ err: error }, 'admin request failed');
+        return adminError(reply, 'internal_error');
+      });
+
       // Admin pages and API (ADR 008): never framed, never cached, no referrer (the callback URL
       // carries the authorization code).
       admin.addHook('onSend', async (_request, reply) => {
@@ -243,7 +213,7 @@ export function adminRoutes(app: FastifyInstance, options: AdminRouteOptions): v
               return adminError(reply, 'csrf');
             }
           }
-          sessions.set(request, session);
+          attachSession(request, session);
         });
 
         guarded.get('/api/session', (request) => {
@@ -279,6 +249,8 @@ export function adminRoutes(app: FastifyInstance, options: AdminRouteOptions): v
           }
           return { redirect };
         });
+
+        if (options.api) adminConfigRoutes(guarded, options.api);
 
         next();
       });

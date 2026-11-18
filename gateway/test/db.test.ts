@@ -44,9 +44,15 @@ describe.skipIf(!appUrl || !ownerUrl)('Postgres storage (ADR 008)', () => {
   });
 
   beforeEach(async () => {
-    await owner.query(
-      'TRUNCATE tenant_config_versions, tenant_config_drafts, tenant_assets, audit_log RESTART IDENTITY',
-    );
+    // Only this file's tenants: other test files use the same database in parallel.
+    for (const table of [
+      'tenant_config_versions',
+      'tenant_config_drafts',
+      'tenant_assets',
+      'audit_log',
+    ]) {
+      await owner.query(`DELETE FROM ${table} WHERE tenant_id = ANY($1)`, [['alpha', 'beta']]);
+    }
     dir = await mkdtemp(join(tmpdir(), 'seed-'));
     for (const id of ['alpha', 'beta']) {
       await writeFile(join(dir, `${id}.yaml`), yaml(id));
@@ -65,14 +71,14 @@ describe.skipIf(!appUrl || !ownerUrl)('Postgres storage (ADR 008)', () => {
     expect(await seedFromYaml(app, dir)).toEqual({ seeded: ['alpha', 'beta'], skipped: [] });
     expect(await seedFromYaml(app, dir)).toEqual({ seeded: [], skipped: ['alpha', 'beta'] });
     const versions = await app.query(
-      'SELECT tenant_id, version, created_by FROM tenant_config_versions ORDER BY 1',
+      "SELECT tenant_id, version, created_by FROM tenant_config_versions WHERE tenant_id IN ('alpha', 'beta') ORDER BY 1",
     );
     expect(versions.rows).toEqual([
       { tenant_id: 'alpha', version: 1, created_by: 'seed:yaml' },
       { tenant_id: 'beta', version: 1, created_by: 'seed:yaml' },
     ]);
     const audit = await app.query(
-      "SELECT tenant_id, action FROM audit_log WHERE action = 'seed' ORDER BY 1",
+      "SELECT tenant_id, action FROM audit_log WHERE action = 'seed' AND tenant_id IN ('alpha', 'beta') ORDER BY 1",
     );
     expect(audit.rows).toHaveLength(2);
   });
@@ -85,7 +91,7 @@ describe.skipIf(!appUrl || !ownerUrl)('Postgres storage (ADR 008)', () => {
     );
     const source = new PostgresTenantSource(app, appUrl ?? '', env, log);
     const tenants = await source.load();
-    expect([...tenants.keys()].sort()).toEqual(['alpha', 'beta']);
+    expect([...tenants.keys()]).toEqual(expect.arrayContaining(['alpha', 'beta']));
     expect(tenants.get('alpha')?.name).toBe('Alpha v2');
     const logo = tenants.get('alpha')?.assets.get('logo.png');
     expect(logo?.url).toMatch(/^\/w\/t\/alpha\/[0-9a-f]{10}-logo\.png$/);

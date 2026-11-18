@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import cookie from '@fastify/cookie';
 import Fastify, { type FastifyInstance } from 'fastify';
 import type { Dispatcher } from 'undici';
+import type { AdminApiOptions } from './admin/api.js';
 import type { AdminAuthConfig } from './admin/auth-config.js';
 import type { KeyValueStore } from './admin/kv.js';
 import type { OidcClient } from './admin/oidc.js';
@@ -23,7 +24,7 @@ export interface BuildAppOptions {
   /** Closing feedback storage (Redis in production, ADR 005). Defaults to in-memory. */
   feedbackStore?: FeedbackStore;
   /** Admin interface (ADR 008); omitted when ADMIN_AUTH_CONFIG is not set. */
-  admin?: { auth: AdminAuthConfig; store: KeyValueStore; oidc: OidcClient };
+  admin?: { auth: AdminAuthConfig; store: KeyValueStore; oidc: OidcClient; api?: AdminApiOptions };
   /** Test hook: route Dify requests through a custom undici dispatcher. */
   difyDispatcher?: Dispatcher;
 }

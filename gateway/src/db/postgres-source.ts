@@ -24,6 +24,19 @@ export class PgAssetSource implements AssetSource {
     return result.rows[0]?.bytes;
   }
 
+  /** With the stored content type (admin thumbnails). */
+  async getWithType(
+    tenantId: string,
+    name: string,
+  ): Promise<{ bytes: Buffer; contentType: string } | undefined> {
+    const result = await this.pool.query<{ bytes: Buffer; content_type: string }>(
+      'SELECT bytes, content_type FROM tenant_assets WHERE tenant_id = $1 AND name = $2',
+      [tenantId, name],
+    );
+    const row = result.rows[0];
+    return row ? { bytes: row.bytes, contentType: row.content_type } : undefined;
+  }
+
   describe(tenantId: string): string {
     return `the images of tenant ${tenantId}`;
   }

@@ -90,6 +90,18 @@ records (no audit screen), the security of §6. Everything else of E4b is E4b.2 
   `preview-` prefix and the gateway logs carry `preview: true`; statistics and exports filter
   them out.
 
+- Implementation notes (step 3):
+  - The admin API never sends or accepts the server fields (`schemaVersion`, `id`, `enabled`,
+    `difyBaseUrl`, `difyApiKeyEnv`). They are copied from the published version on every save,
+    and managed by the platform in E4b.2 (§5.6).
+  - Validation messages name paths only. A missing Dify key variable is reported without its
+    name.
+  - Publishing takes a transaction-level advisory lock per tenant, inserts `latest + 1`, deletes
+    the draft, writes the audit rows and runs `pg_notify` in the same transaction. Every replica,
+    including the publishing one, reloads through LISTEN.
+  - The admin interface requires `TENANT_SOURCE=postgres`; the gateway refuses to start
+    otherwise.
+
 ## Images
 
 - PNG, WebP, JPEG only (no SVG through the admin interface). Real type checked from the magic
@@ -98,6 +110,11 @@ records (no audit screen), the security of §6. Everything else of E4b is E4b.2 
   decompression bombs): this drops EXIF and any other embedded metadata or trailing content, and
   bounds the dimensions. Stored in Postgres, served from `/w/t/<tenant>/<hash>-<name>` with an
   immutable cache like E4 assets.
+- Stored names are content-addressed (`<base>-<sha256[:12]>.<real extension>`), so an upload
+  never changes an image the public widget already uses. Uploads go through the raw request
+  body (no multipart parser). The admin interface shows thumbnails from
+  `/admin/api/tenants/:id/assets/:name`, because draft images are not public before publishing.
+  Deleting images is left to E4b.2 (the application role has no DELETE on `tenant_assets`).
 
 ## Audit
 

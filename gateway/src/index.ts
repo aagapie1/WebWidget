@@ -40,11 +40,14 @@ let adminStore: KeyValueStore | undefined;
 let admin: BuildAppOptions['admin'];
 if (env.ADMIN_AUTH_CONFIG) {
   if (!env.REDIS_URL) throw new Error('ADMIN_AUTH_CONFIG requires REDIS_URL (admin sessions)');
+  if (!database)
+    throw new Error('ADMIN_AUTH_CONFIG requires TENANT_SOURCE=postgres (drafts, versions)');
   adminStore = await RedisKeyValueStore.connect(env.REDIS_URL);
   admin = {
     auth: await loadAdminAuthConfig(resolve(env.ADMIN_AUTH_CONFIG), process.env),
     store: adminStore,
     oidc: new OpenIdClient(env.NODE_ENV !== 'production'),
+    api: { db: database, tenantEnv: process.env },
   };
 }
 
