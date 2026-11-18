@@ -497,6 +497,22 @@ test('validation errors show in the status bar, link to the field and block publ
   expect((await discardDraft(page, 'pilot')).status).toBe(204);
 });
 
+test('the visual choices show a focus ring for the keyboard', async ({ page }) => {
+  await openEditor(page, PILOT_ADMIN);
+  const tiles = page.getByRole('group', { name: 'Avatarul asistentului' });
+  const selected = tiles.getByRole('radio', { checked: true });
+  await selected.focus();
+  await page.keyboard.press('ArrowRight');
+  const focused = tiles.locator('input:focus');
+  await expect(focused).toHaveCount(1);
+  expect(await focused.evaluate((input) => getComputedStyle(input).outlineStyle)).toBe('solid');
+  await page
+    .locator('.option-grid')
+    .first()
+    .screenshot({ path: test.info().outputPath('focus.png') });
+  expect((await discardDraft(page, 'pilot')).status).toBe(204);
+});
+
 // The editor is scanned region by region, each in a fresh page of the same session: a scan of
 // the whole editor at once crashed Firefox in CI ("Page crashed"), even without frames. The
 // preview frame holds the public widget, axe-tested in its own specs, and is left out.
@@ -535,7 +551,10 @@ test('no serious or critical axe violations in the editor', async ({ page, conte
           ? tab.locator('section').filter({ has: tab.locator(region) })
           : tab.locator(region);
         await expect(target.first()).toBeVisible();
-        const selector = region.startsWith('#section-') ? `section:has(> ${region})` : region;
+        // No :has() in the selector (suspected in a Firefox crash under axe).
+        const selector = region.startsWith('#section-')
+          ? `section[aria-labelledby="${region.slice(1)}"]`
+          : region;
         const results = await new AxeBuilder({ page: tab }).include(selector).analyze();
         const serious = results.violations.filter(
           (violation) => violation.impact === 'serious' || violation.impact === 'critical',
