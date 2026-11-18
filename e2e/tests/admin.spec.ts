@@ -576,8 +576,7 @@ async function scanRegion(
       await tab.evaluate(
         ({ base, part, parts }) => {
           const found = document.querySelectorAll(parts.map((item) => `${base} ${item}`).join(','));
-          const target: Element | null = found.item(part);
-          target?.setAttribute('data-axe-part', '');
+          if (part < found.length) found.item(part).setAttribute('data-axe-part', '');
         },
         { base, part: scan.part, parts: PART_SELECTORS },
       );
