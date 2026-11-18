@@ -14,6 +14,7 @@ beforeEach(() => {
     locale: 'ro',
     pageOrigin: 'https://www.primarie.ro',
     preloadWhenIdle: false,
+    loadConfig: () => Promise.resolve(undefined),
   });
 });
 
@@ -53,6 +54,7 @@ describe('loader', () => {
       gatewayOrigin: GATEWAY,
       locale: 'ro',
       pageOrigin: 'https://www.primarie.ro',
+      loadConfig: () => Promise.resolve(undefined),
     });
     expect(iframe()).toBeNull();
     await new Promise((resolve) => setTimeout(resolve, 2100));

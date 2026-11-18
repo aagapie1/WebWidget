@@ -6,6 +6,9 @@ export const en: Texts = {
     close: 'Minimize the virtual assistant',
   },
   frameTitle: 'Virtual assistant',
+  proactive: {
+    close: 'Dismiss message',
+  },
   header: {
     minimize: 'Minimize window',
     newConversation: 'New conversation',

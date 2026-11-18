@@ -5,6 +5,9 @@ export const ro = {
     close: 'Minimizează asistentul virtual',
   },
   frameTitle: 'Asistent virtual',
+  proactive: {
+    close: 'Închide mesajul',
+  },
   header: {
     minimize: 'Minimizează fereastra',
     newConversation: 'Conversație nouă',
