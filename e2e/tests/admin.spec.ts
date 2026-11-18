@@ -551,13 +551,23 @@ test('no serious or critical axe violations in the editor', async ({ page, conte
         await tab.goto(`${ADMIN}/admin/`);
         await expect(tab.getByLabel('Numele clientului')).toBeVisible();
         if (name !== 'Aspect') await area(tab, name);
-        await tab.locator('.preview__frame').evaluate((frame) => {
-          frame.remove();
-        });
+        // The preview's widget is axe-tested in its own specs. For the form regions the whole
+        // preview column goes: next to its large scaled canvas, Firefox crashed in CI while axe
+        // scanned the lower Aspect sections (launcher, window, colors).
+        if (region === '.preview__head') {
+          await tab.locator('.preview__frame').evaluate((frame) => {
+            frame.remove();
+          });
+        } else {
+          await tab.locator('#preview-column').evaluate((column) => {
+            column.remove();
+          });
+        }
         const selector = region.startsWith('#section-')
           ? `section[aria-labelledby="${region.slice(1)}"]`
           : region;
         await expect(tab.locator(selector).first()).toBeVisible();
+        await tab.locator(selector).first().scrollIntoViewIfNeeded();
         const results = await new AxeBuilder({ page: tab }).include(selector).analyze();
         const serious = results.violations.filter(
           (violation) => violation.impact === 'serious' || violation.impact === 'critical',
