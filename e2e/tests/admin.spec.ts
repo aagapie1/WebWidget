@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 import { ADMIN, ADMIN_E2E, DIFY_KEY } from '../constants.js';
 
 /**
@@ -533,53 +533,96 @@ const EDITOR_REGIONS: { area: string; selector: string }[] = [
   { area: 'Aspect', selector: '.preview__head' },
 ];
 
+/** The pieces of a section, scanned one by one in Firefox (see below). */
+const SECTION_PARTS = ['h2', '.field', 'fieldset', '.switch-row', '.contrast'];
+
+/** Scans one region (or the n-th piece of a section) in a fresh page; returns its problems. */
+async function scanRegion(
+  context: BrowserContext,
+  name: string,
+  region: string,
+  part?: number,
+): Promise<string | undefined> {
+  const tab = await context.newPage();
+  try {
+    await tab.goto(`${ADMIN}/admin/`);
+    await expect(tab.getByLabel('Numele clientului')).toBeVisible();
+    if (name !== 'Aspect') await area(tab, name);
+    // The preview's widget is axe-tested in its own specs; its header is scanned on its own.
+    if (region === '.preview__head') {
+      await tab.locator('.preview__frame').evaluate((frame) => {
+        frame.remove();
+      });
+    } else {
+      await tab.locator('#preview-column').evaluate((column) => {
+        column.remove();
+      });
+    }
+    let selector = region.startsWith('#section-')
+      ? `section[aria-labelledby="${region.slice(1)}"]`
+      : region;
+    await expect(tab.locator(selector).first()).toBeVisible();
+    if (part !== undefined) {
+      await tab.evaluate(
+        ({ base, part, parts }) => {
+          const found = document.querySelectorAll(parts.map((item) => `${base} ${item}`).join(','));
+          if (part < found.length) found.item(part).setAttribute('data-axe-part', '');
+        },
+        { base: selector, part, parts: SECTION_PARTS },
+      );
+      selector = '[data-axe-part]';
+    }
+    const results = await new AxeBuilder({ page: tab }).include(selector).analyze();
+    const serious = results.violations.filter(
+      (violation) => violation.impact === 'serious' || violation.impact === 'critical',
+    );
+    return serious.length > 0 ? serious.map((violation) => violation.id).join(', ') : undefined;
+  } catch (error) {
+    return String(error).split('\n')[0] ?? 'error';
+  } finally {
+    await tab.close().catch(() => undefined);
+  }
+}
+
 test('no serious or critical axe violations in the editor', async ({
   page,
   context,
   browserName,
 }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(360_000);
   await openEditor(page, PILOT_ADMIN);
+  // Firefox crashes ("Page crashed") while axe scans an Aspect section as a whole (several rules
+  // trigger it; every piece passes on its own, and the pages work in Firefox). There the Aspect
+  // sections are scanned piece by piece, with every rule; elsewhere as a whole. docs/BACKLOG.md.
+  const pieces = new Map<string, number>();
+  if (browserName === 'firefox') {
+    for (const { area: name, selector } of EDITOR_REGIONS) {
+      if (name !== 'Aspect' || !selector.startsWith('#section-')) continue;
+      const count = await page
+        .locator(
+          SECTION_PARTS.map(
+            (item) => `section[aria-labelledby="${selector.slice(1)}"] ${item}`,
+          ).join(','),
+        )
+        .count();
+      pieces.set(selector, count);
+    }
+  }
   await page.close();
   // Every region is scanned even if one fails, so that one run names all the problems.
   const failures: string[] = [];
   for (const { area: name, selector: region } of EDITOR_REGIONS) {
     await test.step(`axe: ${name} ${region}`, async () => {
-      const tab = await context.newPage();
-      try {
-        await tab.goto(`${ADMIN}/admin/`);
-        await expect(tab.getByLabel('Numele clientului')).toBeVisible();
-        if (name !== 'Aspect') await area(tab, name);
-        // The preview's widget is axe-tested in its own specs; its header is scanned on its own.
-        if (region === '.preview__head') {
-          await tab.locator('.preview__frame').evaluate((frame) => {
-            frame.remove();
-          });
-        } else {
-          await tab.locator('#preview-column').evaluate((column) => {
-            column.remove();
-          });
-        }
-        const selector = region.startsWith('#section-')
-          ? `section[aria-labelledby="${region.slice(1)}"]`
-          : region;
-        await expect(tab.locator(selector).first()).toBeVisible();
-        let builder = new AxeBuilder({ page: tab }).include(selector);
-        // Firefox crashes ("Page crashed") while axe runs aria-allowed-attr on the launcher, window
-        // and colors sections; every field passes on its own (diagnosed in CI, docs/BACKLOG.md).
-        // Chromium and WebKit run the rule on the same DOM.
-        if (browserName === 'firefox') builder = builder.disableRules(['aria-allowed-attr']);
-        const results = await builder.analyze();
-        const serious = results.violations.filter(
-          (violation) => violation.impact === 'serious' || violation.impact === 'critical',
-        );
-        if (serious.length > 0) {
-          failures.push(`${region}: ${serious.map((violation) => violation.id).join(', ')}`);
-        }
-      } catch (error) {
-        failures.push(`${region}: ${String(error).split('\n')[0] ?? ''}`);
-      } finally {
-        await tab.close().catch(() => undefined);
+      const count = pieces.get(region);
+      if (count === undefined) {
+        const problem = await scanRegion(context, name, region);
+        if (problem) failures.push(`${region}: ${problem}`);
+        return;
+      }
+      expect(count, region).toBeGreaterThan(1);
+      for (let part = 0; part < count; part += 1) {
+        const problem = await scanRegion(context, name, region, part);
+        if (problem) failures.push(`${region} piece ${String(part + 1)}: ${problem}`);
       }
     });
   }
