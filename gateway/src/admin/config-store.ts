@@ -13,6 +13,8 @@ export interface PublishedVersion {
 
 export interface Draft {
   config: unknown;
+  /** Increases with every save (optimistic concurrency). */
+  revision: number;
   baseVersion: number | null;
   updatedAt: string;
   updatedBy: string;
@@ -22,6 +24,7 @@ export type AuditAction =
   'draft.save' | 'draft.discard' | 'publish' | 'origins.change' | 'asset.upload';
 
 export class PublishConflictError extends Error {}
+export class DraftConflictError extends Error {}
 
 /**
  * Admin storage (ADR 008) with the application role: versions are INSERT-only, the audit log is
@@ -55,17 +58,19 @@ export class AdminConfigStore {
   async draft(tenant: string): Promise<Draft | undefined> {
     const result = await this.pool.query<{
       config: unknown;
+      revision: number;
       base_version: number | null;
       updated_at: Date;
       updated_by: string;
     }>(
-      'SELECT config, base_version, updated_at, updated_by FROM tenant_config_drafts WHERE tenant_id = $1',
+      'SELECT config, revision, base_version, updated_at, updated_by FROM tenant_config_drafts WHERE tenant_id = $1',
       [tenant],
     );
     const row = result.rows[0];
     return row
       ? {
           config: row.config,
+          revision: row.revision,
           baseVersion: row.base_version,
           updatedAt: row.updated_at.toISOString(),
           updatedBy: row.updated_by,
@@ -73,25 +78,44 @@ export class AdminConfigStore {
       : undefined;
   }
 
+  /**
+   * Saves the draft only if it is still at `expectedRevision` (`null`: no draft yet). Throws
+   * DraftConflictError when someone else saved, published or discarded in between.
+   */
   async saveDraft(
     tenant: string,
     config: unknown,
     baseVersion: number,
+    expectedRevision: number | null,
     actor: AdminIdentity,
     changes: Change[],
-  ): Promise<string> {
+  ): Promise<{ savedAt: string; revision: number }> {
     return this.#transaction(async (client) => {
-      const result = await client.query<{ updated_at: Date }>(
-        `INSERT INTO tenant_config_drafts (tenant_id, config, base_version, updated_at, updated_by)
-         VALUES ($1, $2, $3, now(), $4)
-         ON CONFLICT (tenant_id) DO UPDATE
-           SET config = EXCLUDED.config, base_version = EXCLUDED.base_version,
-               updated_at = EXCLUDED.updated_at, updated_by = EXCLUDED.updated_by
-         RETURNING updated_at`,
-        [tenant, JSON.stringify(config), baseVersion, actor.name],
-      );
-      await audit(client, tenant, actor, 'draft.save', { baseVersion, changes });
-      return (result.rows[0]?.updated_at ?? new Date()).toISOString();
+      const result =
+        expectedRevision === null
+          ? await client.query<{ updated_at: Date; revision: number }>(
+              `INSERT INTO tenant_config_drafts (tenant_id, config, base_version, updated_at, updated_by)
+               VALUES ($1, $2, $3, now(), $4)
+               ON CONFLICT (tenant_id) DO NOTHING
+               RETURNING updated_at, revision`,
+              [tenant, JSON.stringify(config), baseVersion, actor.name],
+            )
+          : await client.query<{ updated_at: Date; revision: number }>(
+              `UPDATE tenant_config_drafts
+                  SET config = $2, base_version = $3, updated_at = now(), updated_by = $4,
+                      revision = revision + 1
+                WHERE tenant_id = $1 AND revision = $5
+                RETURNING updated_at, revision`,
+              [tenant, JSON.stringify(config), baseVersion, actor.name, expectedRevision],
+            );
+      const row = result.rows[0];
+      if (!row) throw new DraftConflictError();
+      await audit(client, tenant, actor, 'draft.save', {
+        baseVersion,
+        revision: row.revision,
+        changes,
+      });
+      return { savedAt: row.updated_at.toISOString(), revision: row.revision };
     });
   }
 

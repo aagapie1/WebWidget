@@ -1,3 +1,6 @@
+import { readFile } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
+import fastifyStatic from '@fastify/static';
 import type { FastifyError, FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import type { AppEnv } from '../config/env.js';
@@ -29,6 +32,8 @@ export interface AdminRouteOptions {
   api?: AdminApiOptions;
   /** Draft preview (needs the configuration API). */
   preview?: PreviewService;
+  /** Built admin interface (`admin/dist`). */
+  distDir: string;
 }
 
 const LIMITS = {
@@ -115,19 +120,47 @@ export function adminRoutes(app: FastifyInstance, options: AdminRouteOptions): v
         return adminError(reply, 'internal_error');
       });
 
-      // Admin pages and API (ADR 008): never framed, never cached, no referrer (the callback URL
-      // carries the authorization code).
+      // Admin pages and API (ADR 008): never framed, not cached (except the hashed bundles), no
+      // referrer (the callback URL carries the authorization code).
       admin.addHook('onSend', async (_request, reply) => {
-        reply
-          .header('cache-control', 'no-store')
-          .header('x-content-type-options', 'nosniff')
-          .header('referrer-policy', 'no-referrer');
+        reply.header('x-content-type-options', 'nosniff').header('referrer-policy', 'no-referrer');
+        if (!reply.hasHeader('cache-control')) reply.header('cache-control', 'no-store');
         if (!reply.hasHeader('content-security-policy')) {
           reply.header(
             'content-security-policy',
             "default-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
           );
         }
+      });
+
+      // The admin interface (separate bundle from the public widget): hashed assets cached
+      // forever, the page itself never cached. Loaded without a session (it shows the login).
+      void admin.register(fastifyStatic, {
+        root: resolve(options.distDir, 'assets'),
+        prefix: '/assets/',
+        decorateReply: false,
+        immutable: true,
+        maxAge: '365d',
+        index: false,
+      });
+      admin.get('/', async (request, reply) => {
+        let html: Buffer;
+        try {
+          html = await readFile(join(options.distDir, 'index.html'));
+        } catch {
+          request.log.error('admin bundle missing: run `pnpm --filter admin build`');
+          return reply
+            .code(503)
+            .type('text/plain; charset=utf-8')
+            .send('Admin interface not built.');
+        }
+        return reply
+          .type('text/html; charset=utf-8')
+          .header(
+            'content-security-policy',
+            "default-src 'self'; img-src 'self' data:; frame-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'",
+          )
+          .send(html);
       });
 
       admin.get('/auth/login', async (request, reply) => {

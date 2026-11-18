@@ -1,3 +1,6 @@
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { parseAdminAuthConfig, type AdminRealm } from '../src/admin/auth-config.js';
@@ -404,5 +407,44 @@ describe('admin sessions', () => {
     expect((await sessions.get(id))?.identity).toEqual(identity);
     now += 61_000;
     expect(await sessions.get(id)).toBeUndefined();
+  });
+});
+
+describe('admin interface page (separate bundle)', () => {
+  it('serves the built page with a strict CSP, its hashed assets cached, and / redirects', async () => {
+    const dist = await mkdtemp(join(tmpdir(), 'admin-dist-'));
+    await mkdir(join(dist, 'assets'));
+    await writeFile(join(dist, 'index.html'), '<!doctype html><title>Admin</title>');
+    await writeFile(join(dist, 'assets', 'index-abc.js'), 'console.log(1)');
+    const app = await buildApp({
+      env: loadEnv({
+        PUBLIC_ORIGIN: ORIGIN,
+        VISITOR_COOKIE_SECRET: 's'.repeat(40),
+        LOG_LEVEL: 'silent',
+        ADMIN_DIST_DIR: dist,
+      }),
+      tenants: new Map(),
+      admin: { auth, store: new MemoryKeyValueStore(), oidc: new FakeOidc() },
+    });
+    try {
+      const page = await app.inject({ url: '/admin/' });
+      expect(page.statusCode).toBe(200);
+      expect(page.body).toContain('<title>Admin</title>');
+      const csp = String(page.headers['content-security-policy']);
+      expect(csp).toContain("default-src 'self'");
+      expect(csp).toContain("frame-ancestors 'none'");
+      expect(csp).not.toContain('unsafe-inline');
+      expect(page.headers['cache-control']).toBe('no-store');
+
+      const asset = await app.inject({ url: '/admin/assets/index-abc.js' });
+      expect(asset.statusCode).toBe(200);
+      expect(asset.headers['cache-control']).toContain('immutable');
+
+      expect((await app.inject({ url: '/' })).headers.location).toBe('/admin/');
+      expect((await app.inject({ url: '/admin' })).statusCode).toBe(200);
+    } finally {
+      await app.close();
+      await rm(dist, { recursive: true, force: true });
+    }
   });
 });

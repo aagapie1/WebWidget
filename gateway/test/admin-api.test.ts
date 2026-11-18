@@ -146,7 +146,7 @@ describe.skipIf(!appUrl || !ownerUrl)('admin configuration API (Postgres)', () =
 
   type ConfigResponse = {
     published: { version: number; config: Record<string, unknown> };
-    draft: { config: Record<string, unknown> } | null;
+    draft: { config: Record<string, unknown>; revision: number } | null;
     errors: string[];
     permissions: Record<string, boolean>;
   };
@@ -163,6 +163,17 @@ describe.skipIf(!appUrl || !ownerUrl)('admin configuration API (Postgres)', () =
         "SELECT action, actor_name, details FROM audit_log WHERE tenant_id = 'gamma' ORDER BY id",
       )
     ).rows;
+
+  type Client = Awaited<ReturnType<typeof as>>;
+  /** Saves from the state the editor last loaded, as the admin interface does. */
+  const saveDraft = async (client: Client, body: { config: Record<string, unknown> }) => {
+    const state = (await client('GET', CONFIG)).json<ConfigResponse>();
+    return client('PUT', `${CONFIG}/draft`, {
+      ...body,
+      baseVersion: state.published.version,
+      draftRevision: state.draft?.revision ?? null,
+    });
+  };
 
   it('returns the editable configuration without the Dify connection or key', async () => {
     const editor = await as('widget-editor');
@@ -207,7 +218,7 @@ describe.skipIf(!appUrl || !ownerUrl)('admin configuration API (Postgres)', () =
     const editor = await as('widget-editor');
     const { published } = (await editor('GET', CONFIG)).json<ConfigResponse>();
     const config = { ...published.config, theme: { accent: '#0b6e4f' } };
-    const saved = await editor('PUT', `${CONFIG}/draft`, { config, baseVersion: 1 });
+    const saved = await saveDraft(editor, { config });
     expect(saved.statusCode).toBe(200);
     expect(saved.json()).toMatchObject({ errors: [] });
     expect((await editor('GET', CONFIG)).json<ConfigResponse>().draft?.config).toMatchObject({
@@ -219,7 +230,7 @@ describe.skipIf(!appUrl || !ownerUrl)('admin configuration API (Postgres)', () =
       error: { code: 'forbidden' },
     });
     // Allowed origins are reserved to widget-admin.
-    const origins = await editor('PUT', `${CONFIG}/draft`, {
+    const origins = await saveDraft(editor, {
       config: { ...config, allowedOrigins: ['https://evil.test'] },
     });
     expect(origins.statusCode).toBe(403);
@@ -237,7 +248,7 @@ describe.skipIf(!appUrl || !ownerUrl)('admin configuration API (Postgres)', () =
       difyApiKeyEnv: 'OTHER_KEY',
       id: 'delta',
     };
-    expect((await admin('PUT', `${CONFIG}/draft`, { config })).statusCode).toBe(200);
+    expect((await saveDraft(admin, { config })).statusCode).toBe(200);
     const result = await admin('POST', `${CONFIG}/publish`, { comment: 'Culori noi' });
     expect(result.json()).toEqual({ version: 2 });
 
@@ -273,7 +284,7 @@ describe.skipIf(!appUrl || !ownerUrl)('admin configuration API (Postgres)', () =
     });
     const { published } = (await admin('GET', CONFIG)).json<ConfigResponse>();
     const config = { ...published.config, theme: { accent: '#3a36d0', onAccent: '#4a46e0' } };
-    const saved = (await admin('PUT', `${CONFIG}/draft`, { config })).json<{ errors: string[] }>();
+    const saved = (await saveDraft(admin, { config })).json<{ errors: string[] }>();
     expect(saved.errors.join('\n')).toMatch(/^theme\.onAccent: contrast/m);
 
     const refused = await admin('POST', `${CONFIG}/publish`, {});
@@ -320,7 +331,7 @@ describe.skipIf(!appUrl || !ownerUrl)('admin configuration API (Postgres)', () =
 
     // The uploaded image is public only once a configuration using it is published.
     const { published } = (await admin('GET', CONFIG)).json<ConfigResponse>();
-    await admin('PUT', `${CONFIG}/draft`, {
+    await saveDraft(admin, {
       config: { ...published.config, launcher: { icon: { type: 'asset', file } } },
     });
     expect((await admin('POST', `${CONFIG}/publish`, {})).statusCode).toBe(200);
@@ -335,7 +346,7 @@ describe.skipIf(!appUrl || !ownerUrl)('admin configuration API (Postgres)', () =
   it('previews the draft through a session-bound token, without changing the public widget', async () => {
     const admin = await as('widget-admin');
     const { published } = (await admin('GET', CONFIG)).json<ConfigResponse>();
-    await admin('PUT', `${CONFIG}/draft`, {
+    await saveDraft(admin, {
       config: { ...published.config, theme: { accent: '#0b6e4f' } },
     });
     const created = await admin('POST', '/admin/api/tenants/gamma/preview-token', {});
@@ -356,6 +367,8 @@ describe.skipIf(!appUrl || !ownerUrl)('admin configuration API (Postgres)', () =
     });
     expect(loader.json<{ theme: { accent: string } }>().theme.accent).toBe('#0b6e4f');
     expect(loader.headers['access-control-allow-origin']).toBe(ORIGIN);
+    // The preview always shows the draft as it is now: never cached by the browser.
+    expect(loader.headers['cache-control']).toBe('no-store');
     expect(await accentOf()).toBe('#3a36d0');
 
     // Preview traffic is marked for Dify (statistics exclude it).
@@ -392,5 +405,64 @@ describe.skipIf(!appUrl || !ownerUrl)('admin configuration API (Postgres)', () =
       403,
     );
     expect((await editor('GET', '/admin/preview?id=<script>')).statusCode).toBe(404);
+  });
+
+  it('refuses a draft save based on an outdated revision instead of overwriting it', async () => {
+    const ana = await as('widget-editor');
+    const ion = await as('widget-admin');
+    const { published } = (await ana('GET', CONFIG)).json<ConfigResponse>();
+
+    // Both start from the published version, with no draft.
+    const first = await ana('PUT', `${CONFIG}/draft`, {
+      config: { ...published.config, name: 'Ana' },
+      baseVersion: 1,
+      draftRevision: null,
+    });
+    expect(first.json()).toMatchObject({ revision: 1 });
+    const stale = await ion('PUT', `${CONFIG}/draft`, {
+      config: { ...published.config, name: 'Ion' },
+      baseVersion: 1,
+      draftRevision: null,
+    });
+    expect(stale.statusCode).toBe(409);
+    expect(stale.json()).toMatchObject({
+      error: {
+        code: 'draft_conflict',
+        publishedVersion: 1,
+        draft: { revision: 1, updatedBy: 'Test widget-editor' },
+      },
+    });
+    // Ana's work is intact; Ana keeps saving from her revision.
+    const state = (await ion('GET', CONFIG)).json<ConfigResponse>();
+    expect(state.draft).toMatchObject({ revision: 1, config: { name: 'Ana' } });
+    const second = await ana('PUT', `${CONFIG}/draft`, {
+      config: { ...published.config, name: 'Ana 2' },
+      baseVersion: 1,
+      draftRevision: 1,
+    });
+    expect(second.json()).toMatchObject({ revision: 2 });
+    expect(
+      (
+        await ion('PUT', `${CONFIG}/draft`, {
+          config: published.config,
+          baseVersion: 1,
+          draftRevision: 1,
+        })
+      ).statusCode,
+    ).toBe(409);
+    // A stale publish (reviewed revision 1, draft now at 2) is refused too.
+    expect((await ion('POST', `${CONFIG}/publish`, { draftRevision: 1 })).json()).toMatchObject({
+      error: { code: 'draft_conflict' },
+    });
+    // After a publish, a draft started from the old version conflicts.
+    expect((await ion('POST', `${CONFIG}/publish`, { draftRevision: 2 })).statusCode).toBe(200);
+    const late = await ana('PUT', `${CONFIG}/draft`, {
+      config: published.config,
+      baseVersion: 1,
+      draftRevision: 2,
+    });
+    expect(late.json()).toMatchObject({
+      error: { code: 'draft_conflict', publishedVersion: 2, draft: null },
+    });
   });
 });

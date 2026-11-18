@@ -8,6 +8,8 @@ const envSchema = z.object({
   TENANTS_DIR: z.string().min(1).default('../config/tenants'),
   /** Built widget (loader.js, app/), served under /w/. */
   WIDGET_DIST_DIR: z.string().min(1).default('../widget/dist'),
+  /** Built admin interface (admin/, ADR 008), served under /admin/. */
+  ADMIN_DIST_DIR: z.string().min(1).default('../admin/dist'),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   /** Redis for closing feedback (and rate limiting in E5). Required in production. */
   REDIS_URL: z.url({ protocol: /^rediss?$/ }).optional(),

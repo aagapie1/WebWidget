@@ -3,7 +3,10 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./protocol": "./src/protocol/index.ts"
+    "./protocol": "./src/protocol/index.ts",
+    "./config-schema": "./src/config/schema.ts",
+    "./contrast": "./src/config/contrast.ts",
+    "./texts": "./src/protocol/texts.ts"
   },
   "scripts": {
     "dev": "tsx watch --env-file-if-exists=.env src/index.ts",
@@ -13,7 +16,8 @@
     "typecheck": "tsc --noEmit",
     "config:check": "tsx src/cli/config-check.ts ../config/tenants ../e2e/tenants",
     "db:migrate": "tsx --env-file-if-exists=.env src/cli/db.ts migrate",
-    "db:seed": "tsx --env-file-if-exists=.env src/cli/db.ts seed"
+    "db:seed": "tsx --env-file-if-exists=.env src/cli/db.ts seed",
+    "dev:admin": "tsx watch --env-file-if-exists=.env --env-file=admin-dev.env src/index.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.5",

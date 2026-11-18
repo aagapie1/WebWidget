@@ -3,7 +3,12 @@ import type pg from 'pg';
 import { z } from 'zod';
 import { validateTenantObject } from '../config/tenants.js';
 import { PgAssetSource } from '../db/postgres-source.js';
-import { AdminConfigStore, PublishConflictError } from './config-store.js';
+import {
+  AdminConfigStore,
+  DraftConflictError,
+  PublishConflictError,
+  type Draft,
+} from './config-store.js';
 import { diff, editableView, mergeServerFields, originsOf, type ConfigObject } from './editable.js';
 import { can } from './identity.js';
 import { IMAGE_LIMITS, processImage } from './images.js';
@@ -22,9 +27,18 @@ export interface AdminApiOptions {
 const tenantParams = z.object({ tenant: z.string().regex(/^[a-z0-9-]{1,64}$/) });
 const draftBody = z.object({
   config: z.record(z.string(), z.unknown()),
-  baseVersion: z.number().int().positive().optional(),
+  /** The published version the editor started from. */
+  baseVersion: z.number().int().positive(),
+  /** The draft revision the editor started from; `null` when there was no draft. */
+  draftRevision: z.number().int().positive().nullable(),
 });
-const publishBody = z.object({ comment: z.string().trim().max(500).optional() }).optional();
+const publishBody = z
+  .object({
+    comment: z.string().trim().max(500).optional(),
+    /** The draft revision the publisher reviewed. */
+    draftRevision: z.number().int().positive().optional(),
+  })
+  .optional();
 const assetQuery = z.object({ name: z.string().max(200).optional() });
 const assetName = z.string().regex(/^[a-z0-9][a-z0-9.-]{0,99}\.(png|jpg|webp|svg)$/);
 
@@ -38,6 +52,16 @@ function adminMessages(errors: readonly string[]): string[] {
       ? 'server: the Dify connection of this tenant is not configured'
       : error,
   );
+}
+
+/** 409 with what the editor needs to explain the conflict (who saved, when). */
+function conflict(reply: FastifyReply, draft: Draft | undefined, publishedVersion: number) {
+  return adminError(reply, 'draft_conflict', {
+    publishedVersion,
+    draft: draft
+      ? { revision: draft.revision, updatedAt: draft.updatedAt, updatedBy: draft.updatedBy }
+      : null,
+  });
 }
 
 export function adminConfigRoutes(
@@ -94,6 +118,7 @@ export function adminConfigRoutes(
       },
       draft: draft
         ? {
+            revision: draft.revision,
             baseVersion: draft.baseVersion,
             updatedAt: draft.updatedAt,
             updatedBy: draft.updatedBy,
@@ -118,7 +143,15 @@ export function adminConfigRoutes(
     const { tenant, published } = found;
     const identity = sessionOf(request).identity;
 
-    const previous = (await store.draft(tenant))?.config ?? published.config;
+    const current = await store.draft(tenant);
+    // Never overwrite work saved by someone else in the meantime (optimistic concurrency).
+    if (
+      body.data.baseVersion !== published.version ||
+      (current?.revision ?? null) !== body.data.draftRevision
+    ) {
+      return conflict(reply, current, published.version);
+    }
+    const previous = current?.config ?? published.config;
     const config = mergeServerFields(body.data.config, published.config);
     // Allowed origins: widget-admin and super-admin only (spec §5.1).
     if (
@@ -128,14 +161,20 @@ export function adminConfigRoutes(
       return adminError(reply, 'forbidden');
     }
     const changes = diff(editableView(previous), editableView(config));
-    const savedAt = await store.saveDraft(
-      tenant,
-      config,
-      body.data.baseVersion ?? published.version,
-      identity,
-      changes,
-    );
-    return { savedAt, errors: await validate(tenant, config) };
+    try {
+      const saved = await store.saveDraft(
+        tenant,
+        config,
+        body.data.baseVersion,
+        body.data.draftRevision,
+        identity,
+        changes,
+      );
+      return { ...saved, errors: await validate(tenant, config) };
+    } catch (error) {
+      if (!(error instanceof DraftConflictError)) throw error;
+      return conflict(reply, await store.draft(tenant), published.version);
+    }
   });
 
   app.delete('/api/tenants/:tenant/config/draft', async (request, reply) => {
@@ -155,6 +194,9 @@ export function adminConfigRoutes(
     const { tenant, published } = found;
     const draft = await store.draft(tenant);
     if (!draft) return adminError(reply, 'no_draft');
+    if (body.data?.draftRevision !== undefined && body.data.draftRevision !== draft.revision) {
+      return conflict(reply, draft, published.version);
+    }
 
     const config: ConfigObject = mergeServerFields(editableView(draft.config), published.config);
     const errors = await validate(tenant, config);

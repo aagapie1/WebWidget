@@ -12,6 +12,7 @@ const STATUS = {
   invalid_request: 400,
   no_draft: 409,
   conflict: 409,
+  draft_conflict: 409,
   invalid_config: 422,
   too_large: 413,
   unsupported_type: 415,

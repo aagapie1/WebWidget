@@ -98,7 +98,10 @@ export function tenantAssetRoutes(app: FastifyInstance, tenants: TenantRegistry)
 
     const body = JSON.stringify(loaderConfig(tenant, query.data.locale));
     const etag = `"${createHash('sha256').update(body).digest('base64url').slice(0, 16)}"`;
-    reply.header('cache-control', 'public, max-age=60').header('etag', etag);
+    // A preview shows the draft as it is now: never served from a cache (ADR 008).
+    reply
+      .header('cache-control', tenant.preview ? 'no-store' : 'public, max-age=60')
+      .header('etag', etag);
     if (request.headers['if-none-match'] === etag) return reply.code(304).send();
     return reply.type('application/json; charset=utf-8').send(body);
   });

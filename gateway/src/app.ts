@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { resolve } from 'node:path';
 import cookie from '@fastify/cookie';
 import Fastify, { type FastifyInstance } from 'fastify';
 import type { Dispatcher } from 'undici';
@@ -150,11 +151,14 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   });
 
   if (options.admin) {
+    // The admin interface lives at /admin/.
+    app.get('/', (_request, reply) => reply.redirect('/admin/', 302));
     adminRoutes(app, {
       env: options.env,
       tenants: options.tenants,
       ...options.admin,
       ...(preview ? { preview } : {}),
+      distDir: resolve(options.env.ADMIN_DIST_DIR),
     });
   }
 
