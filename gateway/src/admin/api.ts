@@ -9,7 +9,14 @@ import {
   PublishConflictError,
   type Draft,
 } from './config-store.js';
-import { diff, editableView, mergeServerFields, originsOf, type ConfigObject } from './editable.js';
+import {
+  diff,
+  editableView,
+  mergeServerFields,
+  nameOf,
+  originsOf,
+  type ConfigObject,
+} from './editable.js';
 import { can } from './identity.js';
 import { IMAGE_LIMITS, processImage } from './images.js';
 import type { PreviewService } from './preview.js';
@@ -139,6 +146,7 @@ export function adminConfigRoutes(
         publish: can(identity, tenant, 'publish'),
         assets: can(identity, tenant, 'assets'),
         origins: can(identity, tenant, 'origins'),
+        name: can(identity, tenant, 'name'),
       },
     };
   });
@@ -167,6 +175,10 @@ export function adminConfigRoutes(
       JSON.stringify(originsOf(config)) !== JSON.stringify(originsOf(previous)) &&
       !can(identity, tenant, 'origins')
     ) {
+      return adminError(reply, 'forbidden');
+    }
+    // The client's name: super-admin only.
+    if (nameOf(config) !== nameOf(previous) && !can(identity, tenant, 'name')) {
       return adminError(reply, 'forbidden');
     }
     const changes = diff(editableView(previous), editableView(config));

@@ -61,11 +61,13 @@ export function identityFromClaims(
   };
 }
 
-export type AdminAction = 'read' | 'edit' | 'publish' | 'assets' | 'origins';
+/** `name`: the client's name is set by the platform (super-admin only, E4b.1 UX 15). */
+export type AdminAction = 'read' | 'edit' | 'publish' | 'assets' | 'origins' | 'name';
 
 /** Server-side authorization on every request (spec §4.3). */
 export function can(identity: AdminIdentity, tenant: string, action: AdminAction): boolean {
   if (identity.role === 'super-admin') return true;
+  if (action === 'name') return false;
   if (identity.tenant !== tenant) return false;
   if (action === 'read' || action === 'edit') return true;
   return identity.role === 'widget-admin';

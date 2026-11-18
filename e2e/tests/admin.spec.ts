@@ -110,6 +110,8 @@ test('a client administrator signs in to their own tenant and cannot reach anoth
   await expect(menu).toContainText('pilot');
   await page.keyboard.press('Escape');
   await expect(menu).toBeHidden();
+  // The client's name is set by the platform team (super-admin).
+  await expect(page.getByLabel('Numele clientului')).toHaveAttribute('readonly', '');
   expect((await api(page, 'GET', '/admin/api/tenants/demo-primarie/config')).status).toBe(403);
   expect(
     (await api(page, 'PUT', '/admin/api/tenants/demo-primarie/config/draft', { config: {} }))
@@ -154,11 +156,13 @@ test('the platform super-admin sees every tenant', async ({ page }) => {
   await expect(tenants.locator('option')).toHaveText(['demo-primarie', 'pilot']);
   await tenants.selectOption('demo-primarie');
   await expect(page.locator('.brand__name')).toHaveText('Primăria e2e');
+  // Only the super-admin may rename a client.
+  await expect(page.getByLabel('Numele clientului')).not.toHaveAttribute('readonly', '');
 });
 
 test('an editor saves the draft but cannot publish (visible reason)', async ({ page }) => {
   await openEditor(page, PILOT_EDITOR);
-  await page.getByLabel('Numele clientului').fill('Pilot de la editor');
+  await page.getByLabel('Numele asistentului').fill('Pilot de la editor');
   await saved(page);
   const publish = publishButton(page);
   await expect(publish).toHaveAttribute('aria-disabled', 'true');
@@ -271,10 +275,10 @@ test('a save based on an outdated draft is refused with a clear message', async 
   try {
     await openEditor(editor, PILOT_EDITOR);
     // The editor saves first...
-    await editor.getByLabel('Numele clientului').fill('Varianta editorului');
+    await editor.getByLabel('Numele asistentului').fill('Varianta editorului');
     await saved(editor);
     // ...then the administrator, who loaded the page before, saves on top of it.
-    await page.getByLabel('Numele clientului').fill('Varianta administratorului');
+    await page.getByLabel('Numele asistentului').fill('Varianta administratorului');
     const alert = page
       .getByRole('alert')
       .filter({ hasText: 'Ciorna a fost modificată de altcineva' });
@@ -282,11 +286,11 @@ test('a save based on an outdated draft is refused with a clear message', async 
     await expect(alert).toContainText('nu au fost salvate');
     // Nothing was overwritten.
     const draft = JSON.parse((await api(page, 'GET', '/admin/api/tenants/pilot/config')).text) as {
-      draft: { config: { name: string } };
+      draft: { config: { identity: { assistantName: string } } };
     };
-    expect(draft.draft.config.name).toBe('Varianta editorului');
+    expect(draft.draft.config.identity.assistantName).toBe('Varianta editorului');
     await alert.getByRole('button', { name: 'Încarcă ciorna actuală' }).click();
-    await expect(page.getByLabel('Numele clientului')).toHaveValue('Varianta editorului');
+    await expect(page.getByLabel('Numele asistentului')).toHaveValue('Varianta editorului');
   } finally {
     expect((await discardDraft(page, 'pilot')).status).toBe(204);
     await editor.close();
@@ -301,12 +305,12 @@ test('an expired session loses nothing: sign in again and back to the form', asy
   // The gateway session ends (expiry); the Keycloak single sign-on session remains.
   await context.clearCookies({ name: /^(__Secure-)?admin$/ });
   const viaKeycloak = page.waitForRequest(/\/realms\/pilot\/protocol\/openid-connect\/auth/);
-  await page.getByLabel('Numele clientului').fill('Scris înainte de expirare');
+  await page.getByLabel('Numele asistentului').fill('Scris înainte de expirare');
   // The single sign-on session at Keycloak brings the browser straight back.
   await viaKeycloak;
   await page.waitForURL(`${ADMIN}/admin/?tenant=pilot`);
   await expect(page.getByText(/au fost restaurate/)).toBeVisible();
-  await expect(page.getByLabel('Numele clientului')).toHaveValue('Scris înainte de expirare');
+  await expect(page.getByLabel('Numele asistentului')).toHaveValue('Scris înainte de expirare');
   await saved(page);
   expect((await discardDraft(page, 'pilot')).status).toBe(204);
 });
@@ -326,7 +330,7 @@ test('the Dify key never appears in the admin interface traffic', async ({ page 
   const previewReloaded = page.waitForResponse(
     (r) => r.url().includes('/api/loader-config') && r.url().includes('--p-'),
   );
-  await page.getByLabel('Numele clientului').fill('Pilot e2e (cheie)');
+  await page.getByLabel('Numele asistentului').fill('Pilot e2e (cheie)');
   await saved(page);
   await previewReloaded;
   // Every answer (pages, bundles, API): neither the key nor the variable that holds it.

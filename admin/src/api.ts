@@ -36,7 +36,7 @@ export interface ConfigState {
     config: Config;
   } | null;
   errors: string[];
-  permissions: { publish: boolean; assets: boolean; origins: boolean };
+  permissions: { publish: boolean; assets: boolean; origins: boolean; name: boolean };
 }
 
 export interface DraftConflict {

@@ -33,7 +33,7 @@ export function configState(overrides: Partial<ConfigState> = {}): ConfigState {
     },
     draft: null,
     errors: [],
-    permissions: { publish: true, assets: true, origins: true },
+    permissions: { publish: true, assets: true, origins: true, name: true },
     ...overrides,
   };
 }

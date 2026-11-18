@@ -230,6 +230,22 @@ describe('Editor', () => {
     expect(await screen.findByLabelText('„Open the virtual assistant”')).toBeTruthy();
   });
 
+  it("shows the client's name read-only without the super-admin right", async () => {
+    const api = fakeApi({
+      config: () =>
+        Promise.resolve({
+          ...configState(),
+          permissions: { publish: true, assets: true, origins: true, name: false },
+        }),
+    });
+    renderWithI18n(<Editor api={api} tenant="pilot" onSessionExpired={vi.fn()} />);
+    const name = await screen.findByLabelText<HTMLInputElement>('Numele clientului');
+    expect(name.readOnly).toBe(true);
+    expect(
+      screen.getByText('Se modifică doar de echipa care administrează platforma.'),
+    ).toBeTruthy();
+  });
+
   it('says under each image where it appears', async () => {
     renderWithI18n(<Editor api={fakeApi()} tenant="pilot" onSessionExpired={vi.fn()} />);
     expect(await screen.findByText('Apare în antetul ferestrei.')).toBeTruthy();

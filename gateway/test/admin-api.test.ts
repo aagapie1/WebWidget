@@ -190,7 +190,12 @@ describe.skipIf(!appUrl || !ownerUrl)('admin configuration API (Postgres)', () =
     });
     expect(body.draft).toBeNull();
     expect(body.errors).toEqual([]);
-    expect(body.permissions).toEqual({ publish: false, assets: false, origins: false });
+    expect(body.permissions).toEqual({
+      publish: false,
+      assets: false,
+      origins: false,
+      name: false,
+    });
     for (const secret of [
       'difyApiKeyEnv',
       'KEY_GAMMA',
@@ -238,6 +243,22 @@ describe.skipIf(!appUrl || !ownerUrl)('admin configuration API (Postgres)', () =
     });
     expect(origins.statusCode).toBe(403);
     expect((await auditRows()).map((row) => row.action)).toEqual(['draft.save']);
+  });
+
+  it("reserves the client's name to the super-admin", async () => {
+    for (const role of ['widget-editor', 'widget-admin'] as const) {
+      const user = await as(role);
+      const { published } = (await user('GET', CONFIG)).json<ConfigResponse>();
+      const renamed = await saveDraft(user, { config: { ...published.config, name: 'Alt nume' } });
+      expect(renamed.statusCode, role).toBe(403);
+    }
+    const root = await as('super-admin');
+    const { published } = (await root('GET', CONFIG)).json<ConfigResponse>();
+    expect((await root('GET', CONFIG)).json<ConfigResponse>().permissions).toMatchObject({
+      name: true,
+    });
+    const renamed = await saveDraft(root, { config: { ...published.config, name: 'Alt nume' } });
+    expect(renamed.statusCode).toBe(200);
   });
 
   it('publishes a valid draft: new version, hot reload without restart, audit with the diff', async () => {
@@ -429,13 +450,13 @@ describe.skipIf(!appUrl || !ownerUrl)('admin configuration API (Postgres)', () =
 
     // Both start from the published version, with no draft.
     const first = await ana('PUT', `${CONFIG}/draft`, {
-      config: { ...published.config, name: 'Ana' },
+      config: { ...published.config, identity: { assistantName: 'Ana' } },
       baseVersion: 1,
       draftRevision: null,
     });
     expect(first.json()).toMatchObject({ revision: 1 });
     const stale = await ion('PUT', `${CONFIG}/draft`, {
-      config: { ...published.config, name: 'Ion' },
+      config: { ...published.config, identity: { assistantName: 'Ion' } },
       baseVersion: 1,
       draftRevision: null,
     });
@@ -449,9 +470,12 @@ describe.skipIf(!appUrl || !ownerUrl)('admin configuration API (Postgres)', () =
     });
     // Ana's work is intact; Ana keeps saving from her revision.
     const state = (await ion('GET', CONFIG)).json<ConfigResponse>();
-    expect(state.draft).toMatchObject({ revision: 1, config: { name: 'Ana' } });
+    expect(state.draft).toMatchObject({
+      revision: 1,
+      config: { identity: { assistantName: 'Ana' } },
+    });
     const second = await ana('PUT', `${CONFIG}/draft`, {
-      config: { ...published.config, name: 'Ana 2' },
+      config: { ...published.config, identity: { assistantName: 'Ana 2' } },
       baseVersion: 1,
       draftRevision: 1,
     });

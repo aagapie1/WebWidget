@@ -274,6 +274,8 @@ export function ConfigForm({
             <TextField
               label={t.fields.name}
               value={str(value('name'))}
+              readOnly={!permissions.name}
+              hint={permissions.name ? undefined : t.fields.nameReadOnly}
               onChange={set('name')}
               errors={errorsFor('name')}
             />

@@ -66,3 +66,8 @@ export function diff(before: unknown, after: unknown, path = '', changes: Change
 export function originsOf(config: unknown): unknown {
   return isObject(config) ? config.allowedOrigins : undefined;
 }
+
+/** The client's name (super-admin only). */
+export function nameOf(config: unknown): unknown {
+  return isObject(config) ? config.name : undefined;
+}

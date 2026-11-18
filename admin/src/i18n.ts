@@ -47,6 +47,7 @@ const ro = {
   } as Record<string, string>,
   fields: {
     name: 'Numele clientului',
+    nameReadOnly: 'Se modifică doar de echipa care administrează platforma.',
     assistantName: 'Numele asistentului',
     assistantNameHint: 'Apare în antetul ferestrei. Implicit: numele clientului.',
     logo: 'Logo',
@@ -379,6 +380,7 @@ const en: Dictionary = {
   },
   fields: {
     name: 'Client name',
+    nameReadOnly: 'Only the platform team can change it.',
     assistantName: 'Assistant name',
     assistantNameHint: 'Shown in the window header. Default: the client name.',
     logo: 'Logo',
