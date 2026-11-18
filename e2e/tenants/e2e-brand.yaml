@@ -1,0 +1,34 @@
+# Second e2e tenant: white-label look, launcher on the left, proactive message after 1 s.
+schemaVersion: 1
+id: e2e-brand
+name: Primăria Test
+difyBaseUrl: ${DIFY_BASE_URL}
+difyApiKeyEnv: DIFY_API_KEY_E2E
+allowedOrigins:
+  - http://127.0.0.1:5180
+identity:
+  assistantName: Asistentul Primăriei
+  logo: logo.svg
+launcher:
+  icon: logo.svg
+  position: bottom-left
+  offsetX: 20
+  offsetY: 20
+window:
+  width: 400
+  height: 600
+theme:
+  accent: '#0b6e4f'
+  accentEnd: '#095c42'
+  link: '#08573f'
+  assistantBubble: '#eef5f1'
+texts:
+  ro:
+    composer.placeholder: Întrebați primăria…
+    launcher.open: Deschide asistentul primăriei
+    header.subtitle: Ghișeu online
+proactive:
+  enabled: true
+  delaySeconds: 1
+  text:
+    ro: Aveți o întrebare? Vă ajut imediat.

@@ -1,0 +1,39 @@
+# Demo client (white-label example): another identity, colors, position and a proactive message.
+# Uses the pilot Dify app. No secrets here.
+schemaVersion: 1
+id: demo-primarie
+name: Primăria Demo
+difyBaseUrl: ${DIFY_BASE_URL}
+difyApiKeyEnv: DIFY_API_KEY_PILOT
+allowedOrigins:
+  - http://localhost:5173
+identity:
+  assistantName: Asistentul Primăriei
+  logo: stema.svg
+  assistantAvatar: stema.svg
+launcher:
+  icon: stema.svg
+  position: bottom-left
+  offsetX: 20
+  offsetY: 20
+window:
+  width: 400
+  height: 620
+theme:
+  accent: '#0b6e4f'
+  accentEnd: '#095c42'
+  onAccent: '#ffffff'
+  link: '#08573f'
+  assistantBubble: '#eef5f1'
+texts:
+  ro:
+    header.subtitle: Primăria Demo · ghișeu online
+    composer.placeholder: Întrebați-ne despre taxe, acte sau program…
+    launcher.open: Deschide asistentul primăriei
+    welcome: Bună ziua! Sunt asistentul virtual al Primăriei Demo. Cu ce vă pot ajuta?
+proactive:
+  enabled: true
+  delaySeconds: 6
+  text:
+    ro: Aveți o întrebare despre taxe sau acte? Vă ajut imediat.
+    en: A question about taxes or documents? I can help right away.
