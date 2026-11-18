@@ -152,7 +152,7 @@ records (no audit screen), the security of §6. Everything else of E4b is E4b.2 
   publishing.
 - **Optimistic concurrency** (migration 002, `tenant_config_drafts.revision`): every draft save
   sends the published version and draft revision it started from. A stale save gets `409
-  draft_conflict` (who saved, when) and nothing is overwritten. Autosave then stops and the
+draft_conflict` (who saved, when) and nothing is overwritten. Autosave then stops and the
   interface offers to load the current draft. Publishing sends the reviewed revision too.
 - **Session expiry**: unsaved edits are kept in `sessionStorage` for that tab only. They hold
   configuration, not personal data, and are cleared after a successful save. The interface signs
