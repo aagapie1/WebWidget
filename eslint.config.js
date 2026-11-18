@@ -22,7 +22,7 @@ export default defineConfig(
     languageOptions: { globals: globals.node },
   },
   {
-    files: ['widget/**/*.{ts,tsx}'],
+    files: ['widget/**/*.{ts,tsx}', 'admin/**/*.{ts,tsx}'],
     languageOptions: { globals: globals.browser },
   },
   {

@@ -136,3 +136,33 @@ records (no audit screen), the security of §6. Everything else of E4b is E4b.2 
 - Draft saves, publishing, image uploads and `allowedOrigins` changes are recorded: user (issuer
   - subject + name), tenant, action, time, differences. Append-only (see roles above). No screen
     in E4b.1.
+
+## Admin interface (step 5)
+
+- Package `admin/` (Preact + Vite), built to `admin/dist` and served by the gateway at `/admin/`
+  (`ADMIN_DIST_DIR`). It is a separate bundle: the widget build is unchanged (its `dist` was
+  compared byte for byte before and after). Admin bundle: about 49 KB gzip; the build fails above
+  200 KB.
+- The page CSP is `default-src 'self'` with no inline scripts or styles. The sign-in button
+  navigates from script, because Chrome applies `form-action 'self'` to the gateway's redirect to
+  the identity provider.
+- Validation uses the gateway's own Zod schema and contrast rules (`gateway/config-schema`,
+  `gateway/contrast`), with messages in Romanian and English next to each field
+  (`aria-describedby`). Contrast errors are shown on both colors of a failing pair and block
+  publishing.
+- **Optimistic concurrency** (migration 002, `tenant_config_drafts.revision`): every draft save
+  sends the published version and draft revision it started from. A stale save gets `409
+  draft_conflict` (who saved, when) and nothing is overwritten. Autosave then stops and the
+  interface offers to load the current draft. Publishing sends the reviewed revision too.
+- **Session expiry**: unsaved edits are kept in `sessionStorage` for that tab only. They hold
+  configuration, not personal data, and are cleared after a successful save. The interface signs
+  in again and comes back to the same tenant. The restored edits are saved from their original
+  base, so a concurrent change is still detected.
+- Publishing: `widget-editor` sees the button with `aria-disabled` and the reason next to it.
+  Confirmation lists the changed sections; viewing the differences comes in E4b.2. The save
+  state is a polite live region.
+- Preview answers (`loader-config` of a preview id) are `no-store`. Without this, the browser
+  cache showed the previous draft for up to 60 seconds.
+- Local run: `pnpm --filter gateway dev:admin` (gateway on :3100 with Postgres, Redis, Keycloak;
+  `gateway/admin-dev.env`) after `pnpm services:up`, `pnpm db:migrate`, `pnpm db:seed` and
+  `pnpm --filter admin build`.
