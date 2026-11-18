@@ -56,6 +56,15 @@ describe('App', () => {
     expect(live?.textContent).toBe('Programul este **8–16**.');
   });
 
+  it('does not take the focus when it mounts (the admin preview frame is visible)', () => {
+    const outside = document.createElement('input');
+    document.body.append(outside);
+    outside.focus();
+    setup([]);
+    expect(document.activeElement).toBe(outside);
+    outside.remove();
+  });
+
   it('hides on Escape (no focus trap) and from the minimize button', () => {
     const { onHide } = setup([]);
     fireEvent.keyDown(document, { key: 'Escape' });

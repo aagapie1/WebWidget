@@ -60,7 +60,14 @@ export function App({
   }, [registerFocus]);
 
   // Moving between views moves focus to the new view (its heading, or the input in the chat).
+  // Not on mount: opening the window focuses through `shown`, and a visible frame (the admin
+  // preview) must not take the focus from the page around it.
+  const mounted = useRef(false);
   useEffect(() => {
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
+    }
     if (view === 'chat') input.current?.focus();
     else heading.current?.focus();
   }, [view]);
