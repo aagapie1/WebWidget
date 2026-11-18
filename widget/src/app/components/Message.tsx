@@ -48,7 +48,7 @@ export function Message({
   return (
     <li class={`message message--${message.author} message--${message.status}`} aria-busy={busy}>
       {(message.author === 'assistant' || message.author === 'operator') && (
-        <Avatar url={identity?.assistantAvatarUrl} size="small" />
+        <Avatar avatar={identity?.assistantAvatar} size="small" />
       )}
       <div class="message__body">
         <div class="message__bubble">
@@ -82,8 +82,8 @@ export function Message({
           />
         )}
       </div>
-      {message.author === 'user' && identity?.userAvatarUrl && (
-        <Avatar url={identity.userAvatarUrl} size="small" />
+      {message.author === 'user' && identity?.userAvatar && identity.userAvatar.kind !== 'none' && (
+        <Avatar avatar={identity.userAvatar} size="small" />
       )}
     </li>
   );

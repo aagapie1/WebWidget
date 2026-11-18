@@ -90,7 +90,9 @@ export function App({
         assistantName={assistantName}
         texts={texts}
         canClose={view === 'chat' && state.conversationId !== undefined}
-        imageUrl={identity.logoUrl ?? identity.assistantAvatarUrl}
+        avatar={
+          identity.logoUrl ? { kind: 'image', url: identity.logoUrl } : identity.assistantAvatar
+        }
         onShowConversations={() => {
           setView('conversations');
           void controller.refreshConversations();

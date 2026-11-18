@@ -4,6 +4,11 @@
  * Browser-safe: no Node imports. Written with `zod/mini` to keep the widget bundle small (ADR 004).
  */
 import * as z from 'zod/mini';
+import {
+  ASSISTANT_AVATAR_ICON_NAMES,
+  LAUNCHER_ICON_NAMES,
+  USER_AVATAR_ICON_NAMES,
+} from './icons.js';
 
 export { SseParser, type SseMessage } from './sse.js';
 export {
@@ -127,6 +132,21 @@ export const themeSchema = z.object({
 });
 export type WidgetTheme = z.infer<typeof themeSchema>;
 
+/**
+ * How the chat window draws an avatar (E4b.1 UX): an image, a built-in icon on the accent color,
+ * initials on the accent color, or nothing.
+ */
+export const avatarSchema = z.union([
+  z.object({ kind: z.literal('image'), url: assetUrlSchema }),
+  z.object({
+    kind: z.literal('icon'),
+    name: z.enum([...ASSISTANT_AVATAR_ICON_NAMES, ...USER_AVATAR_ICON_NAMES]),
+  }),
+  z.object({ kind: z.literal('initials'), text: z.string().check(z.maxLength(3)) }),
+  z.object({ kind: z.literal('none') }),
+]);
+export type WidgetAvatar = z.infer<typeof avatarSchema>;
+
 export const widgetConfigSchema = z.object({
   tenant: tenantIdSchema,
   locale: localeSchema,
@@ -138,13 +158,15 @@ export const widgetConfigSchema = z.object({
   theme: themeSchema,
   identity: z.object({
     logoUrl: z.optional(assetUrlSchema),
-    assistantAvatarUrl: z.optional(assetUrlSchema),
-    userAvatarUrl: z.optional(assetUrlSchema),
+    assistantAvatar: avatarSchema,
+    userAvatar: avatarSchema,
   }),
   /** Tenant overrides of UI texts for this locale (known keys only). */
   texts: z.record(z.string(), z.string()),
   /** Ask Dify for suggested questions after each answer (extra model call, off by default). */
   suggestionsAfterAnswer: z.boolean(),
+  /** Admin preview of a draft (ADR 008): the window shows a sample conversation. */
+  preview: z.optional(z.boolean()),
 });
 
 /** `GET /api/loader-config`: what the host-page loader needs before the iframe exists. */
@@ -155,6 +177,8 @@ export const loaderConfigSchema = z.object({
     offsetX: z.number(),
     offsetY: z.number(),
     iconUrl: z.optional(assetUrlSchema),
+    /** Built-in icon (when there is no uploaded image). */
+    icon: z.optional(z.enum(LAUNCHER_ICON_NAMES)),
   }),
   window: z.object({
     width: z.number(),
@@ -240,3 +264,4 @@ export type WidgetConfig = z.infer<typeof widgetConfigSchema>;
 
 /** `GET /api/messages/:id/suggested` (tenants with `behavior.suggestionsAfterAnswer`). */
 export const suggestedQuestionsSchema = z.object({ questions: z.array(z.string()) });
+export * from './icons.js';

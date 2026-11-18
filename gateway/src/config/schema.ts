@@ -1,4 +1,9 @@
 import { z } from 'zod';
+import {
+  ASSISTANT_AVATAR_ICON_NAMES,
+  LAUNCHER_ICON_NAMES,
+  USER_AVATAR_ICON_NAMES,
+} from '../protocol/icons.js';
 import { TEXT_KEYS } from '../protocol/texts.js';
 import { contrastRatio } from './contrast.js';
 
@@ -32,12 +37,14 @@ const originSchema = z.string().refine(
 
 const textValue = z.string().trim().min(1).max(2000);
 /** Known keys only: an unknown key is an error (strict object). */
-const textsSchema = z.strictObject(
-  Object.fromEntries(TEXT_KEYS.map((key) => [key, textValue.optional()])) as Record<
+const textsSchema = z.strictObject({
+  ...(Object.fromEntries(TEXT_KEYS.map((key) => [key, textValue.optional()])) as Record<
     (typeof TEXT_KEYS)[number],
     z.ZodOptional<typeof textValue>
-  >,
-);
+  >),
+  /** Starter questions for this language (E4b.1 UX); empty: the assistant's own (Dify). */
+  suggestedQuestions: z.array(z.string().trim().min(1).max(200)).max(5).optional(),
+});
 
 const localized = z.strictObject({ ro: textValue, en: textValue.optional() });
 
@@ -137,8 +144,8 @@ export function contrastChecks(theme: Theme): ContrastCheck[] {
   });
 }
 
-/** Built-in launcher icons; the full set arrives with E4b. Unknown names are rejected. */
-export const BUILTIN_ICONS = ['chat'] as const;
+/** Built-in launcher icons (Lucide, bundled in the widget). Unknown names are rejected. */
+export const BUILTIN_ICONS = LAUNCHER_ICON_NAMES;
 
 /** `{ type: 'builtin', name }` or `{ type: 'asset', file }`; a bare file name is the asset form. */
 const launcherIconSchema = z.union([
@@ -149,6 +156,38 @@ const launcherIconSchema = z.union([
   ]),
 ]);
 export type LauncherIcon = z.infer<typeof launcherIconSchema>;
+
+const assetAvatar = z.strictObject({ type: z.literal('asset'), file: assetNameSchema });
+const initialsAvatar = z.strictObject({ type: z.literal('initials') });
+const noAvatar = z.strictObject({ type: z.literal('none') });
+
+/**
+ * Assistant avatar (E4b.1 UX): initials of the assistant name on the accent color (default when
+ * absent), a generic icon, an uploaded image or none. A bare file name is the image form.
+ */
+const assistantAvatarSchema = z.union([
+  assetNameSchema.transform((file) => ({ type: 'asset' as const, file })),
+  z.discriminatedUnion('type', [
+    assetAvatar,
+    initialsAvatar,
+    noAvatar,
+    z.strictObject({ type: z.literal('builtin'), name: z.enum(ASSISTANT_AVATAR_ICON_NAMES) }),
+  ]),
+]);
+export type AssistantAvatar = z.infer<typeof assistantAvatarSchema>;
+
+/** Visitor avatar: none (default), "Tu"/"You", a generic silhouette or an uploaded image. */
+const userAvatarSchema = z.union([
+  z.literal('none').transform(() => ({ type: 'none' as const })),
+  assetNameSchema.transform((file) => ({ type: 'asset' as const, file })),
+  z.discriminatedUnion('type', [
+    assetAvatar,
+    initialsAvatar,
+    noAvatar,
+    z.strictObject({ type: z.literal('builtin'), name: z.enum(USER_AVATAR_ICON_NAMES) }),
+  ]),
+]);
+export type UserAvatar = z.infer<typeof userAvatarSchema>;
 
 export const PRESENTATION_SECTIONS = [
   'identity',
@@ -178,11 +217,11 @@ export const tenantSchema = z
         /** Shown in the header; defaults to `name`. */
         assistantName: z.string().trim().min(1).max(80).optional(),
         logo: assetNameSchema.optional(),
-        assistantAvatar: assetNameSchema.optional(),
-        /** An image, or `none` (default) for no user avatar. */
-        userAvatar: z.union([assetNameSchema, z.literal('none')]).default('none'),
+        /** Default when absent: the initials of the assistant name. */
+        assistantAvatar: assistantAvatarSchema.optional(),
+        userAvatar: userAvatarSchema.default({ type: 'none' }),
       })
-      .default({ userAvatar: 'none' }),
+      .default({ userAvatar: { type: 'none' } }),
     launcher: z
       .strictObject({
         icon: launcherIconSchema.optional(),

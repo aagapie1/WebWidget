@@ -142,8 +142,11 @@ describe('GET /api/widget-config (E4)', () => {
       suggestionsAfterAnswer: true,
     });
     expect(config.identity.logoUrl).toMatch(/-logo\.svg$/);
-    expect(config.identity.assistantAvatarUrl).toMatch(/-avatar\.png$/);
-    expect(config.identity.userAvatarUrl).toBeUndefined();
+    expect(config.identity.assistantAvatar).toEqual({
+      kind: 'image',
+      url: expect.stringMatching(/-avatar\.png$/) as unknown,
+    });
+    expect(config.identity.userAvatar).toEqual({ kind: 'none' });
     expect(config.texts).not.toHaveProperty('welcome');
   });
 });

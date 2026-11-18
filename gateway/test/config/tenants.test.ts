@@ -54,7 +54,7 @@ describe('validateTenant / parseTenant', () => {
     expect(tenant.window).toEqual({ width: 380, height: 640, position: 'auto' });
     expect(tenant.enabled).toBe(true);
     expect(tenant.launcher.icon).toBeUndefined();
-    expect(tenant.identity.userAvatar).toBe('none');
+    expect(tenant.identity.userAvatar).toEqual({ type: 'none' });
     expect(tenant.proactive).toMatchObject({
       enabled: false,
       frequency: 'session',
@@ -315,6 +315,60 @@ describe('E4 completions (schema version 1, all optional)', () => {
     expect(
       await errorsOf(`${validYaml}launcher:\n  icon:\n    type: builtin\n    name: rocket\n`),
     ).toMatch(/launcher\.icon/);
+  });
+
+  it('accepts every built-in launcher icon of the visual set', async () => {
+    for (const name of ['chat-dots', 'help', 'info', 'headset', 'landmark', 'sparkles']) {
+      const tenant = await parseTenant(
+        `${validYaml}launcher:\n  icon:\n    type: builtin\n    name: ${name}\n`,
+        env,
+        'pilot.yaml',
+      );
+      expect(tenant.launcher.icon).toEqual({ type: 'builtin', name });
+    }
+  });
+
+  it('avatars: initials, built-in icons, images (also the legacy forms) or none', async () => {
+    const parse = (identity: string) =>
+      validateTenant(`${validYaml}identity:\n${identity}`, { env, fileName: 'pilot.yaml' });
+    const forms = await parse(
+      '  assistantAvatar:\n    type: builtin\n    name: bot\n  userAvatar:\n    type: initials\n',
+    );
+    expect(forms.tenant?.identity).toMatchObject({
+      assistantAvatar: { type: 'builtin', name: 'bot' },
+      userAvatar: { type: 'initials' },
+    });
+    // Version 1 files written before E4b keep working.
+    const legacy = await parse('  assistantAvatar: avatar.png\n  userAvatar: none\n');
+    expect(legacy.tenant?.identity).toMatchObject({
+      assistantAvatar: { type: 'asset', file: 'avatar.png' },
+      userAvatar: { type: 'none' },
+    });
+    expect((await parse('  userAvatar:\n    type: builtin\n    name: person\n')).errors).toEqual(
+      [],
+    );
+    expect(
+      await errorsOf(
+        `${validYaml}identity:\n  assistantAvatar:\n    type: builtin\n    name: person\n`,
+      ),
+    ).toMatch(/identity\.assistantAvatar/);
+  });
+
+  it('starter questions per language: at most 5, each 1–200 characters', async () => {
+    // validYaml ends inside texts.ro: the questions belong to that block.
+    const questions =
+      '    suggestedQuestions:\n      - Care este programul?\n      - Ce acte îmi trebuie?\n';
+    const tenant = await parseTenant(validYaml + questions, env, 'pilot.yaml');
+    expect(tenant.texts.ro?.suggestedQuestions).toEqual([
+      'Care este programul?',
+      'Ce acte îmi trebuie?',
+    ]);
+    const six = Array.from({ length: 6 }, (_, i) => '      - Întrebarea ' + String(i) + '\n').join(
+      '',
+    );
+    expect(await errorsOf(validYaml + '    suggestedQuestions:\n' + six)).toMatch(
+      /texts\.ro\.suggestedQuestions/,
+    );
   });
 
   it('enabled defaults to true and can be turned off', async () => {

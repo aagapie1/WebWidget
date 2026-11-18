@@ -9,6 +9,7 @@ import { errorResponseSchema, loaderConfigSchema, type LoaderConfig } from 'gate
 import { parseLocale, texts } from '../app/i18n/index.js';
 import { appMessageSchema, message, type LoaderMessage } from '../shared/messages.js';
 import { LOADER_CSS } from './styles.js';
+import { iconElement, LAUNCHER_ICONS } from '../shared/icons/index.js';
 
 // Static markup only (no external data): safe to assign as HTML.
 const ICON_CHAT =
@@ -266,6 +267,9 @@ export function mountLoader(options: LoaderOptions, doc: Document = document): L
         image.alt = ''; // decorative: the button has its own label
         image.className = 'launcher__image';
         openIcon.replaceChildren(image);
+      } else if (config.launcher.icon) {
+        // Built-in icon from the bundled set (the default `chat` icon is already drawn).
+        openIcon.replaceChildren(iconElement(doc, LAUNCHER_ICONS[config.launcher.icon], 28));
       }
       if (config.proactive) scheduleProactive(config.proactive);
     }

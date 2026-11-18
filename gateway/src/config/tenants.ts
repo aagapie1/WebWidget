@@ -199,6 +199,11 @@ export async function validateTenantObject(
   return { tenant: { ...config, difyApiKey, assets }, errors };
 }
 
+/** The image file of an avatar, when it is an uploaded image. */
+export function assetFile(avatar: { type: string; file?: string } | undefined): string | undefined {
+  return avatar?.type === 'asset' ? avatar.file : undefined;
+}
+
 /** Checks referenced asset files; a missing or invalid one is dropped (and reported). */
 async function resolveAssets(
   config: Omit<TenantConfig, 'difyApiKeyEnv'>,
@@ -207,11 +212,8 @@ async function resolveAssets(
 ): Promise<Map<string, TenantAsset>> {
   const references: [string, string | undefined][] = [
     ['identity.logo', config.identity.logo],
-    ['identity.assistantAvatar', config.identity.assistantAvatar],
-    [
-      'identity.userAvatar',
-      config.identity.userAvatar === 'none' ? undefined : config.identity.userAvatar,
-    ],
+    ['identity.assistantAvatar', assetFile(config.identity.assistantAvatar)],
+    ['identity.userAvatar', assetFile(config.identity.userAvatar)],
     [
       'launcher.icon',
       config.launcher.icon?.type === 'asset' ? config.launcher.icon.file : undefined,

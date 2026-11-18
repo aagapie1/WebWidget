@@ -146,7 +146,7 @@ describe('GET /api/widget-config', () => {
   it('uses the identity name and the tenant welcome text', async () => {
     h = await startHarness({
       tenant: {
-        identity: { assistantName: 'Ana', userAvatar: 'none' },
+        identity: { assistantName: 'Ana', userAvatar: { type: 'none' } },
         texts: { en: { welcome: 'Hello!' } },
       },
     });
@@ -159,6 +159,69 @@ describe('GET /api/widget-config', () => {
       welcomeMessage: 'Hello!',
       suggestedQuestions: ['Care e programul?', 'Cum mă înscriu?'],
     });
+  });
+
+  it('default assistant avatar: initials of the assistant name; visitor "Tu"/"You"', async () => {
+    h = await startHarness({
+      tenant: {
+        identity: { assistantName: 'Asistentul Primăriei', userAvatar: { type: 'initials' } },
+        texts: {},
+      },
+    });
+    h.dify.handler = (_req, res) => res.writeHead(200).end(parameters);
+    const ro = (await (await fetch(`${h.url}/api/widget-config?tenant=pilot`)).json()) as {
+      identity: unknown;
+    };
+    expect(ro.identity).toEqual({
+      assistantAvatar: { kind: 'initials', text: 'AP' },
+      userAvatar: { kind: 'initials', text: 'Tu' },
+    });
+    const en = (await (
+      await fetch(`${h.url}/api/widget-config?tenant=pilot&locale=en`)
+    ).json()) as { identity: { userAvatar: unknown } };
+    expect(en.identity.userAvatar).toEqual({ kind: 'initials', text: 'You' });
+  });
+
+  it('built-in avatars and the tenant starter questions (else the assistant ones)', async () => {
+    h = await startHarness({
+      tenant: {
+        identity: {
+          assistantAvatar: { type: 'builtin', name: 'landmark' },
+          userAvatar: { type: 'builtin', name: 'person' },
+        },
+        texts: { ro: { suggestedQuestions: ['Unde depun actele?'] } },
+      },
+    });
+    h.dify.handler = (_req, res) => res.writeHead(200).end(parameters);
+    expect(await (await fetch(`${h.url}/api/widget-config?tenant=pilot`)).json()).toMatchObject({
+      identity: {
+        assistantAvatar: { kind: 'icon', name: 'landmark' },
+        userAvatar: { kind: 'icon', name: 'person' },
+      },
+      suggestedQuestions: ['Unde depun actele?'],
+    });
+    // No list for English: the assistant's own questions.
+    expect(
+      await (await fetch(`${h.url}/api/widget-config?tenant=pilot&locale=en`)).json(),
+    ).toMatchObject({ suggestedQuestions: ['Care e programul?', 'Cum mă înscriu?'] });
+  });
+
+  it('sends a built-in launcher icon name to the loader (the default chat icon is implicit)', async () => {
+    h = await startHarness({
+      tenant: {
+        launcher: {
+          position: 'bottom-right',
+          offsetX: 24,
+          offsetY: 24,
+          icon: { type: 'builtin', name: 'headset' },
+        },
+      },
+    });
+    const config = (await (await fetch(`${h.url}/api/loader-config?tenant=pilot`)).json()) as {
+      launcher: { icon?: string; iconUrl?: string };
+    };
+    expect(config.launcher.icon).toBe('headset');
+    expect(config.launcher.iconUrl).toBeUndefined();
   });
 
   it('still answers with an empty welcome when Dify is down', async () => {
@@ -179,5 +242,16 @@ describe('GET /api/widget-config', () => {
     h = await startHarness();
     const text = await (await fetch(`${h.url}/api/widget-config?tenant=pilot`)).text();
     expect(text).not.toContain('app-');
+  });
+});
+
+describe('initials', () => {
+  it('takes the first letter of the first two words, keeping Romanian letters', async () => {
+    const { initials } = await import('../src/widget-config/route.js');
+    expect(initials('Asistentul Primăriei')).toBe('AP');
+    expect(initials('ștefan')).toBe('Ș');
+    expect(initials('  Pilot  ')).toBe('P');
+    expect(initials('— 123 ajutor')).toBe('1A');
+    expect(initials('')).toBe('?');
   });
 });

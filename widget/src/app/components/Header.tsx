@@ -1,3 +1,4 @@
+import type { WidgetAvatar } from 'gateway/protocol';
 import type { Texts } from '../i18n/index.js';
 import { Avatar } from './Avatar.js';
 import { CheckCircleIcon, ChevronDownIcon, ListIcon } from './icons.js';
@@ -7,8 +8,8 @@ export interface HeaderProps {
   texts: Texts;
   /** Shows "Închide conversația" only when there is a conversation to close. */
   canClose: boolean;
-  /** Logo, else assistant avatar, else the default icon. */
-  imageUrl?: string | undefined;
+  /** Logo (as an image), else the assistant avatar, else the default icon. */
+  avatar?: WidgetAvatar | undefined;
   onShowConversations: () => void;
   onCloseConversation: () => void;
   onHide: () => void;
@@ -19,7 +20,7 @@ export function Header({
   assistantName,
   texts,
   canClose,
-  imageUrl,
+  avatar,
   onShowConversations,
   onCloseConversation,
   onHide,
@@ -27,7 +28,7 @@ export function Header({
   return (
     <header class="header">
       <div class="header__bar">
-        <Avatar url={imageUrl} size="large" />
+        <Avatar avatar={avatar} size="large" />
         <div class="header__titles">
           <h1 class="header__title">{assistantName}</h1>
           <p class="header__subtitle">

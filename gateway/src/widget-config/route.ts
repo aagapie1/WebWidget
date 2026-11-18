@@ -8,8 +8,10 @@ import {
   tenantIdSchema,
   type ErrorResponse,
   type Locale,
+  type WidgetAvatar,
   type WidgetConfig,
 } from '../protocol/index.js';
+import type { AvatarIconName } from '../protocol/icons.js';
 import type { TextKey } from '../protocol/texts.js';
 import { assetUrl, textOverrides } from '../tenant-assets/route.js';
 
@@ -82,18 +84,64 @@ export function widgetConfigRoute(app: FastifyInstance, tenants: TenantRegistry)
       locale,
       assistantName: tenant.identity.assistantName ?? tenant.name,
       welcomeMessage: text(tenant, locale, 'welcome') ?? defaults.welcome,
-      suggestedQuestions: defaults.suggestedQuestions,
+      // The tenant's starter questions for this language, otherwise the assistant's (Dify).
+      suggestedQuestions: tenant.texts[locale]?.suggestedQuestions ?? defaults.suggestedQuestions,
       theme: tenant.theme,
       identity: {
         ...optional('logoUrl', assetUrl(tenant, tenant.identity.logo)),
-        ...optional('assistantAvatarUrl', assetUrl(tenant, tenant.identity.assistantAvatar)),
-        ...optional('userAvatarUrl', assetUrl(tenant, tenant.identity.userAvatar)),
+        assistantAvatar: avatar(
+          tenant,
+          tenant.identity.assistantAvatar ?? { type: 'initials' },
+          initials(tenant.identity.assistantName ?? tenant.name),
+        ),
+        userAvatar: avatar(tenant, tenant.identity.userAvatar, locale === 'en' ? 'You' : 'Tu'),
       },
       texts: textOverrides(tenant, locale),
       suggestionsAfterAnswer: tenant.behavior.suggestionsAfterAnswer,
+      ...(tenant.preview ? { preview: true } : {}),
     };
     return reply.header('cache-control', 'no-store').send(config);
   });
+}
+
+type AvatarSetting =
+  | { type: 'asset'; file: string }
+  | { type: 'builtin'; name: AvatarIconName }
+  | { type: 'initials' }
+  | { type: 'none' };
+
+/** How the chat window draws an avatar; a missing image falls back to the initials. */
+function avatar(tenant: Tenant, setting: AvatarSetting, initialsText: string): WidgetAvatar {
+  switch (setting.type) {
+    case 'asset': {
+      const url = assetUrl(tenant, setting.file);
+      return url ? { kind: 'image', url } : { kind: 'initials', text: initialsText };
+    }
+    case 'builtin':
+      return { kind: 'icon', name: setting.name };
+    case 'initials':
+      return { kind: 'initials', text: initialsText };
+    case 'none':
+      return { kind: 'none' };
+  }
+}
+
+const graphemes = new Intl.Segmenter('ro', { granularity: 'grapheme' });
+
+/** "Asistentul Primăriei" → "AP"; one word → its first letter. */
+export function initials(name: string): string {
+  const letters = name
+    .split(/\s+/)
+    .map((word) => {
+      // Graphemes, not code units: "Ștefan" → "Ș".
+      for (const { segment } of graphemes.segment(word)) {
+        if (/\p{L}|\p{N}/u.test(segment)) return segment;
+      }
+      return undefined;
+    })
+    .filter((char): char is string => char !== undefined)
+    .slice(0, 2);
+  return (letters.join('') || '?').toLocaleUpperCase('ro');
 }
 
 function text(tenant: Tenant, locale: Locale, key: TextKey): string | undefined {
