@@ -54,6 +54,7 @@ export function fakeApi(overrides: Partial<AdminApi> = {}): AdminApi {
     assistantDefaults: () =>
       Promise.resolve({ welcome: '', suggestedQuestions: [], available: false }),
     installations: () => Promise.resolve({ installations: [] }),
+    citedDocuments: () => Promise.resolve({ documents: [] }),
     ...overrides,
   };
 }

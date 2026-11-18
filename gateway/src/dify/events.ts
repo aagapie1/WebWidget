@@ -22,10 +22,16 @@ export class DifyEventNormalizer {
   readonly #tenant: Tenant;
   #started = false;
   #done = false;
+  #citedFiles: string[] = [];
 
   constructor(tenant: Tenant, locale: Locale) {
     this.#tenant = tenant;
     this.#locale = locale;
+  }
+
+  /** File names cited by the final answer (recorded for the admin; never sent to the browser). */
+  get citedFiles(): readonly string[] {
+    return this.#citedFiles;
   }
 
   get done(): boolean {
@@ -93,6 +99,14 @@ export class DifyEventNormalizer {
         return { events: this.#start(event), done: false, ignored: event.event };
       case 'message_end':
         this.#done = true;
+        this.#citedFiles = [
+          ...new Set(
+            (event.metadata?.retriever_resources ?? []).flatMap((resource) => {
+              const name = resource.document_name ?? resource.dataset_name;
+              return name ? [name] : [];
+            }),
+          ),
+        ];
         return {
           events: [
             ...this.#start(event),

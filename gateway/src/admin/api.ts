@@ -23,6 +23,7 @@ import type { PreviewService } from './preview.js';
 import type { KeyValueStore } from './kv.js';
 import type { TenantRegistry } from '../config/tenants.js';
 import { getParameters } from '../dify/client.js';
+import { citedDocuments } from '../cited/index.js';
 import { installations } from '../installs/index.js';
 import { adminError, authorize, sessionIdOf, sessionOf } from './guard.js';
 
@@ -266,6 +267,13 @@ export function adminConfigRoutes(
     return {
       installations: options.store ? await installations(options.store, found.tenant, list) : [],
     };
+  });
+
+  // Citations: the file names the assistant cited recently, offered when mapping titles.
+  app.get('/api/tenants/:tenant/cited-documents', async (request, reply) => {
+    const found = await tenantFor(request, reply, 'read');
+    if (!found) return reply;
+    return { documents: options.store ? await citedDocuments(options.store, found.tenant) : [] };
   });
 
   // Preview (spec §5.2): a 10-minute token bound to this admin session and tenant.

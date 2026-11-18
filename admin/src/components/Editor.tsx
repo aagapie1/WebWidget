@@ -285,6 +285,16 @@ export function Editor({ api, tenant, onSessionExpired, gatewayOrigin, frame }: 
   }, [api, tenant]);
   const [discarding, setDiscarding] = useState<{ busy: boolean } | undefined>();
   const checkInstallations = useCallback(() => api.installations(tenant), [api, tenant]);
+  // Citations: the file names the assistant cited recently, offered as suggestions.
+  const [citedDocuments, setCitedDocuments] = useState<readonly string[]>([]);
+  useEffect(() => {
+    api.citedDocuments(tenant).then(
+      (answer) => {
+        setCitedDocuments(answer.documents.map((document) => document.name));
+      },
+      () => undefined,
+    );
+  }, [api, tenant]);
 
   const createToken = useCallback(() => api.previewToken(tenant), [api, tenant]);
   const upload = useCallback(
@@ -520,6 +530,7 @@ export function Editor({ api, tenant, onSessionExpired, gatewayOrigin, frame }: 
             accent={theme.accent}
             onAccent={theme.onAccent}
             assistantQuestions={assistantQuestions}
+            citedDocuments={citedDocuments}
             integration={
               gatewayOrigin
                 ? {

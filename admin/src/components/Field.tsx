@@ -53,6 +53,8 @@ interface TextFieldProps {
   multiline?: boolean;
   type?: 'text' | 'url';
   readOnly?: boolean;
+  /** Id of a <datalist> with suggestions (the browser filters them as you type). */
+  list?: string | undefined;
 }
 
 /** An emptied text field removes the value, so the default applies. */
@@ -80,6 +82,7 @@ export function TextField(props: TextFieldProps) {
             id={id}
             type="text"
             inputMode={props.type === 'url' ? 'url' : undefined}
+            list={props.list}
             value={props.value ?? ''}
             placeholder={props.placeholder}
             aria-describedby={describedBy}

@@ -147,6 +147,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   chatRoute(app, {
     env: options.env,
     tenants,
+    store: options.admin?.store,
     ...(options.difyDispatcher ? { difyDispatcher: options.difyDispatcher } : {}),
   });
 

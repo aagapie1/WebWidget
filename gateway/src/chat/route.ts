@@ -20,11 +20,15 @@ import {
 } from '../protocol/index.js';
 import { logTenant, type Tenant } from '../config/tenants.js';
 import { resolveVisitor } from '../visitor/index.js';
+import type { KeyValueStore } from '../admin/kv.js';
+import { recordCited } from '../cited/index.js';
 
 export interface ChatRouteOptions {
   env: AppEnv;
   tenants: TenantRegistry;
   difyDispatcher?: Dispatcher;
+  /** Records the cited documents for the admin (E4b.1 UX 13); absent: not recorded. */
+  store?: KeyValueStore | undefined;
 }
 
 export function chatRoute(app: FastifyInstance, options: ChatRouteOptions): void {
@@ -98,7 +102,19 @@ export function chatRoute(app: FastifyInstance, options: ChatRouteOptions): void
       connection: 'keep-alive',
     });
 
-    const stats = await pipeStream(result.body, reply, tenant, locale, signal, totalTimeout);
+    const { citedFiles, ...stats } = await pipeStream(
+      result.body,
+      reply,
+      tenant,
+      locale,
+      signal,
+      totalTimeout,
+    );
+    if (options.store && citedFiles.length > 0) {
+      void recordCited(options.store, tenant.id, citedFiles).catch((error: unknown) => {
+        log.warn({ error: String(error) }, 'recording cited documents failed');
+      });
+    }
 
     // New conversation: set its title from the question, without a model call (SPEC §4).
     if (!conversationId && stats.conversationId) {
@@ -154,6 +170,11 @@ interface StreamStats {
   conversationId?: string;
 }
 
+/** The stream's stats (logged) and the cited file names (recorded, not logged). */
+interface StreamResult extends StreamStats {
+  citedFiles: readonly string[];
+}
+
 const TITLE_LENGTH = 50;
 
 /** First ~50 characters of the question, cut at a word boundary. */
@@ -172,7 +193,7 @@ async function pipeStream(
   locale: Locale,
   signal: AbortSignal,
   totalTimeout: AbortSignal,
-): Promise<StreamStats> {
+): Promise<StreamResult> {
   const parser = new SseParser();
   const normalizer = new DifyEventNormalizer(tenant, locale);
   const stats: StreamStats = { deltas: 0, outcome: 'aborted' };
@@ -188,19 +209,20 @@ async function pipeStream(
       for (const message of parser.push(chunk)) {
         if (emit(normalizer.handle(message))) {
           body.destroy();
-          return stats;
+          return { ...stats, citedFiles: normalizer.citedFiles };
         }
       }
     }
     for (const message of parser.flush()) {
-      if (emit(normalizer.handle(message))) return stats;
+      if (emit(normalizer.handle(message))) return { ...stats, citedFiles: normalizer.citedFiles };
     }
     emit(normalizer.finish());
   } catch (error) {
-    if (signal.aborted && !totalTimeout.aborted) return stats; // client gone: nothing to send
+    if (signal.aborted && !totalTimeout.aborted)
+      return { ...stats, citedFiles: normalizer.citedFiles }; // client gone: nothing to send
     emit(normalizer.fail(totalTimeout.aborted ? 'upstream_timeout' : classifyNetworkError(error)));
   }
-  return stats;
+  return { ...stats, citedFiles: normalizer.citedFiles };
 }
 
 function writeEvent(reply: FastifyReply, event: ChatStreamEvent, stats: StreamStats): void {

@@ -6,6 +6,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { parseAdminAuthConfig } from '../src/admin/auth-config.js';
 import type { AdminIdentity } from '../src/admin/identity.js';
 import { MemoryKeyValueStore } from '../src/admin/kv.js';
+import { recordCited } from '../src/cited/index.js';
 import type { OidcClient } from '../src/admin/oidc.js';
 import { AdminSessions, SESSION_COOKIE } from '../src/admin/sessions.js';
 import { buildApp } from '../src/app.js';
@@ -50,6 +51,7 @@ describe.skipIf(!appUrl || !ownerUrl)('admin configuration API (Postgres)', () =
   let registry: Map<string, Tenant>;
   let stopWatching: () => void;
   let sessions: AdminSessions;
+  let kv: MemoryKeyValueStore;
   // Clock of the session / token store (preview token expiry).
   let now = Date.now();
 
@@ -90,6 +92,7 @@ describe.skipIf(!appUrl || !ownerUrl)('admin configuration API (Postgres)', () =
     stopWatching = source.watch(registry);
     now = Date.now();
     const store = new MemoryKeyValueStore(() => now);
+    kv = store;
     sessions = new AdminSessions(store);
     app = await buildApp({
       env: loadEnv({
@@ -545,6 +548,20 @@ describe.skipIf(!appUrl || !ownerUrl)('admin configuration API (Postgres)', () =
     expect(await list()).toHaveLength(1);
     const other = await as('widget-admin', 'delta');
     expect((await other('GET', '/admin/api/tenants/gamma/installations')).statusCode).toBe(403);
+  });
+
+  it('lists the documents the assistant cited recently (E4b.1 UX 13)', async () => {
+    await recordCited(kv, 'gamma', ['regulament.pdf'], now - 60_000);
+    await recordCited(kv, 'gamma--p-abc', ['ghid.pdf'], now);
+    await recordCited(kv, 'delta', ['alt.pdf'], now);
+    const editor = await as('widget-editor');
+    const answer = await editor('GET', '/admin/api/tenants/gamma/cited-documents');
+    expect(answer.statusCode).toBe(200);
+    expect(
+      answer.json<{ documents: { name: string }[] }>().documents.map((doc) => doc.name),
+    ).toEqual(['ghid.pdf', 'regulament.pdf']);
+    const other = await as('widget-admin', 'delta');
+    expect((await other('GET', '/admin/api/tenants/gamma/cited-documents')).statusCode).toBe(403);
   });
 
   it("gives the assistant's own welcome and starter questions (Dify /parameters)", async () => {

@@ -32,6 +32,8 @@ export interface ConfigFormProps {
   onAccent: string;
   /** The assistant's own starter questions (Dify), suggested when a language has none. */
   assistantQuestions: readonly string[];
+  /** File names the assistant cited recently (suggestions for the title mapping). */
+  citedDocuments?: readonly string[];
   /** The area shown (one at a time, chosen in the sidebar). */
   area?: Area;
   /** "Integrare pe site"; omitted when the gateway address is unknown. */
@@ -125,6 +127,7 @@ export function ConfigForm({
   onChange,
   upload,
   assistantQuestions,
+  citedDocuments = [],
   integration,
   area = 'aspect',
 }: ConfigFormProps) {
@@ -251,6 +254,7 @@ export function ConfigForm({
     : [];
   const titles = (value('citations.documentTitles') ?? {}) as Record<string, string>;
   const titleRows = Object.entries(titles);
+  const citedListId = 'cited-documents';
 
   return (
     <div class="form">
@@ -616,10 +620,25 @@ export function ConfigForm({
         <Section id="citations" title={t.sections.citations ?? ''}>
           <fieldset class="field">
             <legend>{t.fields.documentTitles}</legend>
+            {citedDocuments.length > 0 && (
+              <datalist id={citedListId}>
+                {citedDocuments
+                  .filter((name) => !(name in titles))
+                  .map((name) => (
+                    <option key={name} value={name} />
+                  ))}
+              </datalist>
+            )}
             {titleRows.map(([file, title], index) => (
               <div class="row row--titles" key={index}>
                 <TextField
                   label={t.fields.documentFile}
+                  list={citedDocuments.length > 0 ? citedListId : undefined}
+                  hint={
+                    citedDocuments.length > 0
+                      ? t.fields.documentFileHint
+                      : t.fields.documentFileNone
+                  }
                   value={file}
                   onChange={(next) => {
                     const rows = titleRows.map(([f, v], i) =>

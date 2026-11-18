@@ -280,6 +280,46 @@ describe('Editor', () => {
     );
   });
 
+  it('citations: suggests the documents the assistant cited recently (E4b.1 UX 13)', async () => {
+    const api = fakeApi({
+      citedDocuments: () =>
+        Promise.resolve({
+          documents: [
+            { name: 'Regulament.pdf', lastSeen: '2026-11-19T10:00:00.000Z' },
+            { name: 'Taxe 2026.xlsx', lastSeen: '2026-11-18T10:00:00.000Z' },
+          ],
+        }),
+      config: () =>
+        Promise.resolve(
+          configState({
+            draft: {
+              revision: 1,
+              baseVersion: 3,
+              updatedAt: '2026-11-18T10:00:00.000Z',
+              updatedBy: 'Ana',
+              config: {
+                name: 'Pilot',
+                allowedOrigins: ['https://www.pilot.ro'],
+                citations: { documentTitles: { 'Regulament.pdf': 'Regulamentul intern' } },
+              },
+            },
+          }),
+        ),
+    });
+    renderWithI18n(<Editor api={api} tenant="pilot" onSessionExpired={vi.fn()} />);
+    fireEvent.click(await screen.findByRole('link', { name: /^Citări/ }));
+    const file = await screen.findByLabelText<HTMLInputElement>('Nume fișier');
+    await waitFor(() => {
+      expect(file.getAttribute('list')).toBe('cited-documents');
+    });
+    // A document that already has a title is not suggested again.
+    const options = [...document.querySelectorAll('#cited-documents option')].map(
+      (option) => (option as HTMLOptionElement).value,
+    );
+    expect(options).toEqual(['Taxe 2026.xlsx']);
+    expect(screen.getByText(/^Alegeți dintre documentele citate recent/)).toBeTruthy();
+  });
+
   it('says under each image where it appears', async () => {
     renderWithI18n(<Editor api={fakeApi()} tenant="pilot" onSessionExpired={vi.fn()} />);
     expect(await screen.findByText('Apare în antetul ferestrei.')).toBeTruthy();

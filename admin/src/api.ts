@@ -72,6 +72,8 @@ export interface AdminApi {
   discardDraft(tenant: string): Promise<void>;
   assistantDefaults(tenant: string): Promise<AssistantDefaults>;
   installations(tenant: string): Promise<{ installations: Installation[] }>;
+  /** File names the assistant cited recently (E4b.1 UX 13), most recent first. */
+  citedDocuments(tenant: string): Promise<{ documents: { name: string; lastSeen: string }[] }>;
   logout(): Promise<{ redirect: string }>;
 }
 
@@ -133,6 +135,7 @@ export function createApi(fetchImpl: Fetch = (...args) => fetch(...args)): Admin
     discardDraft: (tenant) => call('DELETE', `${base(tenant)}/config/draft`),
     assistantDefaults: (tenant) => call('GET', `${base(tenant)}/assistant-defaults`),
     installations: (tenant) => call('GET', `${base(tenant)}/installations`),
+    citedDocuments: (tenant) => call('GET', `${base(tenant)}/cited-documents`),
     logout: () => call('POST', '/admin/auth/logout', {}),
   };
 }

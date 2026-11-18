@@ -46,6 +46,19 @@ describe('DifyEventNormalizer', () => {
     ]);
   });
 
+  it('keeps the cited file names for the admin, never in the events (E4b.1 UX 13)', () => {
+    const parser = new SseParser();
+    const normalizer = new DifyEventNormalizer(testTenant, 'ro');
+    const stream = new TextEncoder().encode(fixture('dify-chat.sse'));
+    const events = [...parser.push(stream), ...parser.flush()].flatMap(
+      (message) => normalizer.handle(message).events,
+    );
+    // Deduplicated: Regulament.pdf is cited twice in the stream.
+    expect([...normalizer.citedFiles].sort()).toEqual(['Program.pdf', 'Regulament.pdf']);
+    // File names reach the browser only as mapped titles.
+    expect(JSON.stringify(events)).not.toContain('fileName');
+  });
+
   it('normalizes an agent app stream: agent_message becomes delta, thoughts are skipped', () => {
     const events = normalize(fixture('dify-agent.sse'));
     expect(events.map((event) => event.type)).toEqual(['start', 'delta', 'delta', 'end']);

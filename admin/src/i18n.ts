@@ -107,6 +107,10 @@ const ro = {
     showOnMobile: 'Afișează și pe telefon',
     documentTitles: 'Titluri afișate pentru documente',
     documentFile: 'Nume fișier',
+    documentFileHint:
+      'Alegeți dintre documentele citate recent de asistent sau scrieți numele fișierului.',
+    documentFileNone:
+      'Asistentul nu a citat încă documente. Scrieți numele fișierului, ca în baza de cunoștințe.',
     documentTitle: 'Titlu afișat',
     addDocument: 'Adaugă document',
     remove: 'Elimină',
@@ -456,6 +460,10 @@ const en: Dictionary = {
     showOnMobile: 'Also show on phones',
     documentTitles: 'Display titles for documents',
     documentFile: 'File name',
+    documentFileHint:
+      'Choose one of the documents the assistant cited recently, or type the file name.',
+    documentFileNone:
+      'The assistant has not cited any documents yet. Type the file name, as in the knowledge base.',
     documentTitle: 'Display title',
     addDocument: 'Add document',
     remove: 'Remove',
