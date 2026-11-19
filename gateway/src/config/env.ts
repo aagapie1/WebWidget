@@ -19,6 +19,28 @@ const envSchema = z.object({
   DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }).optional(),
   /** Server-only admin login configuration (ADR 008): issuer → tenant map. Admin is off without it. */
   ADMIN_AUTH_CONFIG: z.string().min(1).optional(),
+  /**
+   * Admin hosts that belong to one organisation (E4b.1 UX 16): "admin.primaria-x.ro=primaria-x,…".
+   * On such a host the sign-in page knows the organisation and hides the code field.
+   */
+  ADMIN_ORG_HOSTS: z
+    .string()
+    .optional()
+    .transform((value, context) => {
+      const hosts = new Map<string, string>();
+      for (const pair of (value ?? '')
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean)) {
+        const [host, org] = pair.split('=').map((part) => part.trim().toLowerCase());
+        if (!host || !org || !/^[a-z0-9.-]+$/.test(host) || !/^[a-z0-9-]{1,64}$/.test(org)) {
+          context.addIssue({ code: 'custom', message: `invalid host=org pair "${pair}"` });
+          return z.NEVER;
+        }
+        hosts.set(host, org);
+      }
+      return hosts;
+    }),
   /** Admin login starts + callbacks per client address per 10 minutes (ADR 008). */
   ADMIN_LOGIN_LIMIT: z.coerce.number().int().positive().default(30),
   VISITOR_COOKIE_SECRET: z.string().min(32, 'must be at least 32 characters'),

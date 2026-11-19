@@ -42,6 +42,7 @@ const LIMITS = {
   api: { limit: 600, windowSeconds: 60 },
 };
 
+const orgQuery = z.object({ org: z.string().max(64).optional() });
 const loginQuery = z.object({
   org: z.string().max(64),
   returnTo: z.string().max(512).optional(),
@@ -178,7 +179,40 @@ export function adminRoutes(app: FastifyInstance, options: AdminRouteOptions): v
       // production this list is not public (it would reveal which clients exist).
       admin.get('/auth/orgs', (_request, reply) => {
         if (env.NODE_ENV === 'production') return adminError(reply, 'not_found');
-        return { orgs: [...auth.realms.keys()] };
+        return {
+          orgs: [...auth.realms.values()].map((realm) => ({
+            org: realm.org,
+            kind: realm.kind,
+            ...(realm.tenant ? { name: options.tenants.get(realm.tenant)?.name ?? realm.org } : {}),
+          })),
+        };
+      });
+
+      // The organisation of the sign-in page (E4b.1 UX 16): the one named in the link (?org=),
+      // or the one this host belongs to (ADMIN_ORG_HOSTS). One organisation at a time, with its
+      // client name; never the list (production keeps the clients private).
+      admin.get('/auth/org', async (request, reply) => {
+        if (
+          !(await withinLimit(
+            store,
+            'org',
+            request.ip,
+            env.ADMIN_LOGIN_LIMIT,
+            LIMITS.login.windowSeconds,
+          ))
+        ) {
+          return adminError(reply, 'rate_limited');
+        }
+        const query = orgQuery.safeParse(request.query);
+        if (!query.success) return adminError(reply, 'invalid_request');
+        const code = query.data.org ?? env.ADMIN_ORG_HOSTS.get(request.hostname.toLowerCase());
+        const realm = code ? auth.realms.get(code) : undefined;
+        if (!realm) return adminError(reply, 'not_found');
+        return {
+          org: realm.org,
+          kind: realm.kind,
+          ...(realm.tenant ? { name: options.tenants.get(realm.tenant)?.name ?? realm.org } : {}),
+        };
       });
 
       admin.get('/auth/login', async (request, reply) => {

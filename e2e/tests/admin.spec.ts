@@ -385,10 +385,31 @@ const serious = async (page: Page) =>
     (violation) => violation.impact === 'serious' || violation.impact === 'critical',
   );
 
+test('sign-in: a known organisation hides the code field; "Altă organizație?" brings it back', async ({
+  page,
+}) => {
+  await page.goto(`${ADMIN}/admin/?org=pilot`);
+  await expect(page.locator('.login__org')).toHaveText('Pilot e2e');
+  await expect(
+    page.getByText('Veți fi redirecționat la pagina de autentificare a instituției.'),
+  ).toBeVisible();
+  await expect(page.getByLabel('Codul organizației')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Altă organizație?' }).click();
+  await expect(page.getByLabel('Codul organizației')).toBeFocused();
+
+  // An organisation that does not exist: the field, with the reason.
+  await page.goto(`${ADMIN}/admin/?org=nu-exista`);
+  const code = page.getByLabel('Codul organizației');
+  await expect(code).toHaveValue('nu-exista');
+  await expect(code).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.getByText(/^Organizația nu este configurată/)).toBeVisible();
+  expect(await serious(page)).toEqual([]);
+});
+
 test('no serious or critical axe violations on the login page', async ({ page }) => {
   await page.goto(`${ADMIN}/admin/`);
   await expect(page.getByRole('heading', { name: 'Autentificare' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'pilot' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /\(pilot\)$/ })).toBeVisible();
   expect(await serious(page)).toEqual([]);
 });
 

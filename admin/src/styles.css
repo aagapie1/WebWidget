@@ -1361,3 +1361,33 @@ details.advanced > summary {
 .color__note .color__action {
   margin-top: 0;
 }
+
+/* Sign-in (E4b.1 UX 16): the known organisation, and the small "Altă organizație?" link. */
+.login__org {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin: 0.5rem 0 0.25rem;
+}
+.login__other {
+  margin-top: 1rem;
+}
+.login__code {
+  color: var(--muted);
+  font-weight: 400;
+}
+/* An action that looks like a link (it stays a button: it does not navigate). */
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--primary);
+  font: inherit;
+  font-size: 0.9rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.link-button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 2px;
+}

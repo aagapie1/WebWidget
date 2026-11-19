@@ -86,7 +86,8 @@ export function App({
         {session === undefined && <p class="page">{t.loading}</p>}
         {session === null && (
           <Login
-            org={params.get('org') ?? read(ORG_KEY) ?? ''}
+            linkOrg={params.get('org') ?? undefined}
+            storedOrg={read(ORG_KEY) ?? undefined}
             error={params.get('error') ?? undefined}
             returnTo={`/admin/${params.get('tenant') ? `?tenant=${encodeURIComponent(params.get('tenant') ?? '')}` : ''}`}
           />

@@ -21,6 +21,10 @@ const ro = {
     orgHint: 'Primit de la echipa care v-a configurat asistentul, de exemplu „primaria-exemplu”.',
     submit: 'Continuă spre autentificare',
     devOrgs: 'Organizații de test (doar în dezvoltare)',
+    redirect: 'Veți fi redirecționat la pagina de autentificare a instituției.',
+    otherOrg: 'Altă organizație?',
+    unknownOrg: 'Organizația nu este configurată. Verificați codul primit.',
+    platform: 'Administrarea platformei',
     errors: {
       no_role:
         'Contul nu face parte din grupurile care administrează asistentul. Cereți accesul administratorului IT.',
@@ -375,6 +379,10 @@ const en: Dictionary = {
     orgHint: 'Given by the team that set up your assistant, for example “example-city”.',
     submit: 'Continue to sign in',
     devOrgs: 'Test organisations (development only)',
+    redirect: "You will be redirected to your organisation's sign-in page.",
+    otherOrg: 'Another organisation?',
+    unknownOrg: 'This organisation is not configured. Check the code you were given.',
+    platform: 'Platform administration',
     errors: {
       no_role:
         'Your account is not in the groups that manage the assistant. Ask your IT administrator for access.',

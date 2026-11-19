@@ -382,7 +382,11 @@ describe('admin login, session and guard', () => {
 
   it('lists the organisations for the login page outside production only', async () => {
     expect((await app.inject({ url: '/admin/auth/orgs' })).json()).toEqual({
-      orgs: ['pilot', 'demo-primarie', 'platform'],
+      orgs: [
+        { org: 'pilot', kind: 'tenant', name: expect.any(String) as unknown },
+        { org: 'demo-primarie', kind: 'tenant', name: expect.any(String) as unknown },
+        { org: 'platform', kind: 'platform' },
+      ],
     });
     const production = await buildApp({
       env: loadEnv({
@@ -396,6 +400,54 @@ describe('admin login, session and guard', () => {
     });
     expect((await production.inject({ url: '/admin/auth/orgs' })).statusCode).toBe(404);
     await production.close();
+  });
+
+  it('names one organisation for the login page, from the link or the host, in production too', async () => {
+    const production = await buildApp({
+      env: loadEnv({
+        PUBLIC_ORIGIN: ORIGIN,
+        VISITOR_COOKIE_SECRET: 's'.repeat(40),
+        LOG_LEVEL: 'silent',
+        NODE_ENV: 'production',
+        ADMIN_ORG_HOSTS: 'admin.pilot.test=pilot, admin.gol.test=necunoscut',
+      }),
+      tenants: new Map(),
+      admin: { auth, store, oidc },
+    });
+    // From the link.
+    expect((await production.inject({ url: '/admin/auth/org?org=demo-primarie' })).json()).toEqual({
+      org: 'demo-primarie',
+      kind: 'tenant',
+      name: 'demo-primarie',
+    });
+    expect((await production.inject({ url: '/admin/auth/org?org=platform' })).json()).toEqual({
+      org: 'platform',
+      kind: 'platform',
+    });
+    // From the host (ADMIN_ORG_HOSTS); an unknown organisation or host is not found.
+    const byHost = await production.inject({
+      url: '/admin/auth/org',
+      headers: { host: 'admin.pilot.test' },
+    });
+    expect(byHost.json()).toMatchObject({ org: 'pilot', kind: 'tenant' });
+    for (const request of [
+      { url: '/admin/auth/org?org=nu-exista' },
+      { url: '/admin/auth/org', headers: { host: 'admin.gol.test' } },
+      { url: '/admin/auth/org', headers: { host: 'alt.test' } },
+    ]) {
+      expect((await production.inject(request)).statusCode).toBe(404);
+    }
+    await production.close();
+  });
+
+  it('rejects malformed ADMIN_ORG_HOSTS', () => {
+    expect(() =>
+      loadEnv({
+        PUBLIC_ORIGIN: ORIGIN,
+        VISITOR_COOKIE_SECRET: 's'.repeat(40),
+        ADMIN_ORG_HOSTS: 'admin.pilot.test',
+      }),
+    ).toThrow(/ADMIN_ORG_HOSTS: invalid host=org pair/);
   });
 
   it('rate-limits login attempts per client address', async () => {
