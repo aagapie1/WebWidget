@@ -36,6 +36,29 @@ Plan: [docs/plans/E5.md](../plans/E5.md). Filled in at the end of E5, in the sty
       user disabled or signed out in Keycloak loses their admin sessions (back-channel logout),
       and the platform team can end a user's or a client's sessions from the command line.
 
+### B9. Audit log (moved from E4b.2)
+
+- [ ] Every event records the exact time (UTC in the database, Romanian time on screen and in
+      exports; server clock on NTP, documented), who (Keycloak user id, name, e-mail, role,
+      organisation, sign-in source: local account or the institution's IdP), from where (IP after
+      D1, user-agent, a hash of the session id, the request's correlation id), what (action,
+      section, fields with old and new values, published version) and the result (succeeded,
+      denied with its reason, failed).
+- [ ] Recorded: sign-in, sign-out, expired session, refused sign-in; failed sign-ins and the other
+      Keycloak user and admin events, imported from every realm; draft saved, published,
+      discarded; image uploaded and deleted; allowed domains changed, marked sensitive; access
+      denied (an editor publishing, a request to another client); the log viewed and exported.
+- [ ] The log is append-only for the application and hash-chained: a verification command finds
+      any changed, removed or inserted record (tested by tampering with a row).
+- [ ] The "Jurnal de audit" screen lists events with filters (period, user, action, section,
+      result) and search, shows an event's old/new diff, and exports CSV and JSON (the export is
+      recorded). A widget-admin sees only their organisation, an editor has no access (screen and
+      API), the super-admin sees every one. e2e tests: filters, export, isolation between clients.
+- [ ] Records older than the retention period (12 months by default, per client) are deleted
+      automatically; the deletion is recorded as a system event and the chain stays verifiable.
+- [ ] An ADR states the GDPR basis (legitimate interest, security) and the period; the text for the
+      clients' privacy notice is listed for E7.
+
 ## C. Production and infrastructure
 
 - [ ] `deploy/docker-compose.yml` starts the gateway stack (Keycloak and Traefik are shared server
