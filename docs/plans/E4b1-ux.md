@@ -1,7 +1,8 @@
-# E4b.1 — admin interface UX (P1, P2)
+# E4b.1 — admin interface UX (P1, P2, P3)
 
 Plan for the feedback on the admin interface. P1 is needed for the demo and comes first; P2 follows
-after review. P3 (login, Keycloak theme, final checks) comes after step 6.
+after review. P3 (login, Keycloak theme, final checks) follows P2; then step 6 (complete e2e in CI
+with Keycloak) and the close of E4b.1.
 
 **[SCHEMA]** marks configuration schema changes. All of them are new optional fields or new
 optional forms of existing fields. `schemaVersion` stays 1, and existing YAML files and published
@@ -231,3 +232,97 @@ P1 in four commits, each with its tests:
 - (c) admin interface: status, discard, values, dependent fields, icon/avatar grid, questions,
   integration (with installation detection);
 - (d) e2e for the new flows and the widget bundle budgets.
+
+## P3 — sign-in, Keycloak theme, consistency, keyboard and tablet (plan, 2026-11-19)
+
+P2 is done (CI green on 28fa9ee; adjustments checked in d06351b). **[DECIDE]** marks a choice to
+confirm before implementing.
+
+### 16. Sign-in screen
+
+- **Organisation known → no code field.** The organisation comes from, in order:
+  1. the link: `/admin/?org=pilot` (already read today, but it only pre-fills the field);
+  2. the address: **[DECIDE]** a server-side map from admin host to organisation
+     (`ADMIN_ORG_HOSTS=admin.primaria-exemplu.ro=primaria-exemplu,…`), checked by the gateway
+     against the configured organisations. Recommended over subdomains (`<org>.admin…`), which
+     need wildcard DNS and TLS. Until a client has its own host, the link is enough;
+  3. the last organisation used in this browser (already stored).
+- With a known organisation the screen shows the client's name (from the organisation list the
+  gateway already has), one primary button "Continuă spre autentificare" and the sentence
+  "Veți fi redirecționat la pagina de autentificare a instituției." **[DECIDE]** no automatic
+  redirect: one explicit click keeps the page understandable and testable (and the error
+  messages, e.g. session expired, readable).
+- **"Codul organizației" only as a fallback:** a link "Altă organizație?" opens the field (also
+  open when no organisation is known or the known one is invalid).
+- **Test organisations** (development and e2e gateways only): the buttons already start the
+  sign-in directly; they get the client name, not just the code.
+- Unknown organisation in the link or the map: the field opens with the error
+  "Organizația nu este configurată."
+
+### 17. Keycloak theme (one theme for every realm)
+
+- One login theme `widget-admin` in `deploy/keycloak/themes/`, mounted in the dev compose and in
+  CI; every realm uses it (`loginTheme`). Same tokens as the admin: accent `#2f54eb`, Inter
+  (woff2 bundled in the theme, OFL; no CDN, rule 8), the same card, buttons, focus and errors.
+- **Per-realm name and logo, without a theme per client:**
+  - name: the realm's `displayName` (already set);
+  - logo: **[DECIDE]** a realm attribute (`clientLogoUrl`, the logo URL served by the gateway).
+    Before coding, check in the dev Keycloak (26.3) that login templates can read realm
+    attributes; if not, fall back to the realm's `displayNameHtml` with an `<img>`. Either way
+    the realm's CSP gets `img-src` for the gateway origin, and nothing else.
+- **Romanian by default:** realms already have `defaultLocale: ro`. Keycloak's Romanian
+  translation may be missing or partial: the theme ships `messages_ro.properties` for every
+  string of the pages we use (login, errors, expired session, logout confirmation), checked by a
+  test that lists the keys used by the templates.
+- Accessibility: the theme pages pass axe (serious/critical) like the admin, and are reached by
+  keyboard (labels, visible focus, errors linked to fields).
+
+### 18. Consistent controls (whole interface)
+
+- One set, in a short reference (`docs/review/admin/controls.md`, with a screenshot):
+  - buttons: primary (only "Publică" and the confirmation in dialogs), secondary, quiet,
+    danger; the same height, radius and focus ring;
+  - links: underlined, the accent color; never a button styled as a link for navigation;
+  - on/off settings: always the switch row (the remaining checkboxes, e.g. "Afișează și pe
+    telefon", become switches); radio tiles for visual choices;
+  - messages: errors under the field (`field__errors`, linked with `aria-describedby`),
+    page-level errors as a red notice with `role="alert"`, confirmations as a polite status.
+- A pass over every area to apply it; the old styles that remain (from before the frame) go.
+
+### 19. Keyboard and tablet
+
+- **Keyboard (e2e):**
+  - focus order: skip link → header (language, user menu) → status bar → sidebar → area title →
+    form → preview;
+  - every stop has a visible focus ring (computed outline checked);
+  - Escape closes: the user menu, the preview side panel (under 1280 px), the dialogs; focus
+    returns to the control that opened them;
+  - the user menu: reached with Tab, opened with Enter/Space, its items reached with Tab, and
+    "Deconectare" usable.
+- **Tablet, 768–1279 px:** no horizontal scroll at 768, 1024 and 1279; the preview as a side
+  panel; under 1024 the sidebar turns into a compact list above the form (**[DECIDE]**: a
+  horizontal row of areas, scrollable, rather than a menu button, so every area stays one tap
+  away); touch targets at least 44 px.
+
+### 20. Screenshots (docs/review/admin/)
+
+- `login-org-known.png` (from `?org=pilot`), `login-fallback.png` (code field open, with an
+  error), `keycloak-pilot-ro.png` (realm "Pilot", Romanian, logo), `1024x768-culori.png` and
+  `1024x768-preview-open.png`, `768x1024-identitate.png`, plus `controls.png` for item 18.
+
+### P3 order (one commit per item, tests first)
+
+1. 16 sign-in screen (admin + small gateway change for the host map);
+2. 17 Keycloak theme (after the realm-attribute check);
+3. 18 consistent controls;
+4. 19 keyboard and tablet (e2e for focus order, Escape, widths);
+5. 20 screenshots and the review README.
+
+### After P3: step 6 and closing E4b.1
+
+- Already in CI since b8d0772: Keycloak with the test realms, the admin e2e (sign-in, roles,
+  brokered IdP, editing, preview, publish, axe) in Chromium, Firefox and WebKit.
+- Still to add for "complete": the review-screenshot spec in CI as an artifact, the new
+  sign-in/theme/keyboard tests, and a check that the theme files are mounted (no silent fallback
+  to the default Keycloak theme).
+- Then the E4b.1 close: the SPEC criteria checked one by one, with what was verified and how.
