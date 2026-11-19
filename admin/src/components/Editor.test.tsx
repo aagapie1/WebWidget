@@ -345,6 +345,30 @@ describe('Editor', () => {
     expect(await screen.findByLabelText('Poziția ferestrei')).toBeTruthy();
   });
 
+  it('consistent controls: switches for on/off, one primary button (E4b.1 UX 18)', async () => {
+    renderWithI18n(<Editor api={fakeApi()} tenant="pilot" onSessionExpired={vi.fn()} />);
+    await screen.findByLabelText('Numele clientului');
+    for (const name of [
+      /^Aspect/,
+      /^Texte/,
+      /^Mesaj proactiv/,
+      /^Citări/,
+      /^Comportament/,
+      /^Domenii/,
+      /^Integrare/,
+    ]) {
+      fireEvent.click(screen.getByRole('link', { name }));
+      expect(document.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
+      // The page's main action is "Publică"; everything else is secondary.
+      expect(
+        [...document.querySelectorAll('.button--primary')].map((button) => button.textContent),
+      ).toEqual([expect.stringMatching(/^Publică/) as unknown]);
+    }
+    fireEvent.click(screen.getByRole('link', { name: /^Mesaj proactiv/ }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Afișează mesajul proactiv' }));
+    expect(await screen.findByRole('switch', { name: 'Afișează și pe telefon' })).toBeTruthy();
+  });
+
   it('says under each image where it appears', async () => {
     renderWithI18n(<Editor api={fakeApi()} tenant="pilot" onSessionExpired={vi.fn()} />);
     expect(await screen.findByText('Apare în antetul ferestrei.')).toBeTruthy();

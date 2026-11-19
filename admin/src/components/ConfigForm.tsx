@@ -7,7 +7,7 @@ import type { Config, ConfigState } from '../api.js';
 import { useI18n } from '../i18n.js';
 import { getIn, themeInput, type FieldErrors, type Path } from '../model.js';
 import { ColorField } from './ColorField.js';
-import { CheckboxField, NumberField, SelectField, TextField } from './Field.js';
+import { NumberField, SelectField, TextField } from './Field.js';
 import { ImageField } from './ImageField.js';
 import { IntegrationSection } from './IntegrationSection.js';
 import { LocaleTabs } from './LocaleTabs.js';
@@ -15,7 +15,14 @@ import { NodeIcon, OptionGrid, type GridOption } from './OptionGrid.js';
 import { OriginsList } from './OriginsList.js';
 import { QuestionsEditor } from './QuestionsEditor.js';
 import { SwitchRow } from './SwitchRow.js';
-import { AppWindow, Lightbulb, MessageCircleMore, TextQuote, Upload } from '../icons.js';
+import {
+  AppWindow,
+  Lightbulb,
+  MessageCircleMore,
+  Smartphone,
+  TextQuote,
+  Upload,
+} from '../icons.js';
 import { AVATAR_ICONS, LAUNCHER_ICONS } from 'widget/icons';
 import type { Installation } from '../api.js';
 import { initials } from '../model.js';
@@ -610,8 +617,10 @@ export function ConfigForm({
                   errors={errorsFor('proactive.frequency')}
                 />
               </div>
-              <CheckboxField
-                label={t.fields.showOnMobile}
+              <SwitchRow
+                icon={Smartphone}
+                title={t.fields.showOnMobile}
+                description={t.ux.showOnMobileDescription}
                 checked={value('proactive.showOnMobile') === true}
                 onChange={set('proactive.showOnMobile')}
               />

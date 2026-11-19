@@ -380,14 +380,22 @@ summary {
   outline-offset: 2px;
 }
 
+/*
+ * Controls (E4b.1 UX 18, docs/review/admin/controls.md): primary only for the page's main action
+ * (Publică, a dialog's confirmation, the sign-in); secondary by default; quiet for row actions;
+ * danger for destructive confirmations. One height, radius and focus ring.
+ */
 .button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
+  min-block-size: 36px;
   font: inherit;
+  font-size: 13.5px;
   font-weight: 600;
-  padding: 0.45rem 0.9rem;
-  border-radius: 6px;
+  padding: 0.4rem 0.85rem;
+  border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
@@ -414,7 +422,13 @@ summary {
   border-color: transparent;
   background: transparent;
   color: var(--primary-dark);
-  text-decoration: underline;
+}
+.button--quiet:hover {
+  background: var(--bg);
+}
+.button:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .segmented {
@@ -965,15 +979,6 @@ a.badge {
   opacity: 1;
   visibility: visible;
 }
-.button {
-  border-color: var(--border);
-  font-size: 13.5px;
-  padding: 0.4rem 0.85rem;
-}
-.button--primary {
-  background: var(--primary);
-  border-color: var(--primary);
-}
 .button--primary[aria-disabled='true'] {
   background: #e4e7ec;
   border-color: #d0d5dd;
@@ -1328,23 +1333,6 @@ a.badge {
   border-color: var(--danger, #b42318);
 }
 
-/* "Fixează valoarea" / "Revino la automat": a small action under the color field. */
-.color__action {
-  margin-top: 4px;
-  padding: 2px 0;
-  border: 0;
-  background: none;
-  color: var(--primary);
-  font: inherit;
-  font-size: 13px;
-  text-decoration: underline;
-  cursor: pointer;
-}
-.color__action:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-  border-radius: 2px;
-}
 details.advanced {
   margin-top: 16px;
 }
@@ -1357,9 +1345,6 @@ details.advanced > summary {
   flex-wrap: wrap;
   gap: 4px 12px;
   align-items: baseline;
-}
-.color__note .color__action {
-  margin-top: 0;
 }
 
 /* Sign-in (E4b.1 UX 16): the known organisation, and the small "Altă organizație?" link. */
@@ -1391,4 +1376,14 @@ details.advanced > summary {
 .login.card {
   max-inline-size: 28rem;
   margin: 3rem auto;
+}
+
+/* Touch screens: 44 px targets (E4b.1 UX 18, 19). */
+@media (pointer: coarse) {
+  .button,
+  .sidebar__item,
+  .switch,
+  .link-button {
+    min-block-size: 44px;
+  }
 }

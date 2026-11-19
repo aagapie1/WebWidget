@@ -90,7 +90,7 @@ export function ColorField({
             {action && (
               <button
                 type="button"
-                class="color__action"
+                class="link-button"
                 aria-label={`${action.text}: ${label}`}
                 onClick={action.run}
               >

@@ -90,7 +90,7 @@ export function IntegrationSection(props: IntegrationSectionProps) {
         <div class="row-actions">
           <button
             type="button"
-            class="button button--primary"
+            class="button"
             onClick={() => {
               copy(snippet).then(
                 () => {

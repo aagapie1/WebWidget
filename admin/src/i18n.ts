@@ -233,6 +233,7 @@ const ro = {
     },
     sameSide: 'Fereastra pe aceeași parte cu butonul',
     sameSideHint: 'Altfel o puteți așeza separat, la dreapta sau la stânga.',
+    showOnMobileDescription: 'Pe ecranele mici bula acoperă o parte din pagină.',
     proactiveDescription:
       'O bulă scurtă lângă buton, după câteva secunde, fără să deschidă fereastra.',
     snippetsDescription:
@@ -589,6 +590,7 @@ const en: Dictionary = {
     },
     sameSide: 'Window on the same side as the launcher',
     sameSideHint: 'Otherwise you can place it separately, on the right or on the left.',
+    showOnMobileDescription: 'On small screens the bubble covers part of the page.',
     proactiveDescription:
       'A short bubble next to the launcher, after a few seconds, without opening the window.',
     snippetsDescription:

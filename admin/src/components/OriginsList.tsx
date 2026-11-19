@@ -66,7 +66,7 @@ export function OriginsList({ origins, errorsAt, listErrors, onChange }: Origins
         {t.fields.originsHint}
       </p>
       {listErrors && listErrors.length > 0 && (
-        <ul class="field__errors" role="alert">
+        <ul class="field__errors">
           {listErrors.map((error) => (
             <li key={error}>{error}</li>
           ))}

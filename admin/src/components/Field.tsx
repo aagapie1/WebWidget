@@ -172,33 +172,3 @@ export function SelectField<T extends string>(props: SelectFieldProps<T>) {
     </Field>
   );
 }
-
-interface CheckboxFieldProps {
-  label: string;
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-  hint?: string | undefined;
-}
-
-export function CheckboxField(props: CheckboxFieldProps) {
-  const id = useId();
-  return (
-    <div class="field field--checkbox">
-      <input
-        id={id}
-        type="checkbox"
-        checked={props.checked}
-        aria-describedby={props.hint ? `${id}-hint` : undefined}
-        onChange={(event) => {
-          props.onChange(event.currentTarget.checked);
-        }}
-      />
-      <label for={id}>{props.label}</label>
-      {props.hint && (
-        <p id={`${id}-hint`} class="field__hint">
-          {props.hint}
-        </p>
-      )}
-    </div>
-  );
-}

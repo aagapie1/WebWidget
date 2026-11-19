@@ -2,7 +2,7 @@ import { fireEvent, screen } from '@testing-library/preact';
 import { describe, expect, it, vi } from 'vitest';
 import { renderWithI18n } from '../test-utils.js';
 import { ColorField } from './ColorField.js';
-import { CheckboxField, NumberField, TextField } from './Field.js';
+import { NumberField, TextField } from './Field.js';
 
 describe('form fields (spec §7)', () => {
   it('links errors and hints to the control and marks it invalid', () => {
@@ -44,13 +44,6 @@ describe('form fields (spec §7)', () => {
     expect(onNumber).toHaveBeenCalledWith(undefined);
     fireEvent.input(screen.getByLabelText('Număr'), { target: { value: '7' } });
     expect(onNumber).toHaveBeenLastCalledWith(7);
-  });
-
-  it('labels checkboxes', () => {
-    const onChange = vi.fn();
-    renderWithI18n(<CheckboxField label="Activ" checked={false} onChange={onChange} />);
-    fireEvent.click(screen.getByLabelText('Activ'));
-    expect(onChange).toHaveBeenCalledWith(true);
   });
 
   it('edits colors as text, shows the default and offers a reset', () => {

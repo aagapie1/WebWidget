@@ -16,6 +16,7 @@ export {
   Palette,
   Quote,
   SlidersHorizontal,
+  Smartphone,
   TextQuote,
   Type,
   Upload,
