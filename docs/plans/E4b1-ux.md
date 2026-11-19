@@ -326,3 +326,18 @@ confirm before implementing.
   sign-in/theme/keyboard tests, and a check that the theme files are mounted (no silent fallback
   to the default Keycloak theme).
 - Then the E4b.1 close: the SPEC criteria checked one by one, with what was verified and how.
+
+**Approved 2026-11-19** with the recommended choices, plus:
+
+1. A known organisation (`ADMIN_ORG_HOSTS` or `?org=`) hides "Codul organizației" and shows a
+   small link "Altă organizație?".
+2. No automatic redirect.
+3. Logo from a realm attribute: the gateway origin is added to `img-src` in the realm's
+   Content-Security-Policy (Realm settings → Security defenses), and the theme test checks that
+   the logo actually loads. If the fallback `displayNameHtml` is used, an ADR notes that only the
+   super-admin sets it (it accepts HTML).
+4. Under 1024 px: a horizontal scrollable row with a visual hint that more areas follow (a faded
+   edge or arrows), fully usable from the keyboard.
+
+Production compose (E5): `deploy/docker-compose.yml` with a volume and explicit persistence for
+Redis, as noted in the backlog.
