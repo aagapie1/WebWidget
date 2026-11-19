@@ -343,6 +343,17 @@ describe('admin login, session and guard', () => {
     expect(forged.statusCode).toBe(401);
   });
 
+  it('rate-limits the admin API per session (600 calls a minute)', async () => {
+    const { session } = await login('pilot', pilotAdmin);
+    const cookies = { [SESSION_COOKIE]: session ?? '' };
+    const statuses: number[] = [];
+    for (let i = 0; i < 601; i++) {
+      statuses.push((await app.inject({ url: '/admin/api/session', cookies })).statusCode);
+    }
+    expect(statuses.slice(0, 600).every((status) => status === 200)).toBe(true);
+    expect(statuses[600]).toBe(429);
+  });
+
   it('requires the CSRF token and the gateway Origin on state-changing requests', async () => {
     const { session } = await login('pilot', pilotAdmin);
     const cookies = { [SESSION_COOKIE]: session ?? '' };
