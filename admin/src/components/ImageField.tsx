@@ -16,6 +16,8 @@ interface ImageFieldProps {
   errors?: readonly string[] | undefined;
   /** Where the image appears (e.g. "Apare în antetul ferestrei."). */
   where?: string | undefined;
+  /** No empty preview square before an upload: only "Încarcă imagine" (images chosen from a tile). */
+  hideEmptyPreview?: boolean;
   /** Hide the field label when a surrounding control already names it. */
   hideLabel?: boolean;
 }
@@ -65,16 +67,18 @@ export function ImageField(props: ImageFieldProps) {
         {props.label}
       </span>
       <div class="image-field__body">
-        <div class="image-field__thumb">
-          {props.value ? (
-            <img
-              src={`/admin/api/tenants/${encodeURIComponent(props.tenant)}/assets/${encodeURIComponent(props.value)}`}
-              alt={`${t.images.preview}: ${props.label}`}
-            />
-          ) : (
-            <span aria-hidden="true">—</span>
-          )}
-        </div>
+        {(props.value || !props.hideEmptyPreview) && (
+          <div class="image-field__thumb">
+            {props.value ? (
+              <img
+                src={`/admin/api/tenants/${encodeURIComponent(props.tenant)}/assets/${encodeURIComponent(props.value)}`}
+                alt={`${t.images.preview}: ${props.label}`}
+              />
+            ) : (
+              <span aria-hidden="true">—</span>
+            )}
+          </div>
+        )}
         <div class="image-field__actions">
           {props.canUpload && (
             <button

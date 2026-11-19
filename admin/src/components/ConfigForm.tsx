@@ -309,6 +309,7 @@ export function ConfigForm({
             <ImageField
               label={t.fields.assistantAvatar}
               hideLabel
+              hideEmptyPreview
               tenant={tenant}
               value={assistantFile}
               canUpload={permissions.assets}
@@ -345,6 +346,7 @@ export function ConfigForm({
             <ImageField
               label={t.fields.userAvatar}
               hideLabel
+              hideEmptyPreview
               tenant={tenant}
               value={userFile}
               canUpload={permissions.assets}
@@ -378,6 +380,7 @@ export function ConfigForm({
             <ImageField
               label={t.fields.iconImage}
               hideLabel
+              hideEmptyPreview
               tenant={tenant}
               value={iconFile}
               canUpload={permissions.assets}

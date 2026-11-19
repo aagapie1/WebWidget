@@ -320,6 +320,31 @@ describe('Editor', () => {
     expect(screen.getByText(/^Alegeți dintre documentele citate recent/)).toBeTruthy();
   });
 
+  it('"Imagine" without an uploaded image shows only "Încarcă imagine" (no empty preview)', async () => {
+    renderWithI18n(<Editor api={fakeApi()} tenant="pilot" onSessionExpired={vi.fn()} />);
+    const avatars = await screen.findByRole('group', { name: /^Avatarul asistentului/ });
+    fireEvent.click(within(avatars).getByRole('radio', { name: 'Imagine' }));
+    const upload = await screen.findAllByRole('button', { name: 'Încarcă imagine' });
+    // The logo keeps its preview square; the avatar row has only the button.
+    const row = upload.at(-1)?.closest('.image-field');
+    expect(row?.querySelector('.image-field__thumb')).toBeNull();
+    expect(document.querySelectorAll('.image-field__thumb')).toHaveLength(1);
+  });
+
+  it('"same side as the launcher" is a switch in Fereastră; off, it shows the window position', async () => {
+    renderWithI18n(<Editor api={fakeApi()} tenant="pilot" onSessionExpired={vi.fn()} />);
+    const toggle = await screen.findByRole('switch', {
+      name: 'Fereastra pe aceeași parte cu butonul',
+    });
+    expect(toggle.closest('section')?.getAttribute('aria-labelledby')).toBe('section-window');
+    expect(toggle.getAttribute('aria-checked')).toBe('true');
+    // Not in the colors section any more.
+    expect(document.querySelector('[aria-labelledby="section-colors"] [role="switch"]')).toBeNull();
+    expect(screen.queryByLabelText('Poziția ferestrei')).toBeNull();
+    fireEvent.click(toggle);
+    expect(await screen.findByLabelText('Poziția ferestrei')).toBeTruthy();
+  });
+
   it('says under each image where it appears', async () => {
     renderWithI18n(<Editor api={fakeApi()} tenant="pilot" onSessionExpired={vi.fn()} />);
     expect(await screen.findByText('Apare în antetul ferestrei.')).toBeTruthy();

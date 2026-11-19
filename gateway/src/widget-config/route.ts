@@ -14,6 +14,7 @@ import {
 import type { AvatarIconName } from '../protocol/icons.js';
 import type { TextKey } from '../protocol/texts.js';
 import { assetUrl, textOverrides } from '../tenant-assets/route.js';
+import { initials } from '../protocol/initials.js';
 
 const optional = <K extends string>(key: K, value: string | undefined) =>
   (value ? { [key]: value } : {}) as Partial<Record<K, string>>;
@@ -126,23 +127,7 @@ function avatar(tenant: Tenant, setting: AvatarSetting, initialsText: string): W
   }
 }
 
-const graphemes = new Intl.Segmenter('ro', { granularity: 'grapheme' });
-
-/** "Asistentul Primăriei" → "AP"; one word → its first letter. */
-export function initials(name: string): string {
-  const letters = name
-    .split(/\s+/)
-    .map((word) => {
-      // Graphemes, not code units: "Ștefan" → "Ș".
-      for (const { segment } of graphemes.segment(word)) {
-        if (/\p{L}|\p{N}/u.test(segment)) return segment;
-      }
-      return undefined;
-    })
-    .filter((char): char is string => char !== undefined)
-    .slice(0, 2);
-  return (letters.join('') || '?').toLocaleUpperCase('ro');
-}
+export { initials } from '../protocol/initials.js';
 
 function text(tenant: Tenant, locale: Locale, key: TextKey): string | undefined {
   const value = tenant.texts[locale]?.[key]?.trim();

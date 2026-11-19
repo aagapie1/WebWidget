@@ -19,6 +19,35 @@ describe('IntegrationSection', () => {
     ]);
   });
 
+  it('marks the domains item ✓ or ⚠, named for screen readers, with the reason', () => {
+    const render = (domainsStatus: 'ok' | 'missing' | 'invalid', origins: string[]) =>
+      renderWithI18n(
+        <IntegrationSection
+          tenant="pilot"
+          gatewayOrigin={GATEWAY}
+          origins={origins}
+          domainsStatus={domainsStatus}
+          checkInstallations={vi.fn()}
+        />,
+      );
+    const ok = render('ok', ['https://www.pilot.ro']);
+    const okItem = ok.container.querySelector('.checklist__item--ok');
+    expect(okItem?.textContent).toMatch(/^✓\s*În regulă: /);
+    ok.unmount();
+
+    const missing = render('missing', []);
+    const warn = missing.container.querySelector('.checklist__item--warn');
+    expect(warn?.textContent).toMatch(/^⚠\s*De verificat: /);
+    expect(warn?.textContent).toContain('Nu există niciun domeniu permis');
+    expect(missing.container.querySelector('.checklist__item--ok')).toBeNull();
+    missing.unmount();
+
+    const invalid = render('invalid', ['http://www.pilot.ro']);
+    expect(invalid.container.querySelector('.checklist__item--warn')?.textContent).toContain(
+      'Unele domenii permise au erori.',
+    );
+  });
+
   it('copies the code (updated live with the language) and confirms politely', async () => {
     const copy = vi.fn(() => Promise.resolve());
     renderWithI18n(

@@ -65,6 +65,37 @@ describe('App', () => {
     outside.remove();
   });
 
+  it("shows the client's logo in the window header, the assistant's avatar next to answers", () => {
+    const transport = new ScriptedTransport([]);
+    const controller = new ChatController({
+      transport,
+      texts: ro,
+      schedule: (flush) => {
+        flush();
+      },
+    });
+    controller.setWelcome('Bună ziua!');
+    const { container } = render(
+      <App
+        controller={controller}
+        texts={ro}
+        assistantName="Ana"
+        identity={{
+          logoUrl: '/w/t/pilot/0123456789-logo.png',
+          assistantAvatar: { kind: 'initials', text: 'AP' },
+        }}
+        onHide={vi.fn()}
+      />,
+    );
+    const header = container.querySelector('.header');
+    expect(header?.querySelector('img')?.getAttribute('src')).toBe(
+      '/w/t/pilot/0123456789-logo.png',
+    );
+    expect(header?.querySelector('.avatar__initials')).toBeNull();
+    // Answers keep the assistant's avatar.
+    expect(container.querySelector('.messages .avatar__initials')?.textContent).toBe('AP');
+  });
+
   it('hides on Escape (no focus trap) and from the minimize button', () => {
     const { onHide } = setup([]);
     fireEvent.keyDown(document, { key: 'Escape' });

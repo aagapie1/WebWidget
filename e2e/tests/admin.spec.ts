@@ -418,6 +418,15 @@ test('the preview opens on a sample conversation and follows the edited section'
   await page.getByLabel('Numele asistentului').focus();
   await expect(launcher).toHaveAttribute('aria-expanded', 'true');
   await expect(chat.getByText('Care este programul cu publicul?')).toBeVisible();
+  // The initials in the form are the ones the window shows (same function, gateway/initials).
+  const formInitials = await page
+    .getByRole('group', { name: /^Avatarul asistentului/ })
+    .locator('.tile')
+    .first()
+    .locator('.glyph')
+    .innerText();
+  await expect(chat.locator('.avatar__initials').first()).toHaveText(formInitials);
+  expect(formInitials).toBe('PE');
 
   // "Mesaj proactiv": the bubble shows at once, with the new text.
   await area(page, 'Mesaj proactiv');

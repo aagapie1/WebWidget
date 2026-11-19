@@ -257,17 +257,4 @@ export const stash = {
 };
 
 /** "Asistentul Primăriei" → "AP" (same rule as the gateway, for the avatar choice). */
-export function initials(name: string): string {
-  const segmenter = new Intl.Segmenter('ro', { granularity: 'grapheme' });
-  const letters = name
-    .split(/\s+/)
-    .map((word) => {
-      for (const { segment } of segmenter.segment(word)) {
-        if (/\p{L}|\p{N}/u.test(segment)) return segment;
-      }
-      return undefined;
-    })
-    .filter((char): char is string => char !== undefined)
-    .slice(0, 2);
-  return (letters.join('') || '?').toLocaleUpperCase('ro');
-}
+export { initials } from 'gateway/initials';

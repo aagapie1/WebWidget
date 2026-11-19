@@ -6,7 +6,8 @@
     "./protocol": "./src/protocol/index.ts",
     "./config-schema": "./src/config/schema.ts",
     "./contrast": "./src/config/contrast.ts",
-    "./texts": "./src/protocol/texts.ts"
+    "./texts": "./src/protocol/texts.ts",
+    "./initials": "./src/protocol/initials.ts"
   },
   "scripts": {
     "dev": "tsx watch --env-file-if-exists=.env src/index.ts",
