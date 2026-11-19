@@ -24,6 +24,11 @@ one theme per client.
   passes its own interface language to the gateway (`/admin/auth/login?…&locale=ro`), which sends
   it as `ui_locales`. Keycloak's Romanian file covers 36 of 471 login strings and writes "ă" as
   "ǎ" (U+01CE); the theme ships `messages_ro.properties` for every page the admin uses.
+  Checked one by one in Romanian (e2e): wrong password, temporary lockout (Keycloak shows the
+  wrong-password text on purpose), expired session, used link, invalid e-mail link, the generic
+  error page and a sign-in refused by the institution's IdP. When Keycloak has lost its cookies
+  (an expired session), it no longer knows the chosen language and follows the browser's: a
+  Romanian browser gets Romanian, an English one English.
 - **No external resources:** Inter (OFL) is served by Keycloak from the theme.
 - **Organisation on the admin's sign-in page:** `?org=` or the host (`ADMIN_ORG_HOSTS`), resolved one
   at a time by `GET /admin/auth/org` (rate-limited, never the list); the code field is the

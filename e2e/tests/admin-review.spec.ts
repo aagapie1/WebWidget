@@ -24,6 +24,12 @@ async function signIn(page: Page): Promise<void> {
   await expect(page.locator('#widget-logo')).toBeVisible();
   await page.waitForTimeout(300); // fonts
   await page.screenshot({ path: `${OUT}/keycloak-pilot-ro.png` });
+  // A wrong password: the message, in Romanian, on the same themed page.
+  await page.locator('#username').fill('pilot-admin');
+  await page.locator('#password').fill('parola-gresita');
+  await page.locator('#kc-login').click();
+  await expect(page.locator('#input-error-username')).toBeVisible();
+  await page.screenshot({ path: `${OUT}/keycloak-wrong-password.png` });
   await page.locator('#username').fill('pilot-admin');
   await page.locator('#password').fill('dev-pilot-admin-Pass1');
   await page.locator('#kc-login').click();

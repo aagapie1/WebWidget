@@ -380,10 +380,26 @@ test('the Dify key never appears in the admin interface traffic', async ({ page 
   expect((await discardDraft(page, 'pilot')).status).toBe(204);
 });
 
-const serious = async (page: Page) =>
-  (await new AxeBuilder({ page }).analyze()).violations.filter(
-    (violation) => violation.impact === 'serious' || violation.impact === 'critical',
-  );
+/**
+ * Serious and critical axe violations of the whole page. Call it last in a test: in Firefox, axe
+ * sometimes crashes the page ("Page crashed", docs/BACKLOG.md). A crash is not a finding (Chromium
+ * and WebKit scan the same page): it is reported as an annotation, and real violations still fail.
+ */
+const serious = async (page: Page) => {
+  try {
+    return (await new AxeBuilder({ page }).analyze()).violations.filter(
+      (violation) => violation.impact === 'serious' || violation.impact === 'critical',
+    );
+  } catch (error) {
+    const firefox = page.context().browser()?.browserType().name() === 'firefox';
+    if (!firefox || !String(error).includes('Page crashed')) throw error;
+    test.info().annotations.push({
+      type: 'firefox-axe-crash',
+      description: `${test.info().title} (docs/BACKLOG.md)`,
+    });
+    return [];
+  }
+};
 
 test('sign-in: a known organisation hides the code field; "Altă organizație?" brings it back', async ({
   page,
@@ -554,6 +570,72 @@ test('tablet: no horizontal scroll at 768, 1024 and 1279 px; under 1024 the area
   await expect(nav).toHaveAttribute('data-more', /start/);
   await page.keyboard.press('Enter');
   await expect(page.getByRole('heading', { level: 1, name: 'Integrare pe site' })).toBeVisible();
+});
+
+test.describe('Keycloak: the rare messages in Romanian', () => {
+  // A Romanian browser: on pages where Keycloak has lost its own language cookie (expired
+  // session), it follows the browser's language.
+  test.use({ locale: 'ro-RO' });
+  const KEYCLOAK = process.env.E2E_KEYCLOAK_URL ?? 'http://localhost:8081';
+  const auth = (client = 'widget-admin-ui') =>
+    `${KEYCLOAK}/realms/pilot/protocol/openid-connect/auth?client_id=${client}` +
+    `&response_type=code&scope=openid&redirect_uri=${encodeURIComponent(`${ADMIN}/admin/auth/callback`)}` +
+    '&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256';
+  const feedback = (page: Page) =>
+    page.locator('#input-error-username, .pf-v5-c-alert__title, #kc-error-message p').first();
+
+  test('wrong password, used link, expired session', async ({ page }) => {
+    // Wrong password (a temporary lockout shows the same text, on purpose: it does not reveal
+    // that the account exists).
+    await page.goto(auth());
+    const action = await page.locator('#kc-form-login').getAttribute('action');
+    await page.locator('#username').fill('pilot-admin');
+    await page.locator('#password').fill('parola-gresita');
+    await page.locator('#kc-login').click();
+    await expect(feedback(page)).toHaveText('Nume de utilizator sau parolă greșită.');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'ro');
+
+    // A link already used (the form of an earlier step).
+    await page.goto(action ?? '');
+    await expect(feedback(page)).toHaveText(
+      'Acțiunea a expirat. Continuați acum cu autentificarea.',
+    );
+
+    // The session expired: the browser lost Keycloak's cookies while the page was open.
+    await page.goto(auth());
+    await page.context().clearCookies();
+    await page.locator('#username').fill('pilot-admin');
+    await page.locator('#password').fill('parola-gresita');
+    await page.locator('#kc-login').click();
+    await expect(page.getByRole('heading', { name: 'Ne pare rău...' })).toBeVisible();
+    await expect(feedback(page)).toContainText(
+      'Datele de autentificare din browser nu au fost găsite',
+    );
+  });
+
+  test('invalid e-mail link, generic error page, refused institution sign-in', async ({ page }) => {
+    await page.goto(`${KEYCLOAK}/realms/pilot/login-actions/action-token?key=nu-este-valid`);
+    await expect(page.getByRole('heading', { name: 'Ne pare rău...' })).toBeVisible();
+    await expect(feedback(page)).toHaveText(
+      'A apărut o eroare. Autentificați-vă din nou, pornind din aplicație.',
+    );
+
+    await page.goto(auth('nu-exista'));
+    await expect(page.getByRole('heading', { name: 'Ne pare rău...' })).toBeVisible();
+    await expect(feedback(page)).toHaveText('Aplicația nu a fost găsită.');
+
+    // The institution's identity provider (idp-sim) refuses the sign-in.
+    await page.goto(auth());
+    await page.getByRole('link', { name: /Contul de serviciu/ }).click();
+    const idp = new URL(page.url());
+    const back = idp.searchParams.get('redirect_uri') ?? '';
+    const state = idp.searchParams.get('state') ?? '';
+    await page.goto(`${back}?error=access_denied&state=${encodeURIComponent(state)}`);
+    await expect(feedback(page)).toHaveText(
+      'Accesul a fost refuzat la autentificarea prin Contul de serviciu (IdP simulat).',
+    );
+    expect(await serious(page)).toEqual([]);
+  });
 });
 
 test('no serious or critical axe violations on the login page', async ({ page }) => {
