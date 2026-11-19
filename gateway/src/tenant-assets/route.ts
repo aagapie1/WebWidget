@@ -125,6 +125,22 @@ export function tenantAssetRoutes(
     return reply.type('application/json; charset=utf-8').send(body);
   });
 
+  /**
+   * The client's current logo at a stable address (E4b.1 UX 17): the Keycloak sign-in theme reads
+   * it from a realm attribute, which cannot follow the content-hashed URL. A short-lived redirect
+   * to that URL; 404 without a logo.
+   */
+  app.get('/w/t/:tenant/logo', (request, reply) => {
+    const params = z.object({ tenant: tenantIdSchema }).safeParse(request.params);
+    const tenant = params.success ? tenants.get(params.data.tenant) : undefined;
+    const url = tenant ? assetUrl(tenant, tenant.identity.logo) : undefined;
+    if (!url) return reply.code(404).type('text/plain; charset=utf-8').send('Not found');
+    return reply
+      .header('cache-control', 'public, max-age=300')
+      .header('cross-origin-resource-policy', 'cross-origin')
+      .redirect(url, 302);
+  });
+
   /** Content-hashed URLs: cached as immutable; a changed file gets a new URL. */
   app.get('/w/t/:tenant/:file', async (request, reply) => {
     const params = assetParams.safeParse(request.params);

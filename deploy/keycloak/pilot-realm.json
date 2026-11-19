@@ -175,5 +175,12 @@
         "role": "widget-editor"
       }
     }
-  ]
+  ],
+  "loginTheme": "widget-admin",
+  "browserSecurityHeaders": {
+    "contentSecurityPolicy": "frame-src 'self'; frame-ancestors 'self'; object-src 'none'; img-src 'self' data: http://localhost:3000 http://localhost:3100 http://localhost:3200;"
+  },
+  "attributes": {
+    "clientLogoUrl": "http://localhost:3200/w/t/pilot/logo"
+  }
 }

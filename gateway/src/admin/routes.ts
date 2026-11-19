@@ -46,6 +46,8 @@ const orgQuery = z.object({ org: z.string().max(64).optional() });
 const loginQuery = z.object({
   org: z.string().max(64),
   returnTo: z.string().max(512).optional(),
+  /** The admin interface's language, passed to the identity provider (ui_locales). */
+  locale: z.enum(['ro', 'en']).optional(),
 });
 const previewQuery = z.object({
   id: z.string().max(110),
@@ -245,6 +247,7 @@ export function adminRoutes(app: FastifyInstance, options: AdminRouteOptions): v
           state,
           nonce,
           codeChallenge: await pkce.challenge(codeVerifier),
+          locale: query.data.locale,
         });
         // Lax: the identity provider brings the browser back with a top-level GET.
         void reply.setCookie(cookies.login, state, {

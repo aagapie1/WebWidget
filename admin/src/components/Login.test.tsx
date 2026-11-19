@@ -32,7 +32,7 @@ describe('Login (E4b.1 UX 16)', () => {
     expect(screen.queryByLabelText('Codul organizației')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Continuă spre autentificare' }));
     expect(navigate).toHaveBeenCalledWith(
-      '/admin/auth/login?org=pilot&returnTo=%2Fadmin%2F%3Ftenant%3Dpilot',
+      '/admin/auth/login?org=pilot&returnTo=%2Fadmin%2F%3Ftenant%3Dpilot&locale=ro',
     );
   });
 
@@ -72,7 +72,7 @@ describe('Login (E4b.1 UX 16)', () => {
     fireEvent.input(input, { target: { value: 'Demo-Primarie' } });
     fireEvent.submit(input.closest('form') as HTMLFormElement);
     expect(navigate).toHaveBeenCalledWith(
-      '/admin/auth/login?org=demo-primarie&returnTo=%2Fadmin%2F',
+      '/admin/auth/login?org=demo-primarie&returnTo=%2Fadmin%2F&locale=ro',
     );
   });
 
@@ -139,7 +139,9 @@ describe('Login (E4b.1 UX 16)', () => {
       />,
     );
     fireEvent.click(await screen.findByRole('button', { name: 'Primăria Pilot (pilot)' }));
-    expect(navigate).toHaveBeenCalledWith('/admin/auth/login?org=pilot&returnTo=%2Fadmin%2F');
+    expect(navigate).toHaveBeenCalledWith(
+      '/admin/auth/login?org=pilot&returnTo=%2Fadmin%2F&locale=ro',
+    );
     expect(
       screen.getByRole('button', { name: 'Administrarea platformei (platform)' }),
     ).toBeTruthy();

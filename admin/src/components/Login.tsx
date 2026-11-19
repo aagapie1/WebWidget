@@ -65,7 +65,7 @@ export function Login({
   loadOrgs = fetchDevOrgs,
   resolveOrg = fetchOrg,
 }: LoginProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [mode, setMode] = useState<Mode>({ kind: 'resolving' });
   const [value, setValue] = useState(linkOrg ?? storedOrg ?? '');
   const [orgs, setOrgs] = useState<KnownOrg[]>([]);
@@ -138,7 +138,7 @@ export function Login({
             type="button"
             class="button button--primary"
             onClick={() => {
-              navigate(loginUrl(mode.org.org, returnTo));
+              navigate(loginUrl(mode.org.org, returnTo, locale));
             }}
           >
             {t.login.submit}
@@ -167,7 +167,7 @@ export function Login({
               // A script navigation, not a form submission: the CSP `form-action 'self'` would
               // block the gateway's redirect to the identity provider.
               event.preventDefault();
-              if (event.currentTarget.checkValidity()) navigate(loginUrl(value, returnTo));
+              if (event.currentTarget.checkValidity()) navigate(loginUrl(value, returnTo, locale));
             }}
           >
             <div class={codeError ? 'field field--invalid' : 'field'}>
@@ -215,10 +215,10 @@ export function Login({
                   type="button"
                   class="button"
                   onClick={() => {
-                    navigate(loginUrl(org.org, returnTo));
+                    navigate(loginUrl(org.org, returnTo, locale));
                   }}
                 >
-                  {orgName(org)} <span class="login__code">({org.org})</span>
+                  {`${orgName(org)} (${org.org})`}
                 </button>
               </li>
             ))}

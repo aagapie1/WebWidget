@@ -151,10 +151,14 @@ class FakeOidc implements OidcClient {
   lastChecks: CodeExchangeChecks | undefined;
   failExchange = false;
 
-  authorizationUrl(realm: AdminRealm, request: { state: string; redirectUri: string }) {
+  authorizationUrl(
+    realm: AdminRealm,
+    request: { state: string; redirectUri: string; locale?: string | undefined },
+  ) {
     const url = new URL(`${realm.issuer}/protocol/openid-connect/auth`);
     url.searchParams.set('state', request.state);
     url.searchParams.set('redirect_uri', request.redirectUri);
+    if (request.locale) url.searchParams.set('ui_locales', request.locale);
     return Promise.resolve(url);
   }
 
@@ -448,6 +452,15 @@ describe('admin login, session and guard', () => {
         ADMIN_ORG_HOSTS: 'admin.pilot.test',
       }),
     ).toThrow(/ADMIN_ORG_HOSTS: invalid host=org pair/);
+  });
+
+  it("passes the admin interface's language to the identity provider (ui_locales)", async () => {
+    const start = await app.inject({ url: '/admin/auth/login?org=pilot&locale=ro' });
+    expect(new URL(start.headers.location ?? '').searchParams.get('ui_locales')).toBe('ro');
+    const english = await app.inject({ url: '/admin/auth/login?org=pilot&locale=en' });
+    expect(new URL(english.headers.location ?? '').searchParams.get('ui_locales')).toBe('en');
+    const none = await app.inject({ url: '/admin/auth/login?org=pilot' });
+    expect(new URL(none.headers.location ?? '').searchParams.has('ui_locales')).toBe(false);
   });
 
   it('rate-limits login attempts per client address', async () => {

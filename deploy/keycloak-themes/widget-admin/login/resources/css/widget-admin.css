@@ -1,0 +1,164 @@
+/*
+ * Sign-in theme of the admin interface (E4b.1 UX 17): the admin's tokens (admin/src/styles.css)
+ * over Keycloak's keycloak.v2 theme (PatternFly 5). Fonts served by Keycloak itself (rule 8).
+ */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../fonts/inter-latin-400-normal.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../fonts/inter-latin-ext-400-normal.woff2') format('woff2');
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('../fonts/inter-latin-600-normal.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('../fonts/inter-latin-ext-600-normal.woff2') format('woff2');
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+
+:root {
+  --wa-bg: #f4f5f7;
+  --wa-surface: #ffffff;
+  --wa-text: #1d2330;
+  --wa-muted: #5b6474;
+  --wa-border: #c9ced6;
+  --wa-primary: #2f54eb;
+  --wa-primary-dark: #2443c4;
+  --wa-danger: #b42318;
+  --wa-focus: #1a73e8;
+  --wa-radius: 10px;
+  --wa-shadow: 0 1px 2px rgb(16 24 40 / 0.05), 0 1px 3px rgb(16 24 40 / 0.06);
+
+  --pf-v5-global--FontFamily--text: 'Inter', system-ui, sans-serif;
+  --pf-v5-global--FontFamily--heading: 'Inter', system-ui, sans-serif;
+  --pf-v5-global--FontFamily--redhat-updated--heading--sans-serif: 'Inter', system-ui, sans-serif;
+  --pf-v5-global--FontFamily--redhat-updated--sans-serif: 'Inter', system-ui, sans-serif;
+  --pf-v5-global--primary-color--100: var(--wa-primary);
+  --pf-v5-global--primary-color--200: var(--wa-primary-dark);
+  --pf-v5-global--link--Color: var(--wa-primary);
+  --pf-v5-global--link--Color--hover: var(--wa-primary-dark);
+  --pf-v5-global--Color--100: var(--wa-text);
+  --pf-v5-global--Color--200: var(--wa-muted);
+  --pf-v5-global--danger-color--100: var(--wa-danger);
+  --pf-v5-global--BorderRadius--sm: 8px;
+}
+
+body#keycloak-bg,
+#keycloak-bg {
+  background: var(--wa-bg);
+  color: var(--wa-text);
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+/* The client's brand above the card: logo and name, like the admin header. */
+.widget-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: center;
+}
+.widget-brand__logo {
+  inline-size: 48px;
+  block-size: 48px;
+  object-fit: contain;
+  border-radius: 8px;
+}
+.widget-brand__text {
+  display: grid;
+  text-align: start;
+}
+.widget-brand__name {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--wa-text);
+}
+.widget-brand__suffix {
+  font-size: 0.875rem;
+  color: var(--wa-muted);
+}
+
+/* The card. */
+.pf-v5-c-login__main {
+  background: var(--wa-surface);
+  border-radius: var(--wa-radius);
+  box-shadow: var(--wa-shadow);
+}
+
+/* Buttons: one primary, the admin's accent. */
+.pf-v5-c-button.pf-m-primary {
+  background-color: var(--wa-primary);
+  border-radius: 8px;
+  font-weight: 600;
+}
+.pf-v5-c-button.pf-m-primary:hover {
+  background-color: var(--wa-primary-dark);
+}
+
+/* Visible focus, the same ring as the admin. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+.pf-v5-c-button:focus-visible {
+  outline: 3px solid var(--wa-focus);
+  outline-offset: 2px;
+}
+
+/* Links are underlined (consistent controls, E4b.1 UX 18). */
+#keycloak-bg a {
+  text-decoration: underline;
+}
+
+/* PatternFly's brand area is uppercase, letter-spaced and underlined in blue: the admin's is not. */
+.pf-v5-c-login__header,
+#kc-header {
+  border: 0;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.widget-brand,
+.widget-brand * {
+  text-transform: none;
+  letter-spacing: normal;
+}
+/* keycloak.v2 draws a 4px band on top of the card (--keycloak-card-top-color): not ours. */
+:root {
+  --keycloak-card-top-color: transparent;
+}
+.pf-v5-c-login__main-header {
+  border-top: 0;
+}
+/* Buttons that are links (identity providers) keep the button look, without underline. */
+#keycloak-bg a.pf-v5-c-button,
+#keycloak-bg .pf-v5-c-login__main-footer-links-item a {
+  text-decoration: none;
+}

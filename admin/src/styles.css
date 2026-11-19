@@ -1371,10 +1371,6 @@ details.advanced > summary {
 .login__other {
   margin-top: 1rem;
 }
-.login__code {
-  color: var(--muted);
-  font-weight: 400;
-}
 /* An action that looks like a link (it stays a button: it does not navigate). */
 .link-button {
   padding: 0;
@@ -1390,4 +1386,9 @@ details.advanced > summary {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
   border-radius: 2px;
+}
+/* The sign-in card is centred (the frame's .card resets margins). */
+.login.card {
+  max-inline-size: 28rem;
+  margin: 3rem auto;
 }

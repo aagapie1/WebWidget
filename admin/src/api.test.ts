@@ -60,7 +60,9 @@ describe('admin API client', () => {
 
   it('builds the re-login URL that comes back to the same screen', () => {
     expect(loginUrl('pilot', '/admin/?tenant=pilot')).toBe(
-      '/admin/auth/login?org=pilot&returnTo=%2Fadmin%2F%3Ftenant%3Dpilot',
+      '/admin/auth/login?org=pilot&returnTo=%2Fadmin%2F%3Ftenant%3Dpilot&locale=ro',
     );
+    // The identity provider's page follows the admin interface's language.
+    expect(loginUrl('pilot', '/admin/', 'en')).toContain('&locale=en');
   });
 });

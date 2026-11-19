@@ -6,6 +6,8 @@ export interface AuthorizationRequest {
   state: string;
   nonce: string;
   codeChallenge: string;
+  /** The sign-in page's language (OIDC ui_locales): the admin interface's own. */
+  locale?: 'ro' | 'en' | undefined;
 }
 
 export interface CodeExchangeChecks {
@@ -72,6 +74,7 @@ export class OpenIdClient implements OidcClient {
       code_challenge_method: 'S256',
       state: request.state,
       nonce: request.nonce,
+      ...(request.locale ? { ui_locales: request.locale } : {}),
     });
   }
 

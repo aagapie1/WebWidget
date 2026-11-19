@@ -60,8 +60,8 @@ export function App({
   // Session expired while editing: the edits are stashed; sign in again and come back here.
   const onSessionExpired = useCallback(() => {
     const org = session?.org ?? read(ORG_KEY) ?? '';
-    location.assign(loginUrl(org, `/admin/?tenant=${encodeURIComponent(tenant ?? '')}`));
-  }, [session, tenant, location]);
+    location.assign(loginUrl(org, `/admin/?tenant=${encodeURIComponent(tenant ?? '')}`, locale));
+  }, [session, tenant, location, locale]);
 
   const chooseLocale = (next: Locale) => {
     setLocale(next);

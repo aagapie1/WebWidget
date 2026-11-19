@@ -35,9 +35,11 @@ export function AppHeader(props: AppHeaderProps) {
         </span>
         <span class="brand__text">
           <span class="brand__name">{props.assistantName}</span>
-          <span class="brand__sub">
-            {props.clientName} · {t.ux.adminSuffix}
-          </span>
+          {props.clientName && (
+            <span class="brand__sub">
+              {props.clientName} · {t.ux.adminSuffix}
+            </span>
+          )}
         </span>
       </div>
       <span class="app-header__spacer" />

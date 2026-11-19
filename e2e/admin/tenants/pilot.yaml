@@ -6,3 +6,6 @@ difyBaseUrl: ${DIFY_BASE_URL}
 difyApiKeyEnv: DIFY_API_KEY_E2E
 allowedOrigins:
   - http://127.0.0.1:5180
+identity:
+  # A generated test logo (the Keycloak sign-in theme shows it through /w/t/pilot/logo).
+  logo: logo.png

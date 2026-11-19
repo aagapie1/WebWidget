@@ -141,7 +141,8 @@ export function createApi(fetchImpl: Fetch = (...args) => fetch(...args)): Admin
 }
 
 /** Where the browser goes to sign in again, coming back to the same screen. */
-export function loginUrl(org: string, returnTo: string): string {
-  const params = new URLSearchParams({ org, returnTo });
+/** The gateway's sign-in start; `locale` makes the identity provider's page use the same language. */
+export function loginUrl(org: string, returnTo: string, locale: 'ro' | 'en' = 'ro'): string {
+  const params = new URLSearchParams({ org, returnTo, locale });
   return `/admin/auth/login?${params.toString()}`;
 }

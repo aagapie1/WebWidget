@@ -406,6 +406,43 @@ test('sign-in: a known organisation hides the code field; "Altă organizație?" 
   expect(await serious(page)).toEqual([]);
 });
 
+test("Keycloak sign-in page: the admin theme, in Romanian, with the client's name and logo", async ({
+  page,
+}) => {
+  await page.goto(`${ADMIN}/admin/?org=pilot`);
+  await page.getByRole('button', { name: 'Continuă spre autentificare' }).click();
+  await page.waitForURL(
+    /\/realms\/pilot\/protocol\/openid-connect\/auth|\/realms\/pilot\/login-actions\//,
+  );
+  // The theme is the one mounted, not Keycloak's default (no silent fallback).
+  expect(
+    await page.evaluate(() =>
+      [...document.styleSheets].some((sheet) => sheet.href?.endsWith('/css/widget-admin.css')),
+    ),
+  ).toBe(true);
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ro');
+  await expect(page).toHaveTitle('Autentificare – Pilot');
+  await expect(page.locator('.widget-brand__name')).toHaveText('Pilot');
+  await expect(page.locator('.widget-brand__suffix')).toHaveText(
+    'administrarea asistentului virtual',
+  );
+  await expect(page.getByRole('heading', { name: 'Autentificați-vă' })).toBeVisible();
+  await expect(page.getByLabel('Parolă', { exact: true })).toBeVisible();
+  // The logo comes from the realm attribute, through the gateway, and really loads (the realm's
+  // CSP allows the gateway in img-src).
+  const logo = page.locator('#widget-logo');
+  await expect(logo).toHaveAttribute('src', `${ADMIN}/w/t/pilot/logo`);
+  await expect
+    .poll(() => logo.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth))
+    .toBeGreaterThan(0);
+  expect(
+    await page
+      .locator('body')
+      .evaluate((body) => getComputedStyle(body).fontFamily.split(',')[0]?.replace(/["']/g, '')),
+  ).toBe('Inter');
+  expect(await serious(page)).toEqual([]);
+});
+
 test('no serious or critical axe violations on the login page', async ({ page }) => {
   await page.goto(`${ADMIN}/admin/`);
   await expect(page.getByRole('heading', { name: 'Autentificare' })).toBeVisible();

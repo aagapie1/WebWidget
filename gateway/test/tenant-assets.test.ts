@@ -112,6 +112,17 @@ describe('GET /api/loader-config', () => {
     expect(loaderConfig(plain, 'ro').launcher).not.toHaveProperty('color');
   });
 
+  it('serves the current logo at a stable address for the sign-in theme (E4b.1 UX 17)', async () => {
+    const logo = await fetch(`${h.url}/w/t/pilot/logo`, { redirect: 'manual' });
+    expect(logo.status).toBe(302);
+    expect(logo.headers.get('location')).toMatch(/^\/w\/t\/pilot\/[0-9a-f]{10}-logo\.svg$/);
+    expect(logo.headers.get('cache-control')).toBe('public, max-age=300');
+    // The redirect leads to the image itself.
+    const image = await fetch(`${h.url}${logo.headers.get('location') ?? ''}`);
+    expect(image.headers.get('content-type')).toContain('image/svg+xml');
+    expect((await fetch(`${h.url}/w/t/nu-exista/logo`, { redirect: 'manual' })).status).toBe(404);
+  });
+
   it('allows CORS only for the tenant origins, with Vary: Origin', async () => {
     const allowed = await fetch(`${h.url}/api/loader-config?tenant=pilot`, {
       headers: { origin: SITE, 'sec-fetch-site': 'cross-site' },

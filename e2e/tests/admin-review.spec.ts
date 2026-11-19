@@ -12,8 +12,18 @@ test.skip(!ADMIN_E2E || process.env.REVIEW !== '1', 'review screenshots on deman
 const OUT = '../docs/review/admin';
 
 async function signIn(page: Page): Promise<void> {
+  // The sign-in screens (E4b.1 UX 16, 17): the known organisation, the fallback, Keycloak.
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto(`${ADMIN}/admin/?org=nu-exista`);
+  await expect(page.getByLabel('Codul organizației')).toBeVisible();
+  await page.screenshot({ path: `${OUT}/login-fallback.png` });
   await page.goto(`${ADMIN}/admin/?org=pilot`);
+  await expect(page.locator('.login__org')).toBeVisible();
+  await page.screenshot({ path: `${OUT}/login-org-known.png` });
   await page.getByRole('button', { name: 'Continuă spre autentificare' }).click();
+  await expect(page.locator('#widget-logo')).toBeVisible();
+  await page.waitForTimeout(300); // fonts
+  await page.screenshot({ path: `${OUT}/keycloak-pilot-ro.png` });
   await page.locator('#username').fill('pilot-admin');
   await page.locator('#password').fill('dev-pilot-admin-Pass1');
   await page.locator('#kc-login').click();

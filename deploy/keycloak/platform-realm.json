@@ -83,5 +83,9 @@
       ],
       "groups": ["/Platform-Administratori"]
     }
-  ]
+  ],
+  "loginTheme": "widget-admin",
+  "browserSecurityHeaders": {
+    "contentSecurityPolicy": "frame-src 'self'; frame-ancestors 'self'; object-src 'none'; img-src 'self' data: http://localhost:3000 http://localhost:3100 http://localhost:3200;"
+  }
 }
