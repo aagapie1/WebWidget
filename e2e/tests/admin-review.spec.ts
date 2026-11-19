@@ -103,4 +103,37 @@ test('admin interface at 1280x720, 1440x900 and 1920x1080', async ({ page }) => 
   await page.getByRole('button', { name: 'Previzualizare' }).click();
   await ready(page);
   await page.screenshot({ path: `${OUT}/1100x800-panel-open.png` });
+
+  // Tablet (E4b.1 UX 19): 1024 px with the sidebar, 768 px with the row of areas.
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await page.goto(`${ADMIN}/admin/`);
+  await expect(page.getByLabel('Numele clientului')).toBeVisible();
+  await nav(page).getByRole('link', { name: 'Culori', exact: true }).click();
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: `${OUT}/1024x768-culori.png` });
+  await page.getByRole('button', { name: 'Previzualizare', exact: true }).click();
+  await ready(page);
+  await page.screenshot({ path: `${OUT}/1024x768-preview-open.png` });
+
+  await page.setViewportSize({ width: 768, height: 1024 });
+  await page.goto(`${ADMIN}/admin/`);
+  await expect(page.getByLabel('Numele clientului')).toBeVisible();
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: `${OUT}/768x1024-identitate.png` });
+
+  // The controls reference (docs/review/admin/controls.md): the "Domenii permise" area.
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto(`${ADMIN}/admin/`);
+  await nav(page)
+    .getByRole('link', { name: /^Domenii permise/ })
+    .click();
+  await expect(page.getByRole('button', { name: 'Adaugă domeniu' })).toBeVisible();
+  await expect(
+    page
+      .frameLocator('iframe[title="Previzualizarea asistentului cu ciorna"]')
+      .frameLocator('iframe[title="Asistent virtual"]')
+      .getByText('Care este programul cu publicul?'),
+  ).toBeVisible();
+  await page.waitForTimeout(700); // the window's opening animation
+  await page.screenshot({ path: `${OUT}/controls.png` });
 });
