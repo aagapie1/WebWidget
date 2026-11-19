@@ -123,3 +123,18 @@ jobs:
           name: playwright-${{ matrix.browser }}
           path: e2e/test-results/
           retention-days: 7
+      # Review screenshots of the admin interface (docs/review/admin/), from this commit, on the
+      # e2e test tenant only: sign-in, Keycloak theme, editor sizes, tablet, controls.
+      - name: Admin review screenshots
+        if: matrix.browser == 'chromium'
+        run: pnpm --filter e2e exec playwright test admin-review --project chromium
+        env:
+          E2E_ALL_BROWSERS: '1'
+          E2E_ADMIN: '1'
+          REVIEW: '1'
+      - uses: actions/upload-artifact@v5
+        if: matrix.browser == 'chromium'
+        with:
+          name: admin-review-screenshots
+          path: docs/review/admin/*.png
+          retention-days: 14

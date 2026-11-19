@@ -84,6 +84,18 @@ describe('loader configuration (E4)', () => {
     expect(hostOf(plain).style.getPropertyValue('--cw-launcher')).toBe('');
   });
 
+  it('names the launcher icon it draws (data-icon): built-in, image or the default', async () => {
+    const icon = async (launcher: LoaderConfig['launcher']) => {
+      const handle = mount({ ...config, launcher });
+      await handle.configured;
+      return handle.root.querySelector<HTMLElement>('.launcher__icon--open')?.dataset.icon;
+    };
+    const plain = { ...config.launcher, iconUrl: undefined };
+    expect(await icon({ ...plain, icon: 'headset' })).toBe('headset');
+    expect(await icon(plain)).toBe('chat');
+    expect(await icon(config.launcher)).toBe('image');
+  });
+
   it('shows itself with the defaults when the configuration cannot be loaded', async () => {
     const handle = mount(null);
     await handle.configured;

@@ -308,15 +308,21 @@ export function mountLoader(options: LoaderOptions, doc: Document = document): L
       labels.proactiveClose = config.texts['proactive.close'] ?? labels.proactiveClose;
       if (iframe) iframe.title = labels.frameTitle;
 
+      // The icon is set again on every configuration (the admin preview applies each draft):
+      // an image, a built-in icon, or back to the default `chat` icon. `data-icon` names it.
       if (config.launcher.iconUrl) {
         const image = doc.createElement('img');
         image.src = new URL(config.launcher.iconUrl, options.gatewayOrigin).toString();
         image.alt = ''; // decorative: the button has its own label
         image.className = 'launcher__image';
         openIcon.replaceChildren(image);
+        openIcon.dataset.icon = 'image';
       } else if (config.launcher.icon) {
-        // Built-in icon from the bundled set (the default `chat` icon is already drawn).
         openIcon.replaceChildren(iconElement(doc, LAUNCHER_ICONS[config.launcher.icon], 28));
+        openIcon.dataset.icon = config.launcher.icon;
+      } else {
+        openIcon.innerHTML = ICON_CHAT;
+        openIcon.dataset.icon = 'chat';
       }
       appliedConfig = config;
       if (config.proactive && !options.preview) scheduleProactive(config.proactive);

@@ -77,12 +77,13 @@ async function api(
 const discardDraft = (page: Page, tenant: string) =>
   api(page, 'DELETE', `/admin/api/tenants/${tenant}/config/draft`);
 
+const publicConfig = async (page: Page, tenant: string) =>
+  (await (await page.request.get(`${ADMIN}/api/loader-config?tenant=${tenant}`)).json()) as {
+    theme: { accent: string };
+    launcher: { icon?: string; position: string };
+  };
 const publicAccent = async (page: Page, tenant: string) =>
-  (
-    (await (await page.request.get(`${ADMIN}/api/loader-config?tenant=${tenant}`)).json()) as {
-      theme: { accent: string };
-    }
-  ).theme.accent;
+  (await publicConfig(page, tenant)).theme.accent;
 
 const status = (page: Page) => page.locator('.save-status').getByRole('status');
 const saved = (page: Page) => expect(status(page)).toHaveText(/^Ciornă: salvată la/);
@@ -202,15 +203,23 @@ test('changes show in the preview at once and publicly only after publishing', a
   );
   await color(page, 'Culoarea principală').fill('#0b6e4f');
   await page.getByLabel('Poziție', { exact: true }).selectOption('bottom-left');
+  await page
+    .getByRole('group', { name: /^Iconul butonului/ })
+    .getByRole('radio', { name: 'Căști' })
+    .check();
   await saved(page);
   await previewConfig;
 
-  // Preview: the real widget with the draft (launcher color and side).
+  // Preview: the real widget with the draft (launcher color, side and icon).
   const preview = page.frameLocator('iframe[title="Previzualizarea asistentului cu ciorna"]');
   const launcher = preview.locator('[data-chat-widget^="pilot--p-"] .launcher');
   await expect(launcher).toHaveCSS('background-image', /rgb\(11, 110, 79\)/);
+  await expect(launcher.locator('.launcher__icon--open')).toHaveAttribute('data-icon', 'headset');
   // Public widget: unchanged until publishing.
-  expect(await publicAccent(page, 'pilot')).toBe('#3a36d0');
+  const before = await publicConfig(page, 'pilot');
+  expect(before.theme.accent).toBe('#3a36d0');
+  expect(before.launcher.icon).toBeUndefined();
+  expect(before.launcher.position).toBe('bottom-right');
 
   await expect(publishButton(page)).toHaveText('Publică (2)');
   await publishButton(page).click();
@@ -224,6 +233,10 @@ test('changes show in the preview at once and publicly only after publishing', a
   await expect(status(page)).toHaveText('Versiunea 2 a fost publicată.');
   // Hot reload (NOTIFY), no gateway restart.
   await expect.poll(() => publicAccent(page, 'pilot')).toBe('#0b6e4f');
+  expect((await publicConfig(page, 'pilot')).launcher).toMatchObject({
+    icon: 'headset',
+    position: 'bottom-left',
+  });
 });
 
 test("the launcher's own color shows in the preview, its icon color is automatic", async ({
