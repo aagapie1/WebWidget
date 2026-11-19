@@ -63,7 +63,10 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
       return typeof incoming === 'string' && REQUEST_ID.test(incoming) ? incoming : randomUUID();
     },
     bodyLimit: 64 * 1024,
-    trustProxy: true,
+    // Only the configured proxies are believed about the client's address, host and protocol
+    // (E5 D1): from anyone else, X-Forwarded-* would let a client pick its own IP and bypass
+    // every rate limit. Without a list, the connection's own address is used.
+    trustProxy: options.env.TRUSTED_PROXIES.length > 0 ? options.env.TRUSTED_PROXIES : false,
   });
 
   app.addHook('onRequest', async (request, reply) => {

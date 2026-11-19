@@ -1,3 +1,4 @@
+import { isIP } from 'node:net';
 import { z } from 'zod';
 
 const envSchema = z.object({
@@ -40,6 +41,32 @@ const envSchema = z.object({
         hosts.set(host, org);
       }
       return hosts;
+    }),
+  /**
+   * Proxies whose `X-Forwarded-For` / `-Host` / `-Proto` are believed (E5 D1): IPs or CIDRs
+   * ("172.18.0.0/16,10.0.0.5"), or `loopback` / `linklocal` / `uniquelocal`. Unset: none, and the
+   * client address is the connection's own. Production sets the Traefik network.
+   */
+  TRUSTED_PROXIES: z
+    .string()
+    .optional()
+    .transform((value, context) => {
+      const entries = (value ?? '')
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter(Boolean);
+      for (const entry of entries) {
+        const [address = '', bits] = entry.split('/');
+        const named = ['loopback', 'linklocal', 'uniquelocal'].includes(entry);
+        const version = isIP(address);
+        const maxBits = version === 6 ? 128 : 32;
+        const validBits = bits === undefined || (/^\d{1,3}$/.test(bits) && Number(bits) <= maxBits);
+        if (!named && (version === 0 || !validBits)) {
+          context.addIssue({ code: 'custom', message: `invalid proxy address "${entry}"` });
+          return z.NEVER;
+        }
+      }
+      return entries;
     }),
   /** Admin login starts + callbacks per client address per 10 minutes (ADR 008). */
   ADMIN_LOGIN_LIMIT: z.coerce.number().int().positive().default(30),

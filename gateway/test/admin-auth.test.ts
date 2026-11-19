@@ -474,6 +474,78 @@ describe('admin login, session and guard', () => {
     expect(new URL(none.headers.location ?? '').searchParams.has('ui_locales')).toBe(false);
   });
 
+  it('believes X-Forwarded-For only from the trusted proxies (E5 D1)', async () => {
+    const build = (proxies?: string) =>
+      buildApp({
+        env: loadEnv({
+          PUBLIC_ORIGIN: ORIGIN,
+          VISITOR_COOKIE_SECRET: 's'.repeat(40),
+          LOG_LEVEL: 'silent',
+          ADMIN_LOGIN_LIMIT: '3',
+          ...(proxies ? { TRUSTED_PROXIES: proxies } : {}),
+        }),
+        tenants: new Map(),
+        admin: { auth, store, oidc },
+      });
+    // A client sending a different fake IP each time: limited all the same (its own address).
+    const direct = await build();
+    const spoofed: number[] = [];
+    for (let i = 0; i < 4; i++) {
+      const answer = await direct.inject({
+        url: '/admin/auth/login?org=pilot',
+        remoteAddress: '203.0.113.10',
+        headers: { 'x-forwarded-for': `198.51.100.${String(i)}` },
+      });
+      spoofed.push(answer.statusCode);
+    }
+    expect(spoofed).toEqual([302, 302, 302, 429]);
+    await direct.close();
+
+    // Behind the trusted proxy: each forwarded client has its own counter; a client that is not
+    // the proxy still cannot choose its address.
+    const proxied = await build('10.20.0.0/16');
+    const forwarded: number[] = [];
+    for (let i = 0; i < 4; i++) {
+      const answer = await proxied.inject({
+        url: '/admin/auth/login?org=pilot',
+        remoteAddress: '10.20.0.2',
+        headers: { 'x-forwarded-for': `198.51.100.${String(50 + i)}` },
+      });
+      forwarded.push(answer.statusCode);
+    }
+    expect(forwarded).toEqual([302, 302, 302, 302]);
+    const outsider: number[] = [];
+    for (let i = 0; i < 4; i++) {
+      const answer = await proxied.inject({
+        url: '/admin/auth/login?org=pilot',
+        remoteAddress: '203.0.113.20',
+        headers: { 'x-forwarded-for': `198.51.100.${String(100 + i)}` },
+      });
+      outsider.push(answer.statusCode);
+    }
+    expect(outsider).toEqual([302, 302, 302, 429]);
+    await proxied.close();
+  });
+
+  it('rejects malformed TRUSTED_PROXIES', () => {
+    for (const value of ['10.0.0.0/33', 'not-an-ip', '10.0.0.1/abc']) {
+      expect(() =>
+        loadEnv({
+          PUBLIC_ORIGIN: ORIGIN,
+          VISITOR_COOKIE_SECRET: 's'.repeat(40),
+          TRUSTED_PROXIES: value,
+        }),
+      ).toThrow(/TRUSTED_PROXIES: invalid proxy address/);
+    }
+    expect(
+      loadEnv({
+        PUBLIC_ORIGIN: ORIGIN,
+        VISITOR_COOKIE_SECRET: 's'.repeat(40),
+        TRUSTED_PROXIES: '172.18.0.0/16, loopback, ::1',
+      }).TRUSTED_PROXIES,
+    ).toEqual(['172.18.0.0/16', 'loopback', '::1']);
+  });
+
   it('rate-limits login attempts per client address', async () => {
     const statuses: number[] = [];
     for (let i = 0; i < 31; i++) {
