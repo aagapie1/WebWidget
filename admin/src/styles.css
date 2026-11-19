@@ -1387,3 +1387,53 @@ details.advanced > summary {
     min-block-size: 44px;
   }
 }
+
+/*
+ * Under 1024 px (E4b.1 UX 19): the areas become a horizontal row under the status bar, scrolled
+ * sideways; a faded edge shows where more areas follow (data-more, set by the Sidebar). Tab goes
+ * through them in order, and the focused area scrolls into view.
+ */
+@media (max-width: 1023px) {
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sidebar {
+    z-index: 5;
+    block-size: auto;
+    flex-direction: row;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    padding: 6px 12px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .sidebar[data-more='start'] {
+    mask-image: linear-gradient(to right, transparent, #000 40px);
+  }
+  .sidebar[data-more='end'] {
+    mask-image: linear-gradient(to left, transparent, #000 40px);
+  }
+  .sidebar[data-more='start end'] {
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 40px,
+      #000 calc(100% - 40px),
+      transparent
+    );
+  }
+  .sidebar__list {
+    display: flex;
+    gap: 4px;
+  }
+  .sidebar__item {
+    white-space: nowrap;
+  }
+  .sidebar__item:focus-visible {
+    outline-offset: -3px;
+  }
+  .sidebar__sub,
+  .sidebar__legend {
+    display: none;
+  }
+}

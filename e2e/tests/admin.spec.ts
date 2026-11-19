@@ -443,6 +443,119 @@ test("Keycloak sign-in page: the admin theme, in Romanian, with the client's nam
   expect(await serious(page)).toEqual([]);
 });
 
+/** Where the focused element is (top level, or inside the preview frame). */
+const focusRegion = (page: Page) =>
+  page.evaluate(() => {
+    const active = document.activeElement;
+    if (!active || active === document.body) return { region: 'none', ring: true, label: '' };
+    const regions: [string, string][] = [
+      ['.skip-link', 'skip'],
+      ['.app-header', 'header'],
+      ['.statusbar', 'status'],
+      ['.sidebar', 'sidebar'],
+      ['.workspace__form', 'form'],
+      ['#preview-column', 'preview'],
+    ];
+    const region = regions.find(([selector]) => active.closest(selector))?.[1] ?? 'other';
+    const style = getComputedStyle(active);
+    // A visible focus indicator: an outline, or (text fields) a focus border/shadow.
+    const ring =
+      active.tagName === 'IFRAME' ||
+      (style.outlineStyle !== 'none' && style.outlineWidth !== '0px') ||
+      style.boxShadow !== 'none';
+    const label = active.getAttribute('aria-label') ?? active.textContent.trim().slice(0, 40);
+    return { region, ring, label };
+  });
+
+test('keyboard: focus order through the editor, with a visible ring at every stop', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openEditor(page, PILOT_ADMIN);
+  await page.evaluate(() => {
+    (document.activeElement as HTMLElement | null)?.blur();
+  });
+  const order: string[] = [];
+  const noRing: string[] = [];
+  for (let step = 0; step < 200; step += 1) {
+    await page.keyboard.press('Tab');
+    const { region, ring, label } = await focusRegion(page);
+    if (!ring) noRing.push(`${region}: ${label}`);
+    if (order.at(-1) !== region) order.push(region);
+    if (region === 'preview') break;
+  }
+  expect(order).toEqual(['skip', 'header', 'status', 'sidebar', 'form', 'preview']);
+  expect(noRing).toEqual([]);
+});
+
+test('keyboard: Escape closes the user menu, the preview panel and dialogs; focus comes back', async ({
+  page,
+}) => {
+  await openEditor(page, PILOT_ADMIN);
+  // User menu: opened from the keyboard, its action reached with Tab.
+  const menuButton = page.getByRole('button', { name: /^Meniul utilizatorului/ });
+  await menuButton.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#user-menu-panel')).toBeVisible();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: 'Deconectare' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#user-menu-panel')).toBeHidden();
+
+  // Preview side panel (under 1280 px).
+  await page.setViewportSize({ width: 1100, height: 800 });
+  const toggle = page.getByRole('button', { name: 'Previzualizare', exact: true });
+  await toggle.click();
+  await expect(page.getByRole('button', { name: 'Închide previzualizarea' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(toggle).toBeFocused();
+
+  // Dialog: discard, cancelled with Escape.
+  await page.getByLabel('Numele asistentului').fill('Pentru dialog');
+  await saved(page);
+  const discard = page.getByRole('button', { name: 'Renunță la modificări' });
+  await discard.click();
+  const dialog = page.getByRole('dialog', { name: 'Renunțați la modificări?' });
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(discard).toBeFocused();
+  expect((await discardDraft(page, 'pilot')).status).toBe(204);
+});
+
+test('tablet: no horizontal scroll at 768, 1024 and 1279 px; under 1024 the areas are a row', async ({
+  page,
+}) => {
+  await openEditor(page, PILOT_ADMIN);
+  for (const [width, height] of [
+    [1279, 800],
+    [1024, 768],
+    [768, 1024],
+  ] as const) {
+    await page.setViewportSize({ width, height });
+    await page.goto(`${ADMIN}/admin/`);
+    await expect(page.getByLabel('Numele clientului')).toBeVisible();
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(overflow, `${String(width)} px`).toBeLessThanOrEqual(0);
+  }
+  // 768 px: a horizontal row with a faded edge where more areas follow.
+  const nav = page.getByRole('navigation', { name: 'Zone de configurare' });
+  expect(await nav.evaluate((element) => getComputedStyle(element).flexDirection)).toBe('row');
+  await expect(nav).toHaveAttribute('data-more', 'end');
+  // Every area is reached with Tab and scrolled into view; Enter opens it.
+  const last = nav.getByRole('link', { name: /^Integrare pe site/ });
+  await nav.getByRole('link', { name: /^Aspect/ }).focus();
+  for (let step = 0; step < 6; step += 1) await page.keyboard.press('Tab');
+  await expect(last).toBeFocused();
+  await expect(last).toBeInViewport({ ratio: 0.9 });
+  await expect(nav).toHaveAttribute('data-more', /start/);
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { level: 1, name: 'Integrare pe site' })).toBeVisible();
+});
+
 test('no serious or critical axe violations on the login page', async ({ page }) => {
   await page.goto(`${ADMIN}/admin/`);
   await expect(page.getByRole('heading', { name: 'Autentificare' })).toBeVisible();

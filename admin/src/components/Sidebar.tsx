@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { useI18n } from '../i18n.js';
 import {
   Code,
@@ -45,8 +46,29 @@ interface SidebarProps {
 /** One area at a time (like the Dify console); dot = unpublished changes, red = errors. */
 export function Sidebar({ area, changed, errors, visible = AREAS, onArea }: SidebarProps) {
   const { t } = useI18n();
+  // Under 1024 px the areas are a horizontal row (E4b.1 UX 19): a faded edge shows on the side
+  // where more areas follow. Computed from the scroll position, so it disappears at the ends.
+  const nav = useRef<HTMLElement>(null);
+  const [more, setMore] = useState('');
+  useEffect(() => {
+    const element = nav.current;
+    if (!element) return;
+    const update = () => {
+      const hidden = element.scrollWidth - element.clientWidth;
+      const start = element.scrollLeft > 1;
+      const end = hidden - element.scrollLeft > 1;
+      setMore([start ? 'start' : '', end ? 'end' : ''].filter(Boolean).join(' '));
+    };
+    update();
+    element.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    return () => {
+      element.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+    };
+  }, []);
   return (
-    <nav class="sidebar" aria-label={t.ux.navLabel}>
+    <nav class="sidebar" aria-label={t.ux.navLabel} ref={nav} data-more={more || undefined}>
       <ul class="sidebar__list">
         {visible.map((item) => {
           const count = errors[item] ?? 0;

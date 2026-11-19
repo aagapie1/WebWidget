@@ -96,6 +96,31 @@ export function Editor({ api, tenant, onSessionExpired, gatewayOrigin, frame }: 
   // Below 1280 px the preview is a side panel opened from the status bar (never squeezed).
   const narrow = useMediaQuery('(max-width: 1279px)');
   const [previewOpen, setPreviewOpen] = useState(false);
+  // The preview side panel (under 1280 px, E4b.1 UX 19): opening moves focus into it, Escape
+  // closes it from anywhere, and closing returns focus to the button that opened it.
+  const previewToggle = useRef<HTMLButtonElement>(null);
+  const previewClose = useRef<HTMLButtonElement>(null);
+  const panelFocus = useRef<'open' | 'close' | undefined>(undefined);
+  const togglePreview = useCallback((open: boolean) => {
+    panelFocus.current = open ? 'open' : 'close';
+    setPreviewOpen(open);
+  }, []);
+  useEffect(() => {
+    const target = panelFocus.current;
+    panelFocus.current = undefined;
+    if (target === 'open') previewClose.current?.focus();
+    if (target === 'close') previewToggle.current?.focus();
+  }, [previewOpen]);
+  useEffect(() => {
+    if (!previewOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') togglePreview(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [previewOpen, togglePreview]);
   // One area at a time (sidebar). The preview shows the open window everywhere, except while
   // the launcher is edited (closed launcher) and in "Mesaj proactiv" (the bubble).
   const [area, setAreaState] = useState<Area>(initialArea);
@@ -435,12 +460,13 @@ export function Editor({ api, tenant, onSessionExpired, gatewayOrigin, frame }: 
         <div class="statusbar__actions">
           {narrow && (
             <button
+              ref={previewToggle}
               type="button"
               class="button"
               aria-expanded={previewOpen}
               aria-controls="preview-column"
               onClick={() => {
-                setPreviewOpen((open) => !open);
+                togglePreview(!previewOpen);
               }}
             >
               {t.ux.previewButton}
@@ -566,16 +592,14 @@ export function Editor({ api, tenant, onSessionExpired, gatewayOrigin, frame }: 
               : 'preview-column'
           }
           aria-label={t.preview.title}
-          onKeyDown={(event) => {
-            if (narrow && event.key === 'Escape') setPreviewOpen(false);
-          }}
         >
           {narrow && (
             <button
+              ref={previewClose}
               type="button"
               class="button preview-column__close"
               onClick={() => {
-                setPreviewOpen(false);
+                togglePreview(false);
               }}
             >
               {t.ux.closePreview}
