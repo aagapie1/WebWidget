@@ -5,6 +5,10 @@ import { stash } from '../model.js';
 import { configState, fakeApi, renderWithI18n } from '../test-utils.js';
 import { Editor } from './Editor.js';
 
+/** The save status (other areas have their own status messages). */
+const saveStatus = () =>
+  within(document.querySelector<HTMLElement>('.save-status') ?? document.body).getByRole('status');
+
 const rename = async (value: string) => {
   const input = await screen.findByLabelText('Numele clientului');
   fireEvent.input(input, { target: { value } });
@@ -27,7 +31,7 @@ describe('Editor', () => {
       <Editor api={fakeApi({ saveDraft })} tenant="pilot" onSessionExpired={vi.fn()} />,
     );
     await rename('Pilot nou');
-    expect(screen.getByRole('status').textContent).toBe('Modificări nesalvate…');
+    expect(saveStatus().textContent).toBe('Modificări nesalvate…');
     await waitFor(() => {
       expect(saveDraft).toHaveBeenCalledTimes(1);
     });
@@ -37,7 +41,7 @@ describe('Editor', () => {
       draftRevision: null,
     });
     await waitFor(() => {
-      expect(screen.getByRole('status').textContent).toMatch(/^Ciornă: salvată la/);
+      expect(saveStatus().textContent).toMatch(/^Ciornă: salvată la/);
     });
 
     // The next save continues from the revision the server returned.
@@ -171,7 +175,7 @@ describe('Editor', () => {
       expect(publish).toHaveBeenCalledWith('pilot', { draftRevision: 5 });
     });
     await waitFor(() => {
-      expect(screen.getByRole('status').textContent).toBe('Versiunea 4 a fost publicată.');
+      expect(saveStatus().textContent).toBe('Versiunea 4 a fost publicată.');
     });
   });
 
@@ -191,7 +195,7 @@ describe('Editor', () => {
     });
     renderWithI18n(<Editor api={api} tenant="pilot" onSessionExpired={vi.fn()} />);
     expect(await screen.findByText(/^Publicat ultima dată: .+ de Ana$/)).toBeTruthy();
-    expect(screen.getByRole('status').textContent).toMatch(/^Ciornă: salvată la \d{2}:\d{2}$/);
+    expect(saveStatus().textContent).toMatch(/^Ciornă: salvată la \d{2}:\d{2}$/);
 
     fireEvent.click(screen.getByRole('button', { name: 'Renunță la modificări' }));
     const dialog = screen.getByRole('dialog', { name: 'Renunțați la modificări?' });
@@ -202,7 +206,7 @@ describe('Editor', () => {
     await waitFor(() => {
       expect(screen.getByLabelText<HTMLInputElement>('Numele clientului').value).toBe('Pilot');
     });
-    expect(screen.getByRole('status').textContent).toMatch(/au fost anulate/);
+    expect(saveStatus().textContent).toMatch(/au fost anulate/);
     expect(
       screen.getByRole('button', { name: 'Renunță la modificări' }).getAttribute('aria-disabled'),
     ).toBe('true');
@@ -228,6 +232,42 @@ describe('Editor', () => {
 
     fireEvent.click(within(tabs).getByRole('tab', { name: 'Engleză' }));
     expect(await screen.findByLabelText('„Open the virtual assistant”')).toBeTruthy();
+  });
+
+  it('shows the audit log to administrators only, full width without the preview', async () => {
+    const editorApi = fakeApi({
+      config: () =>
+        Promise.resolve(
+          configState({
+            permissions: {
+              publish: false,
+              assets: true,
+              origins: false,
+              name: false,
+              retention: false,
+            },
+          }),
+        ),
+    });
+    const view = renderWithI18n(
+      <Editor api={editorApi} tenant="pilot" onSessionExpired={vi.fn()} />,
+    );
+    await screen.findByLabelText('Numele clientului');
+    expect(screen.queryByRole('link', { name: /Jurnal de audit/ })).toBeNull();
+    view.unmount();
+
+    const auditList = vi.fn(() => Promise.resolve({ chain: 'pilot', events: [] }));
+    renderWithI18n(
+      <Editor api={fakeApi({ auditList })} tenant="pilot" onSessionExpired={vi.fn()} />,
+    );
+    await screen.findByLabelText('Numele clientului');
+    fireEvent.click(screen.getByRole('link', { name: /Jurnal de audit/ }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Jurnal de audit' })).toBeTruthy();
+    expect(screen.queryByLabelText('Numele clientului')).toBeNull();
+    expect(document.getElementById('preview-column')?.hidden).toBe(true);
+    await waitFor(() => {
+      expect(auditList).toHaveBeenCalledWith(expect.objectContaining({ opened: '1' }));
+    });
   });
 
   it("shows the client's name read-only without the super-admin right", async () => {

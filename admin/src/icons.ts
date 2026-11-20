@@ -15,6 +15,7 @@ export {
   MessageCircleMore,
   Palette,
   Quote,
+  ScrollText,
   SlidersHorizontal,
   Smartphone,
   TextQuote,

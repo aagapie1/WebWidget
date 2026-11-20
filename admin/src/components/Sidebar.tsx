@@ -6,6 +6,7 @@ import {
   MessageCircleMore,
   Palette,
   Quote,
+  ScrollText,
   SlidersHorizontal,
   Type,
 } from '../icons.js';
@@ -20,6 +21,7 @@ export const AREAS: readonly Area[] = [
   'behavior',
   'domains',
   'integration',
+  'audit',
 ];
 const ICONS = {
   aspect: Palette,
@@ -29,6 +31,7 @@ const ICONS = {
   behavior: SlidersHorizontal,
   domains: Globe,
   integration: Code,
+  audit: ScrollText,
 } as const;
 export const ASPECT_SUBSECTIONS = ['identity', 'launcher', 'window', 'colors'] as const;
 

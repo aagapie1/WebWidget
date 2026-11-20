@@ -82,6 +82,70 @@ export interface AdminApi {
   /** File names the assistant cited recently (E4b.1 UX 13), most recent first. */
   citedDocuments(tenant: string): Promise<{ documents: { name: string; lastSeen: string }[] }>;
   logout(): Promise<{ redirect: string }>;
+  /** The audit log (E5 B9): one page, newest first. */
+  auditList(query: AuditQuery): Promise<AuditPage>;
+}
+
+/** Filters and paging of the audit log screen; empty values are left out. */
+export type AuditQuery = Partial<
+  Record<
+    | 'chain'
+    | 'from'
+    | 'to'
+    | 'user'
+    | 'action'
+    | 'section'
+    | 'result'
+    | 'q'
+    | 'before'
+    | 'limit'
+    | 'opened',
+    string
+  >
+>;
+
+export interface AuditEventView {
+  id: number;
+  seq: number;
+  at: string;
+  chain: string;
+  tenant: string;
+  actor: {
+    kind: 'user' | 'system';
+    subject: string;
+    name?: string;
+    email?: string;
+    role?: string;
+    org?: string;
+    source?: string;
+  };
+  context: { ip?: string; userAgent?: string; sessionHash?: string; requestId?: string };
+  action: string;
+  section?: string;
+  result: 'success' | 'denied' | 'failed';
+  reason?: string;
+  version?: number;
+  sensitive: boolean;
+  details: Record<string, unknown>;
+  source: string;
+  hash?: string;
+  prevHash?: string;
+}
+
+export interface AuditPage {
+  chain: string;
+  events: AuditEventView[];
+  nextBefore?: number;
+}
+
+const auditSearch = (query: AuditQuery): string =>
+  new URLSearchParams(
+    Object.entries(query).filter((entry): entry is [string, string] => Boolean(entry[1])),
+  ).toString();
+
+/** The export link (a plain download: the browser sends the session cookie). */
+export function auditExportUrl(query: AuditQuery, format: 'csv' | 'json'): string {
+  return `/admin/api/audit/export?${auditSearch({ ...query, format } as AuditQuery)}`;
 }
 
 export function createApi(fetchImpl: Fetch = (...args) => fetch(...args)): AdminApi {
@@ -144,6 +208,7 @@ export function createApi(fetchImpl: Fetch = (...args) => fetch(...args)): Admin
     installations: (tenant) => call('GET', `${base(tenant)}/installations`),
     citedDocuments: (tenant) => call('GET', `${base(tenant)}/cited-documents`),
     logout: () => call('POST', '/admin/auth/logout', {}),
+    auditList: (query) => call('GET', `/admin/api/audit?${auditSearch(query)}`),
   };
 }
 

@@ -56,7 +56,15 @@ export interface ConfigFormProps {
 }
 
 export type Area =
-  'aspect' | 'texts' | 'proactive' | 'citations' | 'behavior' | 'domains' | 'integration';
+  | 'aspect'
+  | 'texts'
+  | 'proactive'
+  | 'citations'
+  | 'behavior'
+  | 'domains'
+  | 'integration'
+  /** The audit log (E5 B9): not a form area, the Editor shows the log instead. */
+  | 'audit';
 
 type LauncherChoice = keyof typeof LAUNCHER_ICONS | 'image';
 type AssistantAvatarChoice =

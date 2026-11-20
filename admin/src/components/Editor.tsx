@@ -22,6 +22,7 @@ import {
   type Path,
 } from '../model.js';
 import { AppHeader } from './AppHeader.js';
+import { AuditLog, PLATFORM } from './AuditLog.js';
 import { ConfigForm, type Area } from './ConfigForm.js';
 import { AREAS, Sidebar } from './Sidebar.js';
 import { ConfirmDialog } from './ConfirmDialog.js';
@@ -384,10 +385,14 @@ export function Editor({ api, tenant, onSessionExpired, gatewayOrigin, frame }: 
       : undefined;
 
   // The allowed domains are for administrators (E4b.1 UX 14): editors do not see the area.
-  const visibleAreas = state.permissions.origins
-    ? AREAS
-    : AREAS.filter((item) => item !== 'domains');
+  // The audit log (E5 B9) is for widget-admin and super-admin, like publishing.
+  const visibleAreas = AREAS.filter(
+    (item) =>
+      (item !== 'domains' || state.permissions.origins) &&
+      (item !== 'audit' || state.permissions.publish),
+  );
   const shown: Area = visibleAreas.includes(area) ? area : 'aspect';
+  const auditing = shown === 'audit';
   // Errors per area (sidebar) and in the status bar; contrast has its own indicator.
   const errorPaths = Object.entries(errors).filter(([, list]) => list.length > 0);
   const areaErrors: Partial<Record<Area, number>> = {};
@@ -458,7 +463,7 @@ export function Editor({ api, tenant, onSessionExpired, gatewayOrigin, frame }: 
           )}
         </div>
         <div class="statusbar__actions">
-          {narrow && (
+          {narrow && !auditing && (
             <button
               ref={previewToggle}
               type="button"
@@ -504,7 +509,7 @@ export function Editor({ api, tenant, onSessionExpired, gatewayOrigin, frame }: 
         </div>
       </div>
 
-      <div class="workspace">
+      <div class={auditing ? 'workspace workspace--wide' : 'workspace'}>
         <Sidebar
           area={shown}
           visible={visibleAreas}
@@ -544,46 +549,56 @@ export function Editor({ api, tenant, onSessionExpired, gatewayOrigin, frame }: 
               </button>
             </div>
           )}
-          <ConfigForm
-            key={formKey}
-            area={shown}
-            tenant={tenant}
-            config={config}
-            errors={errors}
-            permissions={state.permissions}
-            onChange={onChange}
-            upload={upload}
-            accent={theme.accent}
-            onAccent={theme.onAccent}
-            assistantQuestions={assistantQuestions}
-            citedDocuments={citedDocuments}
-            integration={
-              gatewayOrigin
-                ? {
-                    gatewayOrigin,
-                    origins: draftOrigins,
-                    domainsStatus:
-                      (areaErrors.domains ?? 0) > 0
-                        ? 'invalid'
-                        : draftOrigins.length === 0
-                          ? 'missing'
-                          : 'ok',
-                    ...(state.permissions.origins
-                      ? {
-                          onDomains: () => {
-                            setArea('domains');
-                          },
-                        }
-                      : {}),
-                    checkInstallations,
-                  }
-                : undefined
-            }
-          />
+          {auditing ? (
+            <AuditLog
+              api={api}
+              tenant={tenant}
+              chains={frame?.user.role === 'super-admin' ? [...frame.tenants, PLATFORM] : undefined}
+              onSessionExpired={expired}
+            />
+          ) : (
+            <ConfigForm
+              key={formKey}
+              area={shown}
+              tenant={tenant}
+              config={config}
+              errors={errors}
+              permissions={state.permissions}
+              onChange={onChange}
+              upload={upload}
+              accent={theme.accent}
+              onAccent={theme.onAccent}
+              assistantQuestions={assistantQuestions}
+              citedDocuments={citedDocuments}
+              integration={
+                gatewayOrigin
+                  ? {
+                      gatewayOrigin,
+                      origins: draftOrigins,
+                      domainsStatus:
+                        (areaErrors.domains ?? 0) > 0
+                          ? 'invalid'
+                          : draftOrigins.length === 0
+                            ? 'missing'
+                            : 'ok',
+                      ...(state.permissions.origins
+                        ? {
+                            onDomains: () => {
+                              setArea('domains');
+                            },
+                          }
+                        : {}),
+                      checkInstallations,
+                    }
+                  : undefined
+              }
+            />
+          )}
         </main>
         <aside
           id="preview-column"
           ref={side}
+          hidden={auditing}
           class={
             narrow
               ? previewOpen
