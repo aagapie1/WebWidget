@@ -34,6 +34,8 @@ const sessionSchema = z.object({
     name: z.string(),
     role: z.enum(['widget-editor', 'widget-admin', 'super-admin']),
     tenant: z.string(),
+    email: z.string().optional(),
+    source: z.string().optional(),
   }),
   org: z.string(),
   csrf: z.string(),

@@ -76,7 +76,17 @@ describe('identity from ID token claims', () => {
         name: 'pilot-admin',
         role: 'widget-admin',
         tenant: 'pilot',
+        source: 'local',
       },
+    });
+    // For the audit log (E5 B9): the e-mail and the institution's IdP when it signed the user in.
+    const brokered = identityFromClaims(
+      claims('pilot', ['widget-admin'], { email: 'ana@pilot.test', identity_provider: 'idp-sim' }),
+      'pilot',
+      auth,
+    );
+    expect(brokered).toMatchObject({
+      identity: { email: 'ana@pilot.test', source: 'idp-sim' },
     });
     const editor = identityFromClaims(claims('pilot', ['widget-editor']), 'pilot', auth);
     expect(editor.ok && editor.identity.role).toBe('widget-editor');

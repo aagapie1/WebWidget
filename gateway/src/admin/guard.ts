@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import type { AuditActor, AuditContext } from '../audit/log.js';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { can, type AdminAction } from './identity.js';
 import type { AdminSession } from './sessions.js';
@@ -52,6 +54,42 @@ export function sessionOf(request: FastifyRequest): AdminSession {
 /** The session id (binds preview tokens to this session). */
 export function sessionIdOf(request: FastifyRequest): string {
   return attached(request).id;
+}
+
+/** The hash of a session id as the audit log stores it: never the session itself (B9). */
+export const sessionHash = (id: string): string =>
+  createHash('sha256').update(id).digest('base64url').slice(0, 22);
+
+/** Where a request comes from (after E5 D1 the IP can be trusted). */
+export function auditContextOf(request: FastifyRequest, sessionId?: string): AuditContext {
+  const agent = request.headers['user-agent'];
+  return {
+    ip: request.ip,
+    ...(typeof agent === 'string' ? { userAgent: agent } : {}),
+    ...(sessionId ? { sessionHash: sessionHash(sessionId) } : {}),
+    requestId: request.id,
+  };
+}
+
+/** The signed-in user as the audit log records them. */
+export function auditActorOf(session: AdminSession): AuditActor {
+  const { identity } = session;
+  return {
+    kind: 'user',
+    issuer: identity.issuer,
+    subject: identity.subject,
+    name: identity.name,
+    email: identity.email,
+    role: identity.role,
+    org: session.org,
+    source: identity.source,
+  };
+}
+
+/** Who acts and from where, for an authenticated admin request. */
+export function auditWhoOf(request: FastifyRequest): { actor: AuditActor; context: AuditContext } {
+  const { session, id } = attached(request);
+  return { actor: auditActorOf(session), context: auditContextOf(request, id) };
 }
 
 /** Server-side authorization for a tenant (spec §4.3). Replies 403 and returns false if denied. */

@@ -25,7 +25,7 @@ import type { TenantRegistry } from '../config/tenants.js';
 import { getParameters } from '../dify/client.js';
 import { citedDocuments } from '../cited/index.js';
 import { installations } from '../installs/index.js';
-import { adminError, authorize, sessionIdOf, sessionOf } from './guard.js';
+import { adminError, auditWhoOf, authorize, sessionIdOf, sessionOf } from './guard.js';
 
 type Env = Readonly<Record<string, string | undefined>>;
 
@@ -189,7 +189,7 @@ export function adminConfigRoutes(
         config,
         body.data.baseVersion,
         body.data.draftRevision,
-        identity,
+        auditWhoOf(request),
         changes,
       );
       return { ...saved, errors: await validate(tenant, config) };
@@ -202,7 +202,7 @@ export function adminConfigRoutes(
   app.delete('/api/tenants/:tenant/config/draft', async (request, reply) => {
     const found = await tenantFor(request, reply, 'edit');
     if (!found) return reply;
-    await store.discardDraft(found.tenant, sessionOf(request).identity);
+    await store.discardDraft(found.tenant, auditWhoOf(request));
     return reply.code(204).send();
   });
 
@@ -226,7 +226,7 @@ export function adminConfigRoutes(
 
     const changes = diff(editableView(published.config), editableView(config));
     try {
-      const version = await store.publish(tenant, config, sessionOf(request).identity, {
+      const version = await store.publish(tenant, config, auditWhoOf(request), {
         ...(body.data?.comment ? { comment: body.data.comment } : {}),
         changes,
         originsChanged: changes.some((change) => change.path === 'allowedOrigins'),
@@ -306,7 +306,7 @@ export function adminConfigRoutes(
       const result = await processImage(request.body, query.data.name);
       if (!result.ok) return adminError(reply, result.error);
       const { image } = result;
-      await store.saveAsset(found.tenant, image, sessionOf(request).identity);
+      await store.saveAsset(found.tenant, image, auditWhoOf(request));
       return reply.code(201).send({
         file: image.name,
         url: `/admin/api/tenants/${found.tenant}/assets/${image.name}`,

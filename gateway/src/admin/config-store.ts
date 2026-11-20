@@ -1,7 +1,7 @@
 import type pg from 'pg';
 import { CONFIG_CHANNEL } from '../db/postgres-source.js';
 import type { Change } from './editable.js';
-import type { AdminIdentity } from './identity.js';
+import { appendAudit, type AuditActor, type AuditContext } from '../audit/log.js';
 import type { ProcessedImage } from './images.js';
 
 export interface PublishedVersion {
@@ -22,6 +22,25 @@ export interface Draft {
 
 export type AuditAction =
   'draft.save' | 'draft.discard' | 'publish' | 'origins.change' | 'asset.upload';
+
+/** Who changes the configuration, and from where (E5 B9): written to the audit chain. */
+export interface AuditWho {
+  actor: AuditActor;
+  context: AuditContext;
+}
+
+const nameOf = (who: AuditWho): string => who.actor.name ?? who.actor.subject;
+
+/** The sections a set of changes touches ("theme, launcher"), for the audit log's filters. */
+export function sectionsOf(changes: readonly Change[]): string | undefined {
+  const sections = [...new Set(changes.map((change) => change.path.split('.')[0] ?? change.path))];
+  return sections.length > 0 ? sections.sort().join(', ') : undefined;
+}
+
+const touchesOrigins = (changes: readonly Change[]): boolean =>
+  changes.some(
+    (change) => change.path === 'allowedOrigins' || change.path.startsWith('allowedOrigins.'),
+  );
 
 export class PublishConflictError extends Error {}
 export class DraftConflictError extends Error {}
@@ -87,7 +106,7 @@ export class AdminConfigStore {
     config: unknown,
     baseVersion: number,
     expectedRevision: number | null,
-    actor: AdminIdentity,
+    who: AuditWho,
     changes: Change[],
   ): Promise<{ savedAt: string; revision: number }> {
     return this.#transaction(async (client) => {
@@ -98,7 +117,7 @@ export class AdminConfigStore {
                VALUES ($1, $2, $3, now(), $4)
                ON CONFLICT (tenant_id) DO NOTHING
                RETURNING updated_at, revision`,
-              [tenant, JSON.stringify(config), baseVersion, actor.name],
+              [tenant, JSON.stringify(config), baseVersion, nameOf(who)],
             )
           : await client.query<{ updated_at: Date; revision: number }>(
               `UPDATE tenant_config_drafts
@@ -106,25 +125,25 @@ export class AdminConfigStore {
                       revision = revision + 1
                 WHERE tenant_id = $1 AND revision = $5
                 RETURNING updated_at, revision`,
-              [tenant, JSON.stringify(config), baseVersion, actor.name, expectedRevision],
+              [tenant, JSON.stringify(config), baseVersion, nameOf(who), expectedRevision],
             );
       const row = result.rows[0];
       if (!row) throw new DraftConflictError();
-      await audit(client, tenant, actor, 'draft.save', {
-        baseVersion,
-        revision: row.revision,
-        changes,
+      await audit(client, tenant, who, 'draft.save', {
+        section: sectionsOf(changes),
+        sensitive: touchesOrigins(changes),
+        details: { baseVersion, revision: row.revision, changes },
       });
       return { savedAt: row.updated_at.toISOString(), revision: row.revision };
     });
   }
 
-  async discardDraft(tenant: string, actor: AdminIdentity): Promise<boolean> {
+  async discardDraft(tenant: string, who: AuditWho): Promise<boolean> {
     return this.#transaction(async (client) => {
       const result = await client.query('DELETE FROM tenant_config_drafts WHERE tenant_id = $1', [
         tenant,
       ]);
-      if (result.rowCount) await audit(client, tenant, actor, 'draft.discard', {});
+      if (result.rowCount) await audit(client, tenant, who, 'draft.discard', {});
       return Boolean(result.rowCount);
     });
   }
@@ -137,7 +156,7 @@ export class AdminConfigStore {
   async publish(
     tenant: string,
     config: unknown,
-    actor: AdminIdentity,
+    who: AuditWho,
     details: { comment?: string; changes: Change[]; originsChanged: boolean },
   ): Promise<number> {
     return this.#transaction(async (client) => {
@@ -151,22 +170,34 @@ export class AdminConfigStore {
         await client.query(
           `INSERT INTO tenant_config_versions (tenant_id, version, config, created_by, comment)
            VALUES ($1, $2, $3, $4, $5)`,
-          [tenant, version, JSON.stringify(config), actor.name, details.comment ?? null],
+          [tenant, version, JSON.stringify(config), nameOf(who), details.comment ?? null],
         );
       } catch (error) {
         if ((error as { code?: string }).code === '23505') throw new PublishConflictError();
         throw error;
       }
       await client.query('DELETE FROM tenant_config_drafts WHERE tenant_id = $1', [tenant]);
-      await audit(client, tenant, actor, 'publish', {
+      await audit(client, tenant, who, 'publish', {
+        section: sectionsOf(details.changes),
         version,
-        ...(details.comment ? { comment: details.comment } : {}),
-        changes: details.changes,
+        sensitive: details.originsChanged,
+        details: {
+          ...(details.comment ? { comment: details.comment } : {}),
+          changes: details.changes,
+        },
       });
       if (details.originsChanged) {
-        await audit(client, tenant, actor, 'origins.change', {
+        // Allowed domains decide where the assistant runs: their own, sensitive record.
+        await audit(client, tenant, who, 'origins.change', {
+          section: 'allowedOrigins',
           version,
-          changes: details.changes.filter((change) => change.path === 'allowedOrigins'),
+          sensitive: true,
+          details: {
+            changes: details.changes.filter(
+              (change) =>
+                change.path === 'allowedOrigins' || change.path.startsWith('allowedOrigins.'),
+            ),
+          },
         });
       }
       await client.query('SELECT pg_notify($1, $2)', [CONFIG_CHANNEL, tenant]);
@@ -175,20 +206,23 @@ export class AdminConfigStore {
   }
 
   /** Stores a re-encoded image; names are content-addressed, so a re-upload is a no-op. */
-  async saveAsset(tenant: string, image: ProcessedImage, actor: AdminIdentity): Promise<void> {
+  async saveAsset(tenant: string, image: ProcessedImage, who: AuditWho): Promise<void> {
     await this.#transaction(async (client) => {
       const inserted = await client.query(
         `INSERT INTO tenant_assets (tenant_id, name, hash, content_type, bytes, created_by)
          VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING`,
-        [tenant, image.name, image.hash, image.contentType, image.bytes, actor.name],
+        [tenant, image.name, image.hash, image.contentType, image.bytes, nameOf(who)],
       );
       if (inserted.rowCount) {
-        await audit(client, tenant, actor, 'asset.upload', {
-          name: image.name,
-          contentType: image.contentType,
-          bytes: image.bytes.length,
-          width: image.width,
-          height: image.height,
+        await audit(client, tenant, who, 'asset.upload', {
+          section: 'assets',
+          details: {
+            name: image.name,
+            contentType: image.contentType,
+            bytes: image.bytes.length,
+            width: image.width,
+            height: image.height,
+          },
         });
       }
     });
@@ -210,16 +244,26 @@ export class AdminConfigStore {
   }
 }
 
+/** A successful configuration change, in the client's chain, in the same transaction (B9). */
 async function audit(
   client: pg.PoolClient,
   tenant: string,
-  actor: AdminIdentity,
+  who: AuditWho,
   action: AuditAction,
-  details: Record<string, unknown>,
+  event: {
+    section?: string | undefined;
+    version?: number | undefined;
+    sensitive?: boolean | undefined;
+    details?: Record<string, unknown>;
+  },
 ): Promise<void> {
-  await client.query(
-    `INSERT INTO audit_log (tenant_id, actor_issuer, actor_subject, actor_name, action, details)
-     VALUES ($1, $2, $3, $4, $5, $6)`,
-    [tenant, actor.issuer, actor.subject, actor.name, action, JSON.stringify(details)],
-  );
+  await appendAudit(client, {
+    chain: tenant,
+    tenant,
+    actor: who.actor,
+    context: who.context,
+    action,
+    result: 'success',
+    ...event,
+  });
 }

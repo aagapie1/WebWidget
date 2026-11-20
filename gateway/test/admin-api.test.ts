@@ -165,8 +165,19 @@ describe.skipIf(!appUrl || !ownerUrl)('admin configuration API (Postgres)', () =
 
   const auditRows = async () =>
     (
-      await pool.query<{ action: string; actor_name: string; details: Record<string, unknown> }>(
-        "SELECT action, actor_name, details FROM audit_log WHERE tenant_id = 'gamma' ORDER BY id",
+      await pool.query<{
+        action: string;
+        actor_name: string;
+        version: number | null;
+        sensitive: boolean;
+        result: string;
+        ip: string | null;
+        request_id: string | null;
+        session_hash: string | null;
+        details: Record<string, unknown>;
+      }>(
+        `SELECT action, actor_name, version, sensitive, result, ip, request_id, session_hash, details
+           FROM audit_log WHERE tenant_id = 'gamma' ORDER BY id`,
       )
     ).rows;
 
@@ -292,10 +303,17 @@ describe.skipIf(!appUrl || !ownerUrl)('admin configuration API (Postgres)', () =
 
     const audit = await auditRows();
     expect(audit.map((row) => row.action)).toEqual(['draft.save', 'publish', 'origins.change']);
+    // Allowed domains are marked sensitive.
+    expect(audit[2]?.sensitive).toBe(true);
     expect(audit[1]).toMatchObject({
       actor_name: 'Test widget-admin',
+      version: 2,
+      result: 'success',
+      // Where from (E5 B9): the request's address and id, a hash of the session (never the id).
+      ip: expect.any(String) as unknown,
+      request_id: expect.any(String) as unknown,
+      session_hash: expect.stringMatching(/^[\w-]{22}$/) as unknown,
       details: {
-        version: 2,
         comment: 'Culori noi',
         changes: expect.arrayContaining([
           { path: 'theme.accent', before: '#3a36d0', after: '#0b6e4f' },

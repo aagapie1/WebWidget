@@ -14,6 +14,9 @@ export async function migrate(
   const client = new pg.Client({ connectionString: ownerUrl });
   await client.connect();
   try {
+    // One migrator at a time: gateway replicas (and parallel test files) starting together would
+    // otherwise apply the same file twice. Released when the connection ends.
+    await client.query("SELECT pg_advisory_lock(hashtextextended('schema_migrations', 0))");
     await client.query(`CREATE TABLE IF NOT EXISTS schema_migrations (
       name text PRIMARY KEY,
       applied_at timestamptz NOT NULL DEFAULT now()

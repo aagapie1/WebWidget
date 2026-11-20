@@ -10,6 +10,10 @@ export interface AdminIdentity {
   role: AdminRole;
   /** The administered tenant; `*` for super-admin (all tenants). */
   tenant: string;
+  /** For the audit log (E5 B9); absent in sessions opened before it. */
+  email?: string | undefined;
+  /** `local` (a Keycloak account) or the alias of the institution's IdP (`identity_provider`). */
+  source?: string | undefined;
 }
 
 export type IdentityResult =
@@ -57,6 +61,11 @@ export function identityFromClaims(
       name,
       role,
       tenant: realm.kind === 'platform' ? '*' : (realm.tenant ?? ''),
+      ...(typeof claims.email === 'string' && claims.email ? { email: claims.email } : {}),
+      source:
+        typeof claims.identity_provider === 'string' && claims.identity_provider
+          ? claims.identity_provider
+          : 'local',
     },
   };
 }

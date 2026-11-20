@@ -3,6 +3,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { extname, join } from 'node:path';
 import type pg from 'pg';
 import { parse as parseYaml } from 'yaml';
+import { appendAudit } from '../audit/log.js';
 
 const CONTENT_TYPES: Readonly<Record<string, string>> = {
   '.png': 'image/png',
@@ -58,11 +59,16 @@ export async function seedFromYaml(pool: pg.Pool, tenantsDir: string): Promise<S
          VALUES ($1, 1, $2, 'seed:yaml', $3)`,
         [id, JSON.stringify(config), `seed from config/tenants/${file}`],
       );
-      await client.query(
-        `INSERT INTO audit_log (tenant_id, actor_issuer, actor_subject, actor_name, action, details)
-         VALUES ($1, 'system', 'seed', 'seed:yaml', 'seed', $2)`,
-        [id, JSON.stringify({ file })],
-      );
+      await appendAudit(client, {
+        chain: id,
+        tenant: id,
+        actor: { kind: 'system', issuer: 'system', subject: 'seed', name: 'seed:yaml' },
+        action: 'seed',
+        result: 'success',
+        version: 1,
+        source: 'system',
+        details: { file },
+      });
       await client.query('COMMIT');
       result.seeded.push(id);
     } catch (error) {

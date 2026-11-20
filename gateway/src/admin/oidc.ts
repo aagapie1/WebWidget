@@ -69,7 +69,7 @@ export class OpenIdClient implements OidcClient {
     const config = await this.#config(realm);
     return client.buildAuthorizationUrl(config, {
       redirect_uri: request.redirectUri,
-      scope: 'openid profile',
+      scope: 'openid profile email',
       code_challenge: request.codeChallenge,
       code_challenge_method: 'S256',
       state: request.state,
