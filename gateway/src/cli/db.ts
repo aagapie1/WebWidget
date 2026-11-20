@@ -88,7 +88,15 @@ if (command === 'migrate') {
     const anchors = flag('anchors');
     const publicKey = flag('public-key');
     if (anchors && publicKey) {
-      const result = await checkAnchors(pool, anchors, await readFile(publicKey, 'utf8'));
+      const checked = await checkAnchors(pool, anchors, await readFile(publicKey, 'utf8'));
+      // With --chain, only that chain's heads count (an auditor of one client); problems with a
+      // file itself (signature, unreadable) always count.
+      const result = {
+        ...checked,
+        problems: checked.problems.filter(
+          (problem) => !only || problem.chain === undefined || problem.chain === only,
+        ),
+      };
       failed ||= result.problems.length > 0;
       console.log(
         `anchors: ${String(result.files)} files, ${String(result.heads)} heads` +
