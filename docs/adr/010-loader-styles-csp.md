@@ -60,6 +60,8 @@ Shadow DOM. A site with a strict Content-Security-Policy must then allow
 
 - e2e `e2e/tests/strict-csp.spec.ts` on `/strict.html`. The page's CSP is `default-src 'none'`
   plus exactly the list shown in "Integrare pe site" (and `base-uri`, `form-action` `'none'`).
+  The page also allows its own images (`img-src 'self'`, as any site does): Firefox requests the
+  page's `/favicon.ico`, and the first CI run reported that block as a violation of the test page.
   1. Constructed sheet: one adopted sheet, no `<style>`, no `<link>`; the launcher is styled
      (fixed, round, colored); the chat opens and answers.
   2. Fallback, forced by removing `adoptedStyleSheets` from the page: `/w/loader.css?v=…` loads

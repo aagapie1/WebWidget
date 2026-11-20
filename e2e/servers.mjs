@@ -242,6 +242,8 @@ function site(name) {
     }
     // /strict.html: a client site with a strict CSP (E5 A1, ADR 010): default-src 'none' plus exactly
     // what 'Integrare pe site' tells clients to add (cspFor() in the admin), no 'unsafe-inline'.
+    // Plus img-src 'self', which any real site has: Firefox requests the page's own /favicon.ico,
+    // and blocking it would be a violation of the test page, not of the widget.
     const headers = { 'content-type': 'text/html; charset=utf-8' };
     if (req.url?.startsWith('/strict.html')) {
       headers['content-security-policy'] = [
@@ -250,7 +252,7 @@ function site(name) {
         `style-src ${GATEWAY}`,
         `frame-src ${GATEWAY}`,
         `connect-src ${GATEWAY}`,
-        `img-src ${GATEWAY}`,
+        `img-src 'self' ${GATEWAY}`,
         "base-uri 'none'",
         "form-action 'none'",
       ].join('; ');
