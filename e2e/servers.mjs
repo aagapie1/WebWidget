@@ -240,7 +240,22 @@ function site(name) {
         );
       return;
     }
-    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end(`<!doctype html>
+    // /strict.html: a client site with a strict CSP (E5 A1, ADR 010): default-src 'none' plus exactly
+    // what 'Integrare pe site' tells clients to add (cspFor() in the admin), no 'unsafe-inline'.
+    const headers = { 'content-type': 'text/html; charset=utf-8' };
+    if (req.url?.startsWith('/strict.html')) {
+      headers['content-security-policy'] = [
+        "default-src 'none'",
+        `script-src ${GATEWAY}`,
+        `style-src ${GATEWAY}`,
+        `frame-src ${GATEWAY}`,
+        `connect-src ${GATEWAY}`,
+        `img-src ${GATEWAY}`,
+        "base-uri 'none'",
+        "form-action 'none'",
+      ].join('; ');
+    }
+    res.writeHead(200, headers).end(`<!doctype html>
 <html lang="ro">
   <head><meta charset="utf-8"><title>${name}</title></head>
   <body>

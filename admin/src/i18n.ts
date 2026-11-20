@@ -366,7 +366,7 @@ const ro = {
       domainsNow: (list: string) => `Acum: ${list}`,
       csp: 'Dacă site-ul folosește Content-Security-Policy, adăugați:',
       cspNote:
-        "style-src trebuie să permită stilurile inline ale butonului ('unsafe-inline'), până la o versiune viitoare a widget-ului.",
+        'Nu trebuie permise stiluri inline. style-src e folosit doar de browserele mai vechi, care încarcă stilurile butonului ca fișier de pe același server.',
       check: 'Verifică instalarea',
       checking: 'Se verifică…',
       seen: (origin: string, when: string) => `Widget detectat pe ${origin} la ${when}`,
@@ -854,7 +854,7 @@ const en: Dictionary = {
       domainsNow: (list: string) => `Now: ${list}`,
       csp: 'If the site uses a Content-Security-Policy, add:',
       cspNote:
-        "style-src must allow the launcher's inline styles ('unsafe-inline'), until a future widget version.",
+        "Inline styles need not be allowed. style-src is used only by older browsers, which load the launcher's styles as a file from the same server.",
       check: 'Check the installation',
       checking: 'Checking…',
       seen: (origin: string, when: string) => `Widget detected on ${origin} at ${when}`,

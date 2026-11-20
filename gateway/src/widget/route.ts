@@ -66,6 +66,18 @@ export async function widgetRoute(
     );
   });
 
+  // The loader's CSS as a file: the fallback where constructable stylesheets are missing
+  // (ADR 010). Same text as in loader.js; its URL carries a version of that text (`?v=`).
+  app.get('/w/loader.css', async (_request, reply) => {
+    const file = await readDist(distDir, 'loader.css');
+    if (file === undefined) return notBuilt(reply);
+    return reply
+      .type('text/css; charset=utf-8')
+      .header('cache-control', 'public, max-age=300')
+      .header('cross-origin-resource-policy', 'cross-origin')
+      .send(file);
+  });
+
   app.get('/w/app', async (request, reply) => {
     const parsed = appQuerySchema.safeParse(request.query);
     const tenant = parsed.success ? tenants.get(parsed.data.tenant) : undefined;

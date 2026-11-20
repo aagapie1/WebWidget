@@ -15,7 +15,7 @@ import {
   type LoaderMessage,
   type PreviewState,
 } from '../shared/messages.js';
-import { LOADER_CSS } from './styles.js';
+import { attachStyles } from './stylesheet.js';
 import { iconElement, LAUNCHER_ICONS } from '../shared/icons/index.js';
 
 // Static markup only (no external data): safe to assign as HTML.
@@ -95,9 +95,6 @@ export function mountLoader(options: LoaderOptions, doc: Document = document): L
   host.style.visibility = 'hidden';
   const root = host.attachShadow({ mode: 'open' });
 
-  const style = doc.createElement('style');
-  style.textContent = LOADER_CSS;
-
   const panel = doc.createElement('div');
   panel.className = 'panel';
   panel.id = 'chat-widget-panel';
@@ -115,7 +112,9 @@ export function mountLoader(options: LoaderOptions, doc: Document = document): L
   closeIcon.innerHTML = ICON_CLOSE;
   launcher.append(openIcon, closeIcon);
 
-  root.append(style, panel, launcher);
+  root.append(panel, launcher);
+  // No <style> element: sites keep a strict style-src (ADR 010).
+  attachStyles(root, options.gatewayOrigin);
   doc.body.append(host);
 
   let iframe: HTMLIFrameElement | undefined;

@@ -23,10 +23,14 @@ export function embedSnippet(gatewayOrigin: string, tenant: string, locale: 'ro'
   return `<script src="${gatewayOrigin}/w/loader.js" data-tenant="${tenant}"${lang} async></script>`;
 }
 
-/** Content-Security-Policy additions for sites that have one. */
+/**
+ * Content-Security-Policy additions for sites that have one. No 'unsafe-inline': the loader styles
+ * itself through CSSOM, and `style-src` lets older browsers load the same CSS as a file (ADR 010).
+ */
 export function cspFor(gatewayOrigin: string): string[] {
   return [
     `script-src ${gatewayOrigin}`,
+    `style-src ${gatewayOrigin}`,
     `frame-src ${gatewayOrigin}`,
     `connect-src ${gatewayOrigin}`,
     `img-src ${gatewayOrigin}`,

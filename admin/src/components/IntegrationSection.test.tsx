@@ -6,6 +6,24 @@ import { cspFor, embedSnippet, IntegrationSection } from './IntegrationSection.j
 const GATEWAY = 'https://asistent.example.ro';
 
 describe('IntegrationSection', () => {
+  it("never asks for 'unsafe-inline' (E5 A1, ADR 010), in Romanian or English", () => {
+    for (const locale of ['ro', 'en'] as const) {
+      const view = renderWithI18n(
+        <IntegrationSection
+          tenant="pilot"
+          gatewayOrigin={GATEWAY}
+          origins={['https://www.pilot.ro']}
+          domainsStatus="ok"
+          checkInstallations={vi.fn()}
+        />,
+        locale,
+      );
+      expect(view.container.textContent).not.toContain('unsafe-inline');
+      expect(view.container.textContent).toContain(`style-src ${GATEWAY}`);
+      view.unmount();
+    }
+  });
+
   it('builds the embed line and the CSP additions from the server configuration', () => {
     expect(embedSnippet(GATEWAY, 'pilot', 'ro')).toBe(
       '<script src="https://asistent.example.ro/w/loader.js" data-tenant="pilot" async></script>',
@@ -13,10 +31,13 @@ describe('IntegrationSection', () => {
     expect(embedSnippet(GATEWAY, 'pilot', 'en')).toContain(' data-locale="en" ');
     expect(cspFor(GATEWAY)).toEqual([
       `script-src ${GATEWAY}`,
+      `style-src ${GATEWAY}`,
       `frame-src ${GATEWAY}`,
       `connect-src ${GATEWAY}`,
       `img-src ${GATEWAY}`,
     ]);
+    // No 'unsafe-inline' anywhere (E5 A1, ADR 010).
+    expect(cspFor(GATEWAY).join(';')).not.toContain('unsafe-inline');
   });
 
   it('marks the domains item ✓ or ⚠, named for screen readers, with the reason', () => {

@@ -11,6 +11,7 @@ beforeEach(async () => {
   dist = await mkdtemp(join(tmpdir(), 'widget-dist-'));
   await mkdir(join(dist, 'app', 'assets'), { recursive: true });
   await writeFile(join(dist, 'loader.js'), 'console.log("loader");');
+  await writeFile(join(dist, 'loader.css'), ':host { all: initial; }');
   await writeFile(join(dist, 'app', 'index.html'), '<!doctype html><title>chat</title>');
   await writeFile(join(dist, 'app', 'assets', 'app-abc123.js'), 'export {};');
   h = await startHarness({
@@ -66,6 +67,16 @@ describe('GET /w/loader.js and assets', () => {
     expect(response.headers.get('content-type')).toMatch(/^text\/javascript/);
     expect(response.headers.get('cache-control')).toBe('public, max-age=300');
     expect(response.headers.get('cross-origin-resource-policy')).toBe('cross-origin');
+  });
+
+  it('serves the loader CSS fallback like the loader (ADR 010)', async () => {
+    const response = await fetch(`${h.url}/w/loader.css?v=abc`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toMatch(/^text\/css/);
+    expect(response.headers.get('cache-control')).toBe('public, max-age=300');
+    expect(response.headers.get('cross-origin-resource-policy')).toBe('cross-origin');
+    expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(await response.text()).toBe(':host { all: initial; }');
   });
 
   it('serves hashed assets as immutable', async () => {
