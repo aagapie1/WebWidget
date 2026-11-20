@@ -1,6 +1,6 @@
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
+import { serious } from '../axe.js';
 import { ADMIN, ADMIN_E2E } from '../constants.js';
 
 /**
@@ -171,13 +171,11 @@ test('filters: period, action, result and search narrow the log; the detail show
   await page.getByRole('button', { name: 'Aplică filtrele' }).click();
   await expect(rows(page)).toHaveCount(1);
 
-  // No serious or critical accessibility problem on the screen (filters, table, detail).
-  const results = await new AxeBuilder({ page }).include('.audit').analyze();
-  expect(
-    results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical'),
-  ).toEqual([]);
-
   await api(page, 'DELETE', '/admin/api/tenants/pilot/config/draft');
+
+  // No serious or critical accessibility problem on the screen (filters, table). Last: in
+  // Firefox axe may crash the page (see e2e/axe.ts).
+  expect(await serious(page, '.audit')).toEqual([]);
 });
 
 test('export: CSV and JSON with the filters, a header and the hashes; the export is recorded', async ({

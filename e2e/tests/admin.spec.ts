@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
+import { serious } from '../axe.js';
 import { ADMIN, ADMIN_E2E, DIFY_KEY } from '../constants.js';
 
 /**
@@ -392,27 +393,6 @@ test('the Dify key never appears in the admin interface traffic', async ({ page 
   expect(api).not.toContain('difyBaseUrl');
   expect((await discardDraft(page, 'pilot')).status).toBe(204);
 });
-
-/**
- * Serious and critical axe violations of the whole page. Call it last in a test: in Firefox, axe
- * sometimes crashes the page ("Page crashed", docs/BACKLOG.md). A crash is not a finding (Chromium
- * and WebKit scan the same page): it is reported as an annotation, and real violations still fail.
- */
-const serious = async (page: Page) => {
-  try {
-    return (await new AxeBuilder({ page }).analyze()).violations.filter(
-      (violation) => violation.impact === 'serious' || violation.impact === 'critical',
-    );
-  } catch (error) {
-    const firefox = page.context().browser()?.browserType().name() === 'firefox';
-    if (!firefox || !String(error).includes('Page crashed')) throw error;
-    test.info().annotations.push({
-      type: 'firefox-axe-crash',
-      description: `${test.info().title} (docs/BACKLOG.md)`,
-    });
-    return [];
-  }
-};
 
 test('sign-in: a known organisation hides the code field; "Altă organizație?" brings it back', async ({
   page,
