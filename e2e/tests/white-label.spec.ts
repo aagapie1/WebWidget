@@ -1,5 +1,5 @@
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
+import { describe, serious, WCAG21_AA } from '../axe.js';
 import { DIFY, GATEWAY, SITE } from '../constants.js';
 
 test.beforeEach(async ({ page }) => {
@@ -142,14 +142,9 @@ test('tenant images come from the gateway only, SVG with a sandbox CSP', async (
 test('no serious or critical accessibility violations with the tenant theme', async ({ page }) => {
   await gotoBrand(page);
   await expect(widget(page).locator('.proactive')).toBeVisible({ timeout: 4000 });
+  // Two scans in one test: a Firefox crash fails it (as before) rather than hiding the second.
   const check = async () =>
-    (
-      await new AxeBuilder({ page })
-        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-        .analyze()
-    ).violations
-      .filter((v) => v.impact === 'serious' || v.impact === 'critical')
-      .map((v) => `${v.id}: ${v.help}`);
+    describe(await serious(page, { tags: WCAG21_AA, firefoxCrash: 'throw' }));
   expect(await check()).toEqual([]); // launcher + proactive message
 
   await launcher(page).click();

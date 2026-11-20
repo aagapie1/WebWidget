@@ -57,8 +57,11 @@ export default defineConfig({
   globalSetup: './global-setup.ts',
   fullyParallel: false,
   workers: 1,
-  // In CI, failures also become GitHub annotations (readable without access to the logs).
-  reporter: process.env.CI ? [['github'], ['list']] : 'list',
+  // In CI, failures also become GitHub annotations (readable without access to the logs). Every
+  // run ends with the number of Firefox axe crash notes (e2e/axe.ts; job summary in CI).
+  reporter: process.env.CI
+    ? [['github'], ['list'], ['./reporters/axe-crash-summary.ts']]
+    : [['list'], ['./reporters/axe-crash-summary.ts']],
   timeout: 30_000,
   use: { trace: 'retain-on-failure' },
   webServer: [

@@ -175,7 +175,7 @@ test('filters: period, action, result and search narrow the log; the detail show
 
   // No serious or critical accessibility problem on the screen (filters, table). Last: in
   // Firefox axe may crash the page (see e2e/axe.ts).
-  expect(await serious(page, '.audit')).toEqual([]);
+  expect(await serious(page, { include: '.audit' })).toEqual([]);
 });
 
 test('export: CSV and JSON with the filters, a header and the hashes; the export is recorded', async ({

@@ -1,5 +1,5 @@
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type FrameLocator, type Page } from '@playwright/test';
+import { analyze, WCAG21_AA } from '../axe.js';
 import { DIFY, DIFY_KEY, FORBIDDEN_SITE, GATEWAY, SITE } from '../constants.js';
 
 interface DifyRequest {
@@ -176,9 +176,7 @@ test('no serious or critical accessibility violations (host page with the chat o
   await ask(page, 'Care e programul?');
   await expect(chat(page).locator('.message--assistant').last()).toContainText('8 și 16');
 
-  const results = await new AxeBuilder({ page })
-    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-    .analyze();
+  const results = await analyze(page, { tags: WCAG21_AA });
   const blocking = results.violations.filter(
     (v) => v.impact === 'serious' || v.impact === 'critical',
   );

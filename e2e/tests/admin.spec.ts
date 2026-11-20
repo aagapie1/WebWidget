@@ -1,6 +1,5 @@
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
-import { serious } from '../axe.js';
+import { noteFirefoxCrash, serious } from '../axe.js';
 import { ADMIN, ADMIN_E2E, DIFY_KEY } from '../constants.js';
 
 /**
@@ -852,11 +851,9 @@ async function scanRegion(
       );
       selector = '[data-axe-part]';
     }
-    const results = await new AxeBuilder({ page: tab }).include(selector).analyze();
-    const serious = results.violations.filter(
-      (violation) => violation.impact === 'serious' || violation.impact === 'critical',
-    );
-    return serious.length > 0 ? serious.map((violation) => violation.id).join(', ') : undefined;
+    // A Firefox crash comes back as the error text: the caller retries it once.
+    const found = await serious(tab, { include: selector, firefoxCrash: 'throw' });
+    return found.length > 0 ? found.map((violation) => violation.id).join(', ') : undefined;
   } catch (error) {
     return String(error).split('\n')[0] ?? 'error';
   } finally {
@@ -908,10 +905,7 @@ test('no serious or critical axe violations in the editor', async ({
         if (problem?.includes('Page crashed')) {
           problem = await scanRegion(context, name, region, part);
           if (problem?.includes('Page crashed')) {
-            test.info().annotations.push({
-              type: 'firefox-axe-crash',
-              description: `${label} (docs/BACKLOG.md)`,
-            });
+            noteFirefoxCrash(label);
             continue;
           }
         }
