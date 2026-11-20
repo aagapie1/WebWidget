@@ -240,30 +240,27 @@ function site(name) {
         );
       return;
     }
-    // /strict.html: a client site with a strict CSP (E5 A1, ADR 010): default-src 'none' plus exactly
-    // what 'Integrare pe site' tells clients to add (cspFor() in the admin), no 'unsafe-inline'.
-    // Plus img-src 'self', which any real site has: Firefox requests the page's own /favicon.ico,
-    // and blocking it would be a violation of the test page, not of the widget.
+    // /strict.html?csp=…&tenant=…: a client site with a strict CSP (E5 A1, ADR 010). The test
+    // builds the policy from the list "Integrare pe site" gives clients (admin/src/csp.ts), so the
+    // page has exactly that and nothing it does not say. Its favicon points to the gateway:
+    // browsers request a favicon by themselves, and the page's own one would need img-src 'self'.
     const headers = { 'content-type': 'text/html; charset=utf-8' };
+    let page = { tenant, icon: '' };
     if (req.url?.startsWith('/strict.html')) {
-      headers['content-security-policy'] = [
-        "default-src 'none'",
-        `script-src ${GATEWAY}`,
-        `style-src ${GATEWAY}`,
-        `frame-src ${GATEWAY}`,
-        `connect-src ${GATEWAY}`,
-        `img-src 'self' ${GATEWAY}`,
-        "base-uri 'none'",
-        "form-action 'none'",
-      ].join('; ');
+      const query = new URL(req.url, 'http://site.test').searchParams;
+      headers['content-security-policy'] = query.get('csp') ?? "default-src 'none'";
+      page = {
+        tenant: query.get('tenant') ?? 'e2e',
+        icon: `<link rel="icon" href="${GATEWAY}/favicon.ico">`,
+      };
     }
     res.writeHead(200, headers).end(`<!doctype html>
 <html lang="ro">
-  <head><meta charset="utf-8"><title>${name}</title></head>
+  <head><meta charset="utf-8"><title>${name}</title>${page.icon}</head>
   <body>
     <header><h1>${name}</h1></header>
     <main><p>Conținutul paginii.</p><a href="#x">Link din pagină</a></main>
-    <script src="${GATEWAY}/w/loader.js" data-tenant="${tenant}" async></script>
+    <script src="${GATEWAY}/w/loader.js" data-tenant="${page.tenant}" async></script>
   </body>
 </html>`);
   });

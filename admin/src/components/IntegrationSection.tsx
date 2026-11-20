@@ -1,5 +1,6 @@
 import { useId, useState } from 'preact/hooks';
 import type { Installation } from '../api.js';
+import { cspFor } from '../csp.js';
 import { formatDateTime, useI18n } from '../i18n.js';
 
 interface IntegrationSectionProps {
@@ -23,19 +24,8 @@ export function embedSnippet(gatewayOrigin: string, tenant: string, locale: 'ro'
   return `<script src="${gatewayOrigin}/w/loader.js" data-tenant="${tenant}"${lang} async></script>`;
 }
 
-/**
- * Content-Security-Policy additions for sites that have one. No 'unsafe-inline': the loader styles
- * itself through CSSOM, and `style-src` lets older browsers load the same CSS as a file (ADR 010).
- */
-export function cspFor(gatewayOrigin: string): string[] {
-  return [
-    `script-src ${gatewayOrigin}`,
-    `style-src ${gatewayOrigin}`,
-    `frame-src ${gatewayOrigin}`,
-    `connect-src ${gatewayOrigin}`,
-    `img-src ${gatewayOrigin}`,
-  ];
-}
+/** Kept here for existing imports; the list lives in ../csp.ts (also used by the e2e tests). */
+export { cspFor };
 
 /**
  * Site integration (E4b.1 UX, like Dify's embed dialog): the code ready to copy, where it goes,

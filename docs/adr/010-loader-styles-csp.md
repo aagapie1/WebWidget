@@ -58,20 +58,35 @@ Shadow DOM. A site with a strict Content-Security-Policy must then allow
 
 ## Verification done
 
-- e2e `e2e/tests/strict-csp.spec.ts` on `/strict.html`. The page's CSP is `default-src 'none'`
-  plus exactly the list shown in "Integrare pe site" (and `base-uri`, `form-action` `'none'`).
-  The page also allows its own images (`img-src 'self'`, as any site does): Firefox requests the
-  page's `/favicon.ico`, and the first CI run reported that block as a violation of the test page.
-  1. Constructed sheet: one adopted sheet, no `<style>`, no `<link>`; the launcher is styled
-     (fixed, round, colored); the chat opens and answers.
-  2. Fallback, forced by removing `adoptedStyleSheets` from the page: `/w/loader.css?v=…` loads
-     (200), and the launcher and chat behave the same.
+- e2e `e2e/tests/strict-csp.spec.ts` on `/strict.html`, with the brand tenant (image launcher icon,
+  its own colors, launcher on the left, 400 px window, proactive message). The test builds the
+  page's policy from `cspFor()` (`admin/src/csp.ts`), the same list "Integrare pe site" shows:
+  1. `default-src 'none'` + that list (+ `base-uri`, `form-action` `'none'`);
+  2. the most restrictive variant: `default-src 'self'` + exactly that list, nothing else.
 
-  Neither path reports a CSP violation, whether through `securitypolicyviolation` in the page and
-  in the chat iframe or through the console. Chromium and WebKit pass locally; Firefox runs in CI.
+  For each policy, two style paths: a constructed sheet (one adopted sheet, no `<style>`, no
+  `<link>`), and the file fallback, forced by removing `adoptedStyleSheets` from the page
+  (`/w/loader.css?v=…` loads with 200; one `<link>`, no `<style>`). That makes 4 tests per browser.
 
+- Each test asserts, explicitly:
+  - The CSP header received equals the policy. Its directives are exactly the expected ones,
+    `style-src` and `script-src` are only the gateway, and it contains neither `'unsafe-inline'`
+    nor `'unsafe-eval'`.
+  - The launcher has the loader styles applied: fixed, round, in the tenant's accent, on the left.
+    Its image icon is loaded and sized (34 px, `contain`).
+  - The proactive message appears after its delay, as a fixed, styled card with a 32 px close
+    button.
+  - The window opens fixed at the tenant's 400 px width. The chat answers, and the visitor's
+    bubble has the tenant's color (the iframe's CSS and theme applied).
+  - No CSP violation is reported, whether through `securitypolicyviolation` in the page and in the
+    chat iframe or through the console.
+
+- The test pages set their favicon to a gateway URL. Browsers request a favicon by themselves
+  (Firefox did, and CI reported the page's own `/favicon.ico` blocked), and the page's own icon
+  would need an `img-src 'self'` that is not in the list.
+- Results: all 4 pass in Chromium and WebKit locally, and in the three CI browsers.
 - Controls: an inline `<style>` added to the strict page is reported by the same watcher
-  (`style-src-elem`, in Chromium and WebKit). With the previous loader (a `<style>` element) both
+  (`style-src-elem`, in Chromium and WebKit). With the previous loader (a `<style>` element) all 4
   tests fail.
 - Unit tests: `widget/src/loader/stylesheet.test.ts` covers both paths and the versioned URL;
   `gateway/test/widget-serving.test.ts` covers the file's headers.
