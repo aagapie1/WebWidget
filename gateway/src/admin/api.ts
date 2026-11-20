@@ -28,6 +28,19 @@ import { citedDocuments } from '../cited/index.js';
 import { installations } from '../installs/index.js';
 import { adminError, auditWhoOf, sessionIdOf, sessionOf } from './guard.js';
 import { AuditRecorder, chainOf } from '../audit/recorder.js';
+import { PLATFORM_CHAIN } from '../audit/log.js';
+import {
+  auditFilterSchema,
+  exportAudit,
+  exportHeader,
+  hashedView,
+  listAudit,
+  toCsv,
+  type AuditFilters,
+} from '../audit/query.js';
+
+/** At most this many records per export (a year of a busy client fits). */
+const EXPORT_LIMIT = 100_000;
 
 type Env = Readonly<Record<string, string | undefined>>;
 
@@ -346,6 +359,134 @@ export function adminConfigRoutes(
     const found = await tenantFor(request, reply, 'read');
     if (!found) return reply;
     return { documents: options.store ? await citedDocuments(options.store, found.tenant) : [] };
+  });
+
+  // The audit log (E5 B9): widget-admin sees their organisation, super-admin every client and the
+  // platform chain, editors nothing. Reading it and exporting it are recorded too (K7).
+  const auditQuery = auditFilterSchema.extend({
+    chain: z
+      .string()
+      .regex(/^[a-z0-9-]{1,64}$/)
+      .optional(),
+    before: z.coerce.number().int().positive().optional(),
+    limit: z.coerce.number().int().min(1).max(200).default(50),
+    opened: z.literal('1').optional(),
+    format: z.enum(['csv', 'json']).default('json'),
+  });
+
+  async function auditChainFor(
+    request: FastifyRequest,
+    reply: FastifyReply,
+    requested: string | undefined,
+  ): Promise<string | undefined> {
+    const { identity } = sessionOf(request);
+    const own = chainOf(identity.tenant);
+    const chain = requested ?? own;
+    const allowed =
+      identity.role === 'super-admin'
+        ? chain === PLATFORM_CHAIN || (options.tenants?.has(chain) ?? false)
+        : identity.role === 'widget-admin' && chain === identity.tenant;
+    if (allowed) return chain;
+    if (identity.role === 'super-admin') {
+      void adminError(reply, 'not_found');
+      return undefined;
+    }
+    await audit.recordIn([own, ...(options.tenants?.has(chain) ? [chain] : [])], {
+      tenant: chain,
+      ...auditWhoOf(request),
+      action: 'access.denied',
+      section: 'audit',
+      result: 'denied',
+      reason: 'forbidden',
+      details: {
+        method: request.method,
+        route: request.routeOptions.url ?? request.url,
+        needed: 'audit',
+      },
+    });
+    void adminError(reply, 'forbidden');
+    return undefined;
+  }
+
+  /** Only the filter fields, without the empty ones. */
+  const filtersOf = (query: z.infer<typeof auditQuery>): AuditFilters =>
+    Object.fromEntries(
+      Object.keys(auditFilterSchema.shape)
+        .map((key) => [key, query[key as keyof AuditFilters]] as const)
+        .filter(([, value]) => value !== undefined && value !== ''),
+    );
+
+  app.get('/api/audit', async (request, reply) => {
+    const query = auditQuery.safeParse(request.query);
+    if (!query.success) return adminError(reply, 'invalid_request');
+    const chain = await auditChainFor(request, reply, query.data.chain);
+    if (!chain) return reply;
+    const filters = filtersOf(query.data);
+    if (query.data.opened) {
+      // One record per opening of the screen, with its filters (not per filter change).
+      await audit.record({
+        chain,
+        tenant: chain === PLATFORM_CHAIN ? '*' : chain,
+        ...auditWhoOf(request),
+        action: 'audit.view',
+        section: 'audit',
+        result: 'success',
+        details: { filters },
+      });
+    }
+    const page = await listAudit(options.db, chain, filters, {
+      before: query.data.before,
+      limit: query.data.limit,
+    });
+    return { chain, ...page };
+  });
+
+  app.get('/api/audit/export', async (request, reply) => {
+    const query = auditQuery.safeParse(request.query);
+    if (!query.success) return adminError(reply, 'invalid_request');
+    const chain = await auditChainFor(request, reply, query.data.chain);
+    if (!chain) return reply;
+    const filters = filtersOf(query.data);
+    const events = await exportAudit(options.db, chain, filters, EXPORT_LIMIT);
+    const session = sessionOf(request);
+    const header = exportHeader(
+      {
+        name: session.identity.name,
+        email: session.identity.email,
+        role: session.identity.role,
+        org: session.org,
+      },
+      chain,
+      filters,
+      events,
+    );
+    // The export is recorded before it is sent (an auditor sees who took a copy, and of what).
+    await audit.record({
+      chain,
+      tenant: chain === PLATFORM_CHAIN ? '*' : chain,
+      ...auditWhoOf(request),
+      action: 'audit.export',
+      section: 'audit',
+      result: 'success',
+      details: {
+        format: query.data.format,
+        filters,
+        count: events.length,
+        firstSeq: events[0]?.seq ?? null,
+        lastSeq: events.at(-1)?.seq ?? null,
+      },
+    });
+    const stamp = header.generatedAt.slice(0, 19).replace(/[:T]/g, '-');
+    const name = `jurnal-audit-${chain}-${stamp}.${query.data.format}`;
+    void reply
+      .header('content-disposition', `attachment; filename="${name}"`)
+      .header('cache-control', 'no-store');
+    if (query.data.format === 'csv') {
+      return reply.type('text/csv; charset=utf-8').send(toCsv(header, events));
+    }
+    return reply
+      .type('application/json; charset=utf-8')
+      .send(JSON.stringify({ header, events: events.map(hashedView) }, null, 2));
   });
 
   // Preview (spec §5.2): a 10-minute token bound to this admin session and tenant.

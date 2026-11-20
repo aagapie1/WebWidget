@@ -69,14 +69,19 @@ describe.skipIf(!appUrl || !ownerUrl)('audit anchors and retention (E5 B9, K2/K3
     expect(anchor.chains).toContainEqual(
       expect.objectContaining({ chain: 'anchor-a', seq: 3 }) as unknown,
     );
-    expect((await checkAnchors(app, dir, publicPem)).problems).toEqual([]);
+    // Other test files rewrite their own chains in parallel: only this chain is looked at.
+    const own = async () =>
+      (await checkAnchors(app, dir, publicPem)).problems.filter(
+        (problem) => problem.chain === undefined || problem.chain === 'anchor-a',
+      );
+    expect(await own()).toEqual([]);
 
     // Someone with database access replaces the whole chain, hashes recomputed: the chain alone
     // looks perfect, the anchor does not match it.
     await owner.query("DELETE FROM audit_log WHERE chain = 'anchor-a'");
     for (let i = 0; i < 3; i += 1) await recordAudit(app, event('anchor-a', NOW, 100 + i));
     expect((await verifyChain(app, 'anchor-a')).problems).toEqual([]);
-    expect((await checkAnchors(app, dir, publicPem)).problems).toContainEqual({
+    expect(await own()).toContainEqual({
       file,
       chain: 'anchor-a',
       seq: 3,
@@ -86,7 +91,7 @@ describe.skipIf(!appUrl || !ownerUrl)('audit anchors and retention (E5 B9, K2/K3
     // A forged anchor file fails its signature.
     const path = join(dir, file);
     await writeFile(path, (await readFile(path, 'utf8')).replace('"version":1', '"version":2'));
-    expect((await checkAnchors(app, dir, publicPem)).problems).toContainEqual({
+    expect(await own()).toContainEqual({
       file,
       problem: 'signature',
     });

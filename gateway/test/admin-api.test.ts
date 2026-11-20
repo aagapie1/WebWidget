@@ -17,6 +17,7 @@ import { PostgresTenantSource } from '../src/db/postgres-source.js';
 import { FakeDify } from './fake-dify.js';
 import { PREVIEW_ID } from '../src/admin/preview.js';
 import { verifyChain } from '../src/audit/log.js';
+import { chainHash } from '../src/audit/chain.js';
 
 // Real Postgres (same test database as db.test.ts; this file only touches its own tenants).
 const appUrl = process.env.TEST_DATABASE_URL;
@@ -688,6 +689,136 @@ describe.skipIf(!appUrl || !ownerUrl)('admin configuration API (Postgres)', () =
         ['access.denied', 'widget-admin-1'],
       ]);
       for (const chain of TENANTS) expect((await verifyChain(pool, chain)).problems).toEqual([]);
+    });
+  });
+
+  describe('the audit log screen API (E5 B9)', () => {
+    type AuditPage = {
+      chain: string;
+      events: {
+        seq: number;
+        action: string;
+        result: string;
+        reason?: string;
+        actor: { name?: string };
+        details: Record<string, unknown>;
+      }[];
+      nextBefore?: number;
+    };
+
+    it('lists the own organisation with filters and pages; records the opening once', async () => {
+      const admin = await as('widget-admin');
+      const editor = await as('widget-editor');
+      const { published } = (await admin('GET', CONFIG)).json<ConfigResponse>();
+      await saveDraft(editor, { config: { ...published.config, theme: { accent: '#0b6e4f' } } });
+      await editor('POST', `${CONFIG}/publish`, {}); // refused: an editor
+      await admin('POST', `${CONFIG}/publish`, {});
+
+      const all = (await admin('GET', '/admin/api/audit?opened=1')).json<AuditPage>();
+      expect(all.chain).toBe('gamma');
+      // Newest first; the opening of the screen recorded before the list was read.
+      expect(all.events.map((event) => event.action)).toEqual([
+        'audit.view',
+        'publish',
+        'access.denied',
+        'draft.save',
+      ]);
+      const denied = (await admin('GET', '/admin/api/audit?result=denied')).json<AuditPage>();
+      expect(denied.events.map((event) => [event.action, event.reason])).toEqual([
+        ['access.denied', 'forbidden'],
+      ]);
+      const byUser = (await admin('GET', '/admin/api/audit?user=widget-editor')).json<AuditPage>();
+      expect(new Set(byUser.events.map((event) => event.actor.name))).toEqual(
+        new Set(['Test widget-editor']),
+      );
+      const search = (await admin('GET', '/admin/api/audit?q=0b6e4f')).json<AuditPage>();
+      expect(search.events.map((event) => event.action)).toEqual(['publish', 'draft.save']);
+      const prefix = (await admin('GET', '/admin/api/audit?action=audit.*')).json<AuditPage>();
+      expect(prefix.events.every((event) => event.action.startsWith('audit.'))).toBe(true);
+      const future = (await admin('GET', '/admin/api/audit?from=2099-01-01')).json<AuditPage>();
+      expect(future.events).toEqual([]);
+      // Pages: two by two.
+      const first = (await admin('GET', '/admin/api/audit?limit=2')).json<AuditPage>();
+      expect(first.events).toHaveLength(2);
+      const second = (
+        await admin('GET', `/admin/api/audit?limit=2&before=${String(first.nextBefore)}`)
+      ).json<AuditPage>();
+      expect(second.events[0]?.seq).toBeLessThan(first.events[1]?.seq ?? 0);
+      // Only one audit.view: the later reads were not openings.
+      const views = (await admin('GET', '/admin/api/audit?action=audit.view')).json<AuditPage>();
+      expect(views.events).toHaveLength(1);
+    });
+
+    it('editors have no access; another client is refused (and recorded); super-admin sees all', async () => {
+      const editor = await as('widget-editor');
+      expect((await editor('GET', '/admin/api/audit')).statusCode).toBe(403);
+      const admin = await as('widget-admin');
+      expect((await admin('GET', '/admin/api/audit?chain=delta')).statusCode).toBe(403);
+      expect((await admin('GET', '/admin/api/audit/export?chain=delta')).statusCode).toBe(403);
+      const root = await as('super-admin');
+      const gamma = (await root('GET', '/admin/api/audit?chain=gamma')).json<AuditPage>();
+      expect(
+        gamma.events
+          .filter((event) => event.action === 'access.denied')
+          .map((event) => event.reason),
+      ).toEqual(['forbidden', 'forbidden', 'forbidden']);
+      const delta = (await root('GET', '/admin/api/audit?chain=delta')).json<AuditPage>();
+      expect(delta.events.map((event) => event.action)).toEqual(['access.denied', 'access.denied']);
+      expect((await root('GET', '/admin/api/audit?chain=platform')).statusCode).toBe(200);
+      expect((await root('GET', '/admin/api/audit?chain=nu-exista')).statusCode).toBe(404);
+    });
+
+    it('exports CSV and JSON with a header an auditor can check; the export is recorded', async () => {
+      const admin = await as('widget-admin');
+      const { published } = (await admin('GET', CONFIG)).json<ConfigResponse>();
+      await saveDraft(admin, { config: { ...published.config, theme: { accent: '#0b6e4f' } } });
+      await admin('POST', `${CONFIG}/publish`, { comment: 'Culori „noi”' });
+
+      const json = await admin('GET', '/admin/api/audit/export?format=json');
+      expect(json.headers['content-disposition']).toMatch(
+        /^attachment; filename="jurnal-audit-gamma-.+\.json"$/,
+      );
+      const body = json.json<{
+        header: Record<string, unknown>;
+        events: { record: Record<string, unknown>; prevHash: string; hash: string }[];
+      }>();
+      expect(body.header).toMatchObject({
+        generatedBy: { name: 'Test widget-admin', role: 'widget-admin', org: 'gamma' },
+        chain: 'gamma',
+        count: 2,
+        contiguous: true,
+        startsAfter: { seq: 0, hash: '' },
+      });
+      // Every record can be recomputed by the auditor, and they link to each other.
+      for (const [index, event] of body.events.entries()) {
+        expect(chainHash(event.prevHash, event.record)).toBe(event.hash);
+        if (index > 0) expect(event.prevHash).toBe(body.events[index - 1]?.hash);
+      }
+      expect(body.header.lastHash).toBe(body.events.at(-1)?.hash);
+
+      const csv = await admin('GET', '/admin/api/audit/export?format=csv&action=publish');
+      expect(csv.headers['content-type']).toBe('text/csv; charset=utf-8');
+      const lines = csv.body.replace(/^\uFEFF/, '').split('\r\n');
+      expect(lines[0]).toBe('# Jurnal de audit — gamma');
+      expect(lines[1]).toBe('# generat de: Test widget-admin (widget-admin, gamma)');
+      expect(lines.find((line) => line.startsWith('# continuu:'))).toBeUndefined();
+      expect(lines.find((line) => line.startsWith('# înregistrări:'))).toBe(
+        '# înregistrări: 1; continuu: nu',
+      );
+      const columns = lines.find((line) => line.startsWith('seq,'))?.split(',') ?? [];
+      const row = lines[lines.findIndex((line) => line.startsWith('seq,')) + 1] ?? '';
+      expect(columns.slice(0, 4)).toEqual(['seq', 'at_utc', 'at_romania', 'action']);
+      expect(row).toContain(',publish,');
+      expect(row).toContain('Culori „noi”');
+
+      // Both exports are in the log, with what they contained.
+      const exports = (
+        await admin('GET', '/admin/api/audit?action=audit.export')
+      ).json<AuditPage>();
+      expect(exports.events.map((event) => event.details)).toEqual([
+        expect.objectContaining({ format: 'csv', count: 1, filters: { action: 'publish' } }),
+        expect.objectContaining({ format: 'json', count: 2, filters: {} }),
+      ]);
     });
   });
 
