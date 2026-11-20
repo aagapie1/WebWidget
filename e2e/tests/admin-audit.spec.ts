@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { serious } from '../axe.js';
+import { diagnoseMotionOnFailure } from '../diagnostics.js';
 import { ADMIN, ADMIN_E2E } from '../constants.js';
 
 /**
@@ -10,6 +11,8 @@ import { ADMIN, ADMIN_E2E } from '../constants.js';
  */
 test.skip(!ADMIN_E2E, 'needs E2E_ADMIN=1 with Postgres, Redis and Keycloak running');
 test.describe.configure({ mode: 'serial' });
+// On a failure, record what was moving (CI prints it; docs/BACKLOG.md, WebKit sign-in timeout).
+diagnoseMotionOnFailure();
 
 interface User {
   org: string;

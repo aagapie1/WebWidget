@@ -60,10 +60,16 @@ export default defineConfig({
   // In CI, failures also become GitHub annotations (readable without access to the logs). Every
   // run ends with the number of Firefox axe crash notes (e2e/axe.ts; job summary in CI).
   reporter: process.env.CI
-    ? [['github'], ['list'], ['./reporters/axe-crash-summary.ts']]
+    ? [
+        ['github'],
+        ['list'],
+        ['./reporters/axe-crash-summary.ts'],
+        // Failure details readable without signing in (error, last actions, page snapshot).
+        ['./reporters/failure-details.ts'],
+      ]
     : [['list'], ['./reporters/axe-crash-summary.ts']],
   timeout: 30_000,
-  use: { trace: 'retain-on-failure' },
+  use: { trace: 'retain-on-failure', screenshot: 'only-on-failure' },
   webServer: [
     {
       command: 'node servers.mjs',
