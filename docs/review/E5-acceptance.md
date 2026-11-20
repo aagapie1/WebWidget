@@ -5,10 +5,22 @@ Plan: [docs/plans/E5.md](../plans/E5.md). Filled in at the end of E5, in the sty
 
 ## A. Public surface
 
-- [ ] A site with a strict CSP and **no** `style-src 'unsafe-inline'` shows a styled launcher, opens
+- [x] **A site with a strict CSP and no `style-src 'unsafe-inline'` shows a styled launcher, opens
       the chat and sends a message, with no CSP violation, in Chromium, Firefox and WebKit (e2e);
       the fallback CSS file path works too. "Integrare pe site" no longer mentions
-      `'unsafe-inline'`.
+      `'unsafe-inline'`.**
+      e2e [strict-csp.spec.ts](../../e2e/tests/strict-csp.spec.ts), 4 tests per browser: the
+      client page's policy is built from `cspFor()` (the list "Integrare pe site" shows), as
+      `default-src 'none'` + the list and, most restrictive, `default-src 'self'` + exactly the
+      list; each with constructable stylesheets and with the forced `/w/loader.css` fallback. Each
+      test asserts the received CSP (style-src and script-src only the gateway, no
+      `'unsafe-inline'` or `'unsafe-eval'`), the whole widget with its styles (launcher with its
+      image icon, proactive message, 400 px window, an answer, the tenant's bubble color in the
+      iframe) and no CSP violation in the page or the iframe. Green in Chromium, Firefox and WebKit
+      in CI run 44756602039 (a1c443b, 65 tests per browser). Controls: an inline `<style>` on the
+      page is reported; with the previous loader all 4 tests fail. Admin: "never asks for
+      'unsafe-inline' (E5 A1, ADR 010), in Romanian or English". Widget unit tests: both style
+      paths. [ADR 010](../adr/010-loader-styles-csp.md).
 - [ ] Every public endpoint answers as expected for an allowed origin, another origin, no origin
       and `Origin: null` (table test); `/w/app` is framed only by the client's allowed sites
       (`frame-ancestors`), and a `Referer` that contradicts `parent` is refused.
