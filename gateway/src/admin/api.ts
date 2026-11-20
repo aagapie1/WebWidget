@@ -25,7 +25,8 @@ import type { TenantRegistry } from '../config/tenants.js';
 import { getParameters } from '../dify/client.js';
 import { citedDocuments } from '../cited/index.js';
 import { installations } from '../installs/index.js';
-import { adminError, auditWhoOf, authorize, sessionIdOf, sessionOf } from './guard.js';
+import { adminError, auditWhoOf, sessionIdOf, sessionOf } from './guard.js';
+import { AuditRecorder, chainOf } from '../audit/recorder.js';
 
 type Env = Readonly<Record<string, string | undefined>>;
 
@@ -87,6 +88,27 @@ export function adminConfigRoutes(
 ): void {
   const store = new AdminConfigStore(options.db);
   const assets = new PgAssetSource(options.db);
+  const audit = new AuditRecorder(options.db, app.log);
+
+  /**
+   * A refused request in the audit log (B9): in the client's chain, and in the requester's own
+   * chain when it differs (a super-admin's platform, or another client trying to reach this one).
+   */
+  const denied = (
+    request: FastifyRequest,
+    tenant: string,
+    action: string,
+    reason: string,
+    extra: { section?: string; sensitive?: boolean; details?: Record<string, unknown> } = {},
+  ) =>
+    audit.recordIn([tenant, chainOf(sessionOf(request).identity.tenant)], {
+      tenant,
+      ...auditWhoOf(request),
+      action,
+      result: 'denied',
+      reason,
+      ...extra,
+    });
 
   const validate = async (tenant: string, config: unknown): Promise<string[]> => {
     const result = await validateTenantObject(config, {
@@ -110,7 +132,27 @@ export function adminConfigRoutes(
       return undefined;
     }
     const { tenant } = params.data;
-    if (!authorize(request, reply, tenant, action)) return undefined;
+    if (!can(sessionOf(request).identity, tenant, action)) {
+      // Recorded in the requester's chain, and in the target's when that client exists.
+      const known = options.tenants?.has(tenant) ?? false;
+      await audit.recordIn(
+        [chainOf(sessionOf(request).identity.tenant), ...(known ? [tenant] : [])],
+        {
+          tenant,
+          ...auditWhoOf(request),
+          action: 'access.denied',
+          result: 'denied',
+          reason: 'forbidden',
+          details: {
+            method: request.method,
+            route: request.routeOptions.url ?? request.url,
+            needed: action,
+          },
+        },
+      );
+      void adminError(reply, 'forbidden');
+      return undefined;
+    }
     const published = await store.published(tenant);
     if (!published) {
       void adminError(reply, 'not_found');
@@ -167,6 +209,7 @@ export function adminConfigRoutes(
       body.data.baseVersion !== published.version ||
       (current?.revision ?? null) !== body.data.draftRevision
     ) {
+      await denied(request, tenant, 'draft.save', 'draft_conflict');
       return conflict(reply, current, published.version);
     }
     const previous = current?.config ?? published.config;
@@ -176,10 +219,15 @@ export function adminConfigRoutes(
       JSON.stringify(originsOf(config)) !== JSON.stringify(originsOf(previous)) &&
       !can(identity, tenant, 'origins')
     ) {
+      await denied(request, tenant, 'draft.save', 'forbidden', {
+        section: 'allowedOrigins',
+        sensitive: true,
+      });
       return adminError(reply, 'forbidden');
     }
     // The client's name: super-admin only.
     if (nameOf(config) !== nameOf(previous) && !can(identity, tenant, 'name')) {
+      await denied(request, tenant, 'draft.save', 'forbidden', { section: 'name' });
       return adminError(reply, 'forbidden');
     }
     const changes = diff(editableView(previous), editableView(config));
@@ -195,6 +243,7 @@ export function adminConfigRoutes(
       return { ...saved, errors: await validate(tenant, config) };
     } catch (error) {
       if (!(error instanceof DraftConflictError)) throw error;
+      await denied(request, tenant, 'draft.save', 'draft_conflict');
       return conflict(reply, await store.draft(tenant), published.version);
     }
   });
@@ -215,14 +264,21 @@ export function adminConfigRoutes(
     if (!body.success) return adminError(reply, 'invalid_request');
     const { tenant, published } = found;
     const draft = await store.draft(tenant);
-    if (!draft) return adminError(reply, 'no_draft');
+    if (!draft) {
+      await denied(request, tenant, 'publish', 'no_draft');
+      return adminError(reply, 'no_draft');
+    }
     if (body.data?.draftRevision !== undefined && body.data.draftRevision !== draft.revision) {
+      await denied(request, tenant, 'publish', 'draft_conflict');
       return conflict(reply, draft, published.version);
     }
 
     const config: ConfigObject = mergeServerFields(editableView(draft.config), published.config);
     const errors = await validate(tenant, config);
-    if (errors.length > 0) return adminError(reply, 'invalid_config', { errors });
+    if (errors.length > 0) {
+      await denied(request, tenant, 'publish', 'invalid', { details: { errors: errors.length } });
+      return adminError(reply, 'invalid_config', { errors });
+    }
 
     const changes = diff(editableView(published.config), editableView(config));
     try {
@@ -233,7 +289,10 @@ export function adminConfigRoutes(
       });
       return { version };
     } catch (error) {
-      if (error instanceof PublishConflictError) return adminError(reply, 'conflict');
+      if (error instanceof PublishConflictError) {
+        await denied(request, tenant, 'publish', 'draft_conflict');
+        return adminError(reply, 'conflict');
+      }
       throw error;
     }
   });
@@ -304,7 +363,13 @@ export function adminConfigRoutes(
       // Text and JSON bodies are parsed as such: not an image.
       if (!Buffer.isBuffer(request.body)) return adminError(reply, 'unsupported_type');
       const result = await processImage(request.body, query.data.name);
-      if (!result.ok) return adminError(reply, result.error);
+      if (!result.ok) {
+        await denied(request, found.tenant, 'asset.upload', 'invalid', {
+          section: 'assets',
+          details: { error: result.error },
+        });
+        return adminError(reply, result.error);
+      }
       const { image } = result;
       await store.saveAsset(found.tenant, image, auditWhoOf(request));
       return reply.code(201).send({

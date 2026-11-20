@@ -1,7 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { AuditActor, AuditContext } from '../audit/log.js';
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { can, type AdminAction } from './identity.js';
 import type { AdminSession } from './sessions.js';
 
 const STATUS = {
@@ -72,7 +71,7 @@ export function auditContextOf(request: FastifyRequest, sessionId?: string): Aud
 }
 
 /** The signed-in user as the audit log records them. */
-export function auditActorOf(session: AdminSession): AuditActor {
+export function auditActorOf(session: Pick<AdminSession, 'identity' | 'org'>): AuditActor {
   const { identity } = session;
   return {
     kind: 'user',
@@ -90,16 +89,4 @@ export function auditActorOf(session: AdminSession): AuditActor {
 export function auditWhoOf(request: FastifyRequest): { actor: AuditActor; context: AuditContext } {
   const { session, id } = attached(request);
   return { actor: auditActorOf(session), context: auditContextOf(request, id) };
-}
-
-/** Server-side authorization for a tenant (spec §4.3). Replies 403 and returns false if denied. */
-export function authorize(
-  request: FastifyRequest,
-  reply: FastifyReply,
-  tenant: string,
-  action: AdminAction,
-): boolean {
-  if (can(sessionOf(request).identity, tenant, action)) return true;
-  void adminError(reply, 'forbidden');
-  return false;
 }

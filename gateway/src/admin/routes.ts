@@ -7,8 +7,15 @@ import type { AppEnv } from '../config/env.js';
 import type { TenantRegistry } from '../config/tenants.js';
 import { adminConfigRoutes, type AdminApiOptions } from './api.js';
 import type { AdminAuthConfig } from './auth-config.js';
-import { adminError, attachSession, authorize, sessionOf } from './guard.js';
-import { identityFromClaims } from './identity.js';
+import {
+  adminError,
+  attachSession,
+  auditActorOf,
+  auditContextOf,
+  auditWhoOf,
+  sessionOf,
+} from './guard.js';
+import { can, identityFromClaims } from './identity.js';
 import { PREVIEW_ID, type PreviewService } from './preview.js';
 import type { KeyValueStore } from './kv.js';
 import { pkce, type OidcClient } from './oidc.js';
@@ -20,6 +27,8 @@ import {
   safeEqual,
   withinLimit,
 } from './sessions.js';
+import { PLATFORM_CHAIN } from '../audit/log.js';
+import { AuditRecorder, chainOf } from '../audit/recorder.js';
 
 export interface AdminRouteOptions {
   env: AppEnv;
@@ -116,6 +125,8 @@ function safeReturnTo(value: string | undefined): string {
 export function adminRoutes(app: FastifyInstance, options: AdminRouteOptions): void {
   const { env, auth, store, oidc } = options;
   const sessionStore = new AdminSessions(store);
+  // The audit log (E5 B9) lives in Postgres: with the admin API only.
+  const audit = new AuditRecorder(options.api?.db, app.log);
   const cookies = adminCookies(env.PUBLIC_ORIGIN);
   const secure = { httpOnly: true, secure: cookies.secure } as const;
   const callbackUri = `${env.PUBLIC_ORIGIN}/admin/auth/callback`;
@@ -264,6 +275,33 @@ export function adminRoutes(app: FastifyInstance, options: AdminRouteOptions): v
           request.log.warn({ reason }, 'admin login rejected');
           return reply.redirect(`/admin/?error=${reason}`, 302);
         };
+        /** A refused or failed sign-in, in the organisation's chain (B9). */
+        const recordRefusal = async (
+          realmOrg: string | undefined,
+          reason: string,
+          result: 'denied' | 'failed',
+          claims?: Readonly<Record<string, unknown>>,
+        ) => {
+          const realm = realmOrg ? auth.realms.get(realmOrg) : undefined;
+          await audit.record({
+            chain: realm?.tenant ?? PLATFORM_CHAIN,
+            tenant: realm?.tenant ?? '*',
+            actor: {
+              kind: 'user',
+              issuer: typeof claims?.iss === 'string' ? claims.iss : (realm?.issuer ?? 'unknown'),
+              subject: typeof claims?.sub === 'string' ? claims.sub : 'unknown',
+              ...(typeof claims?.name === 'string' ? { name: claims.name } : {}),
+              ...(typeof claims?.email === 'string' ? { email: claims.email } : {}),
+              ...(realmOrg ? { org: realmOrg } : {}),
+              source:
+                typeof claims?.identity_provider === 'string' ? claims.identity_provider : 'local',
+            },
+            context: auditContextOf(request),
+            action: 'auth.login',
+            result,
+            reason,
+          });
+        };
         if (
           !(await withinLimit(
             store,
@@ -284,7 +322,10 @@ export function adminRoutes(app: FastifyInstance, options: AdminRouteOptions): v
         }
         const login = await sessionStore.takeLogin(query.data.state);
         const realm = login ? auth.realms.get(login.org) : undefined;
-        if (!login || !realm) return fail('login_state');
+        if (!login || !realm) {
+          await recordRefusal(undefined, 'login_state', 'denied');
+          return fail('login_state');
+        }
 
         let exchanged;
         try {
@@ -295,10 +336,14 @@ export function adminRoutes(app: FastifyInstance, options: AdminRouteOptions): v
           });
         } catch (error) {
           request.log.warn({ org: realm.org, err: String(error) }, 'admin code exchange failed');
+          await recordRefusal(realm.org, 'login_failed', 'failed');
           return fail('login_failed');
         }
         const result = identityFromClaims(exchanged.claims, realm.org, auth);
-        if (!result.ok) return fail(result.reason);
+        if (!result.ok) {
+          await recordRefusal(realm.org, result.reason, 'denied', exchanged.claims);
+          return fail(result.reason);
+        }
 
         const { id } = await sessionStore.create(
           result.identity,
@@ -313,6 +358,16 @@ export function adminRoutes(app: FastifyInstance, options: AdminRouteOptions): v
           maxAge: realm.sessionSeconds,
         });
         request.log.info({ org: realm.org, role: result.identity.role }, 'admin session started');
+        const session = { identity: result.identity, org: realm.org };
+        await audit.record({
+          chain: chainOf(result.identity.tenant),
+          tenant: result.identity.tenant,
+          actor: auditActorOf(session),
+          context: auditContextOf(request, id),
+          action: 'auth.login',
+          result: 'success',
+          details: { sessionSeconds: realm.sessionSeconds },
+        });
         return reply.redirect(login.returnTo, 302);
       });
 
@@ -325,8 +380,24 @@ export function adminRoutes(app: FastifyInstance, options: AdminRouteOptions): v
           }
           // Only the session cookie authenticates: an Authorization header (for example a
           // token from another realm) is never accepted.
-          const session = await sessionStore.get(request.cookies[cookies.session]);
-          if (!session) return adminError(reply, 'unauthenticated');
+          const cookie = request.cookies[cookies.session];
+          const session = await sessionStore.get(cookie);
+          if (!session) {
+            // A session that ended by itself: recorded once, with its user (B9).
+            const trace = await sessionStore.expired(cookie);
+            if (trace) {
+              await audit.record({
+                chain: chainOf(trace.identity.tenant),
+                tenant: trace.identity.tenant,
+                actor: auditActorOf(trace),
+                context: auditContextOf(request, cookie),
+                action: 'auth.session_expired',
+                result: 'denied',
+                reason: 'session_expired',
+              });
+            }
+            return adminError(reply, 'unauthenticated');
+          }
           if (
             !(await withinLimit(
               store,
@@ -368,6 +439,13 @@ export function adminRoutes(app: FastifyInstance, options: AdminRouteOptions): v
 
         guarded.post('/auth/logout', async (request, reply) => {
           const session = sessionOf(request);
+          await audit.record({
+            chain: chainOf(session.identity.tenant),
+            tenant: session.identity.tenant,
+            ...auditWhoOf(request),
+            action: 'auth.logout',
+            result: 'success',
+          });
           await sessionStore.destroy(request.cookies[cookies.session]);
           void reply.clearCookie(cookies.session, {
             ...secure,
@@ -401,11 +479,28 @@ export function adminRoutes(app: FastifyInstance, options: AdminRouteOptions): v
 
         // Preview page (spec §5.2): a neutral page with the real loader and the preview tenant id.
         // Framed by the admin interface only (same origin).
-        guarded.get('/preview', (request, reply) => {
+        guarded.get('/preview', async (request, reply) => {
           const query = previewQuery.safeParse(request.query);
           const match = query.success ? PREVIEW_ID.exec(query.data.id) : null;
           if (!query.success || !match) return adminError(reply, 'not_found');
-          if (!authorize(request, reply, match[1] ?? '', 'edit')) return reply;
+          const target = match[1] ?? '';
+          if (!can(sessionOf(request).identity, target, 'edit')) {
+            await audit.recordIn(
+              [
+                chainOf(sessionOf(request).identity.tenant),
+                ...(options.tenants.has(target) ? [target] : []),
+              ],
+              {
+                tenant: target,
+                ...auditWhoOf(request),
+                action: 'access.denied',
+                result: 'denied',
+                reason: 'forbidden',
+                details: { method: request.method, route: '/admin/preview', needed: 'edit' },
+              },
+            );
+            return adminError(reply, 'forbidden');
+          }
           return reply
             .type('text/html; charset=utf-8')
             .header(

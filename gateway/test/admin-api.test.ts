@@ -16,6 +16,7 @@ import { migrate } from '../src/db/migrate.js';
 import { PostgresTenantSource } from '../src/db/postgres-source.js';
 import { FakeDify } from './fake-dify.js';
 import { PREVIEW_ID } from '../src/admin/preview.js';
+import { verifyChain } from '../src/audit/log.js';
 
 // Real Postgres (same test database as db.test.ts; this file only touches its own tenants).
 const appUrl = process.env.TEST_DATABASE_URL;
@@ -38,9 +39,12 @@ const seedConfig = (id: string) => ({
   theme: { accent: '#3a36d0' },
 });
 
-const unusedOidc: OidcClient = {
-  authorizationUrl: () => Promise.reject(new Error('not used')),
-  exchange: () => Promise.reject(new Error('not used')),
+/** The identity provider's answer at the next sign-in (claims of the ID token). */
+let oidcClaims: Record<string, unknown> = {};
+const fakeOidc: OidcClient = {
+  authorizationUrl: (realm, request) =>
+    Promise.resolve(new URL(`${realm.issuer}/protocol/openid-connect/auth?state=${request.state}`)),
+  exchange: () => Promise.resolve({ claims: oidcClaims, idToken: 'id-token' }),
   endSessionUrl: () => Promise.resolve(undefined),
 };
 
@@ -74,7 +78,12 @@ describe.skipIf(!appUrl || !ownerUrl)('admin configuration API (Postgres)', () =
       'tenant_assets',
       'audit_log',
     ]) {
-      await owner.query(`DELETE FROM ${table} WHERE tenant_id = ANY($1)`, [TENANTS]);
+      await owner.query(
+        table === 'audit_log'
+          ? 'DELETE FROM audit_log WHERE tenant_id = ANY($1) OR chain = ANY($1)'
+          : `DELETE FROM ${table} WHERE tenant_id = ANY($1)`,
+        [TENANTS],
+      );
     }
     for (const id of TENANTS) {
       await pool.query(
@@ -107,7 +116,7 @@ describe.skipIf(!appUrl || !ownerUrl)('admin configuration API (Postgres)', () =
           { S: 's' },
         ),
         store,
-        oidc: unusedOidc,
+        oidc: fakeOidc,
         api: { db: pool, tenantEnv },
       },
     });
@@ -256,7 +265,12 @@ describe.skipIf(!appUrl || !ownerUrl)('admin configuration API (Postgres)', () =
       config: { ...config, allowedOrigins: ['https://evil.test'] },
     });
     expect(origins.statusCode).toBe(403);
-    expect((await auditRows()).map((row) => row.action)).toEqual(['draft.save']);
+    // The save succeeded; the publish and the domains were refused, and recorded as such (B9).
+    expect((await auditRows()).map((row) => [row.action, row.result])).toEqual([
+      ['draft.save', 'success'],
+      ['access.denied', 'denied'],
+      ['draft.save', 'denied'],
+    ]);
   });
 
   it("reserves the client's name to the super-admin", async () => {
@@ -566,6 +580,114 @@ describe.skipIf(!appUrl || !ownerUrl)('admin configuration API (Postgres)', () =
     expect(await list()).toHaveLength(1);
     const other = await as('widget-admin', 'delta');
     expect((await other('GET', '/admin/api/tenants/gamma/installations')).statusCode).toBe(403);
+  });
+
+  describe('audit events (E5 B9)', () => {
+    const rows = async (chain: string) =>
+      (
+        await pool.query<Record<string, unknown>>(
+          `SELECT action, result, reason, tenant_id, actor_subject, actor_email, actor_role,
+                  actor_org, actor_source, ip, user_agent, session_hash, request_id, section,
+                  sensitive FROM audit_log WHERE chain = $1 ORDER BY seq`,
+          [chain],
+        )
+      ).rows;
+    const LOGIN_COOKIE = '__Secure-admin-login';
+    async function signIn(claims: Record<string, unknown>) {
+      const start = await app.inject({ url: '/admin/auth/login?org=gamma' });
+      const state = new URL(String(start.headers.location)).searchParams.get('state') ?? '';
+      const loginCookie = start.cookies.find((cookie) => cookie.name === LOGIN_COOKIE)?.value ?? '';
+      oidcClaims = { iss: 'http://kc.test/realms/gamma', sub: 'user-9', ...claims };
+      return app.inject({
+        url: `/admin/auth/callback?code=c&state=${state}`,
+        cookies: { [LOGIN_COOKIE]: loginCookie },
+        headers: { 'user-agent': 'AuditTest/1.0' },
+      });
+    }
+
+    it('records sign-in, refused sign-in, sign-out and an expired session, with who and where', async () => {
+      const ok = await signIn({
+        name: 'Ana Pop',
+        email: 'ana@gamma.test',
+        roles: ['widget-admin'],
+        identity_provider: 'idp-sim',
+      });
+      expect(ok.statusCode).toBe(302);
+      const session = ok.cookies.find((cookie) => cookie.name === SESSION_COOKIE)?.value ?? '';
+      const refused = await signIn({ name: 'Fără rol', roles: [] });
+      expect(String(refused.headers.location)).toContain('error=no_role');
+
+      const me = (
+        await app.inject({ url: '/admin/api/session', cookies: { [SESSION_COOKIE]: session } })
+      ).json<{ csrfToken: string }>();
+      await app.inject({
+        method: 'POST',
+        url: '/admin/auth/logout',
+        cookies: { [SESSION_COOKIE]: session },
+        headers: { origin: ORIGIN, 'x-csrf-token': me.csrfToken },
+      });
+
+      // A session that ends by itself: recorded at the next request, once.
+      const short = await as('widget-editor');
+      now += 3601 * 1000;
+      expect((await short('GET', CONFIG)).statusCode).toBe(401);
+      expect((await short('GET', CONFIG)).statusCode).toBe(401);
+      now = Date.now();
+
+      const events = await rows('gamma');
+      expect(events.map((event) => [event.action, event.result, event.reason ?? null])).toEqual([
+        ['auth.login', 'success', null],
+        ['auth.login', 'denied', 'no_role'],
+        ['auth.logout', 'success', null],
+        ['auth.session_expired', 'denied', 'session_expired'],
+      ]);
+      expect(events[0]).toMatchObject({
+        actor_subject: 'user-9',
+        actor_email: 'ana@gamma.test',
+        actor_role: 'widget-admin',
+        actor_org: 'gamma',
+        actor_source: 'idp-sim',
+        user_agent: 'AuditTest/1.0',
+        ip: expect.any(String) as unknown,
+        session_hash: expect.stringMatching(/^[\w-]{22}$/) as unknown,
+        request_id: expect.any(String) as unknown,
+      });
+      expect((await verifyChain(pool, 'gamma')).problems).toEqual([]);
+    });
+
+    it('records refusals: an editor publishing, a draft conflict, another client, the domains', async () => {
+      const editor = await as('widget-editor');
+      expect((await editor('POST', `${CONFIG}/publish`, {})).statusCode).toBe(403);
+      const { published } = (await editor('GET', CONFIG)).json<ConfigResponse>();
+      const stale = await editor('PUT', `${CONFIG}/draft`, {
+        config: published.config,
+        baseVersion: published.version + 5,
+        draftRevision: null,
+      });
+      expect(stale.statusCode).toBe(409);
+      const domains = await editor('PUT', `${CONFIG}/draft`, {
+        config: { ...published.config, allowedOrigins: ['https://alt.test'] },
+        baseVersion: published.version,
+        draftRevision: null,
+      });
+      expect(domains.statusCode).toBe(403);
+      // A client's admin asking for another client: in both chains.
+      const admin = await as('widget-admin');
+      expect((await admin('GET', '/admin/api/tenants/delta/config')).statusCode).toBe(403);
+
+      const gamma = await rows('gamma');
+      expect(gamma.map((event) => [event.action, event.reason, event.tenant_id])).toEqual([
+        ['access.denied', 'forbidden', 'gamma'],
+        ['draft.save', 'draft_conflict', 'gamma'],
+        ['draft.save', 'forbidden', 'gamma'],
+        ['access.denied', 'forbidden', 'delta'],
+      ]);
+      expect(gamma[2]).toMatchObject({ section: 'allowedOrigins', sensitive: true });
+      expect((await rows('delta')).map((event) => [event.action, event.actor_subject])).toEqual([
+        ['access.denied', 'widget-admin-1'],
+      ]);
+      for (const chain of TENANTS) expect((await verifyChain(pool, chain)).problems).toEqual([]);
+    });
   });
 
   it('lists the documents the assistant cited recently (E4b.1 UX 13)', async () => {
