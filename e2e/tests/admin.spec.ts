@@ -349,6 +349,10 @@ test('an expired session loses nothing: sign in again and back to the form', asy
   context,
 }) => {
   await openEditor(page, PILOT_ADMIN);
+  // The session must expire while someone edits, not while the editor is still loading: a start-up
+  // request answered 401 would send the browser to sign in before anything was typed (seen once
+  // in CI's WebKit). So the editor finishes loading first.
+  await page.waitForLoadState('networkidle');
   // The gateway session ends (expiry); the Keycloak single sign-on session remains.
   await context.clearCookies({ name: /^(__Secure-)?admin$/ });
   const viaKeycloak = page.waitForRequest(/\/realms\/pilot\/protocol\/openid-connect\/auth/);
