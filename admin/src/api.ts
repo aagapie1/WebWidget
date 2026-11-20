@@ -36,7 +36,14 @@ export interface ConfigState {
     config: Config;
   } | null;
   errors: string[];
-  permissions: { publish: boolean; assets: boolean; origins: boolean; name: boolean };
+  permissions: {
+    publish: boolean;
+    assets: boolean;
+    origins: boolean;
+    name: boolean;
+    /** The audit log retention and the audit screen's platform view: super-admin (E5 B9). */
+    retention: boolean;
+  };
 }
 
 export interface DraftConflict {

@@ -10,6 +10,7 @@ import {
   type Draft,
 } from './config-store.js';
 import {
+  auditSettingsOf,
   diff,
   editableView,
   mergeServerFields,
@@ -190,6 +191,7 @@ export function adminConfigRoutes(
         assets: can(identity, tenant, 'assets'),
         origins: can(identity, tenant, 'origins'),
         name: can(identity, tenant, 'name'),
+        retention: can(identity, tenant, 'retention'),
       },
     };
   });
@@ -226,6 +228,17 @@ export function adminConfigRoutes(
       return adminError(reply, 'forbidden');
     }
     // The client's name: super-admin only.
+    // The audit log's retention: super-admin only (a compliance setting).
+    if (
+      JSON.stringify(auditSettingsOf(config)) !== JSON.stringify(auditSettingsOf(previous)) &&
+      !can(identity, tenant, 'retention')
+    ) {
+      await denied(request, tenant, 'draft.save', 'forbidden', {
+        section: 'audit',
+        sensitive: true,
+      });
+      return adminError(reply, 'forbidden');
+    }
     if (nameOf(config) !== nameOf(previous) && !can(identity, tenant, 'name')) {
       await denied(request, tenant, 'draft.save', 'forbidden', { section: 'name' });
       return adminError(reply, 'forbidden');

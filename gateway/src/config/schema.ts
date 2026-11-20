@@ -332,6 +332,10 @@ export const tenantSchema = z
     feedback: z
       .strictObject({ retentionDays: z.number().int().min(1).max(730).default(90) })
       .default({ retentionDays: 90 }),
+    /** The audit log's retention for this client (E5 B9, K4): super-admin only, 6–60 months. */
+    audit: z
+      .strictObject({ retentionMonths: z.number().int().min(6).max(60).default(12) })
+      .default({ retentionMonths: 12 }),
   })
   .superRefine((tenant, context) => {
     // The launcher sits on the client's page: 3:1 against white (WCAG 1.4.11).

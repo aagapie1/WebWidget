@@ -3,11 +3,14 @@
 -- widget_app:   used by the gateway; the migrations grant it no UPDATE/DELETE on the audit log.
 CREATE ROLE widget_owner LOGIN PASSWORD 'dev-widget-owner';
 CREATE ROLE widget_app LOGIN PASSWORD 'dev-widget-app';
+-- widget_audit_cleanup: only the retention job of the audit log (E5 B9); granted by migration 004.
+CREATE ROLE widget_audit_cleanup LOGIN PASSWORD 'dev-widget-audit-cleanup';
 CREATE DATABASE widget OWNER widget_owner;
 \connect widget
 REVOKE ALL ON SCHEMA public FROM PUBLIC;
 GRANT USAGE, CREATE ON SCHEMA public TO widget_owner;
 GRANT USAGE ON SCHEMA public TO widget_app;
+GRANT USAGE ON SCHEMA public TO widget_audit_cleanup;
 
 -- Separate database for the integration tests: they truncate tables (never the dev data).
 \connect postgres
@@ -16,6 +19,7 @@ CREATE DATABASE widget_test OWNER widget_owner;
 REVOKE ALL ON SCHEMA public FROM PUBLIC;
 GRANT USAGE, CREATE ON SCHEMA public TO widget_owner;
 GRANT USAGE ON SCHEMA public TO widget_app;
+GRANT USAGE ON SCHEMA public TO widget_audit_cleanup;
 
 -- Separate database for the admin end-to-end tests (Playwright resets it on every run).
 \connect postgres
@@ -24,3 +28,4 @@ CREATE DATABASE widget_e2e OWNER widget_owner;
 REVOKE ALL ON SCHEMA public FROM PUBLIC;
 GRANT USAGE, CREATE ON SCHEMA public TO widget_owner;
 GRANT USAGE ON SCHEMA public TO widget_app;
+GRANT USAGE ON SCHEMA public TO widget_audit_cleanup;

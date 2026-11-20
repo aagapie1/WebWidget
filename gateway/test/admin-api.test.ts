@@ -218,6 +218,7 @@ describe.skipIf(!appUrl || !ownerUrl)('admin configuration API (Postgres)', () =
       assets: false,
       origins: false,
       name: false,
+      retention: false,
     });
     for (const secret of [
       'difyApiKeyEnv',

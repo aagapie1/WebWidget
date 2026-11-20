@@ -18,6 +18,9 @@
     "config:check": "tsx src/cli/config-check.ts ../config/tenants ../e2e/tenants",
     "db:migrate": "tsx --env-file-if-exists=.env src/cli/db.ts migrate",
     "db:seed": "tsx --env-file-if-exists=.env src/cli/db.ts seed",
+    "db:audit-verify": "tsx --env-file-if-exists=.env src/cli/db.ts audit-verify",
+    "db:audit-anchor": "tsx --env-file-if-exists=.env src/cli/db.ts audit-anchor",
+    "db:audit-purge": "tsx --env-file-if-exists=.env src/cli/db.ts audit-purge",
     "dev:admin": "tsx watch --env-file-if-exists=.env --env-file=admin-dev.env src/index.ts"
   },
   "dependencies": {

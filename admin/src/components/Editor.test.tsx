@@ -235,7 +235,13 @@ describe('Editor', () => {
       config: () =>
         Promise.resolve({
           ...configState(),
-          permissions: { publish: true, assets: true, origins: true, name: false },
+          permissions: {
+            publish: true,
+            assets: true,
+            origins: true,
+            name: false,
+            retention: false,
+          },
         }),
     });
     renderWithI18n(<Editor api={api} tenant="pilot" onSessionExpired={vi.fn()} />);

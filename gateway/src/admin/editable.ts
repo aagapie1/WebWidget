@@ -71,3 +71,8 @@ export function originsOf(config: unknown): unknown {
 export function nameOf(config: unknown): unknown {
   return isObject(config) ? config.name : undefined;
 }
+
+/** The audit log's retention setting (super-admin only, E5 B9). */
+export function auditSettingsOf(config: unknown): unknown {
+  return isObject(config) ? config.audit : undefined;
+}
