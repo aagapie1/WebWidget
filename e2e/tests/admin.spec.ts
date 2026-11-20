@@ -496,6 +496,12 @@ const focusRegion = (page: Page) =>
     return { region, ring, label };
   });
 
+/**
+ * WebKit on Windows and macOS does not move to links with Tab by default (as in Safari, where
+ * "Press Tab to highlight each item" is off), so the skip link and the sidebar links are passed over
+ * and this test fails there. The reference for WebKit is CI's WebKit on Linux, which tabs through
+ * links like the other browsers. A local failure on Windows or macOS WebKit is not a regression.
+ */
 test('keyboard: focus order through the editor, with a visible ring at every stop', async ({
   page,
 }) => {

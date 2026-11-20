@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "e2e": "playwright test",
+    "e2e:all": "node scripts/all-browsers.mjs",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
