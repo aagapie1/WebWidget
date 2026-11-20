@@ -84,7 +84,8 @@ Shadow DOM. A site with a strict Content-Security-Policy must then allow
 - The test pages set their favicon to a gateway URL. Browsers request a favicon by themselves
   (Firefox did, and CI reported the page's own `/favicon.ico` blocked), and the page's own icon
   would need an `img-src 'self'` that is not in the list.
-- Results: all 4 pass in Chromium and WebKit locally, and in the three CI browsers.
+- Results: all 4 pass in Chromium and WebKit locally, and in Chromium, Firefox and WebKit in CI
+  (run 44756602039 on a1c443b, green in all three; 65 tests per browser).
 - Controls: an inline `<style>` added to the strict page is reported by the same watcher
   (`style-src-elem`, in Chromium and WebKit). With the previous loader (a `<style>` element) all 4
   tests fail.
