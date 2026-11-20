@@ -19,6 +19,7 @@ import type { ErrorResponse } from './protocol/index.js';
 import { tenantAssetRoutes } from './tenant-assets/route.js';
 import { widgetConfigRoute } from './widget-config/route.js';
 import { widgetRoute } from './widget/route.js';
+import { KeycloakEventImport } from './audit/keycloak-import.js';
 
 export interface BuildAppOptions {
   env: AppEnv;
@@ -164,6 +165,15 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
       ...(preview ? { preview } : {}),
       distDir: resolve(options.env.ADMIN_DIST_DIR),
     });
+    // Keycloak events into the audit log (E5 B9, K1), for the realms with a read-only events client.
+    const realms = [...options.admin.auth.realms.values()].filter((realm) => realm.audit);
+    if (options.admin.api && realms.length > 0 && options.env.AUDIT_IMPORT_INTERVAL_SECONDS > 0) {
+      const importer = new KeycloakEventImport(options.admin.api.db, realms, app.log);
+      app.addHook('onReady', () => {
+        importer.start(options.env.AUDIT_IMPORT_INTERVAL_SECONDS * 1000);
+      });
+      app.addHook('onClose', () => importer.stop());
+    }
   }
 
   return app;

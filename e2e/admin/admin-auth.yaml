@@ -5,11 +5,23 @@ tenants:
     issuer: http://localhost:8081/realms/pilot
     clientId: widget-admin-ui
     clientSecretEnv: ADMIN_OIDC_SECRET_PILOT
+    # Keycloak events into the audit log (E5 B9): a read-only client (view-events only).
+    audit:
+      clientId: widget-audit-reader
+      clientSecretEnv: ADMIN_AUDIT_SECRET_PILOT
   - tenant: demo-primarie
     issuer: http://localhost:8081/realms/demo-primarie
     clientId: widget-admin-ui
     clientSecretEnv: ADMIN_OIDC_SECRET_DEMO_PRIMARIE
+    # Keycloak events into the audit log (E5 B9): a read-only client (view-events only).
+    audit:
+      clientId: widget-audit-reader
+      clientSecretEnv: ADMIN_AUDIT_SECRET_DEMO_PRIMARIE
 platform:
   issuer: http://localhost:8081/realms/platform
   clientId: widget-admin-ui
   clientSecretEnv: ADMIN_OIDC_SECRET_PLATFORM
+  # Keycloak events into the audit log (E5 B9): a read-only client (view-events only).
+  audit:
+    clientId: widget-audit-reader
+    clientSecretEnv: ADMIN_AUDIT_SECRET_PLATFORM

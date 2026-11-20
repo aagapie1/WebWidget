@@ -68,6 +68,8 @@ const envSchema = z.object({
       }
       return entries;
     }),
+  /** How often Keycloak events are imported into the audit log (E5 B9, K1); 0 turns it off. */
+  AUDIT_IMPORT_INTERVAL_SECONDS: z.coerce.number().int().min(0).max(3600).default(60),
   /** Admin login starts + callbacks per client address per 10 minutes (ADR 008). */
   ADMIN_LOGIN_LIMIT: z.coerce.number().int().positive().default(30),
   VISITOR_COOKIE_SECRET: z.string().min(32, 'must be at least 32 characters'),

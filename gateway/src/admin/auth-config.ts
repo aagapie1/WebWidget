@@ -14,6 +14,17 @@ const realmSchema = z.strictObject({
   clientSecretEnv: z.string().regex(/^[A-Z][A-Z0-9_]*$/),
   /** Admin session lifetime for this realm (spec §4.3: 8 hours by default). */
   sessionHours: z.number().min(0.25).max(24).default(8),
+  /**
+   * The audit log import (E5 B9, K1): a confidential client of this realm whose service account has
+   * only realm-management/view-events. Optional: without it this realm's Keycloak events are not
+   * imported.
+   */
+  audit: z
+    .strictObject({
+      clientId: z.string().min(1),
+      clientSecretEnv: z.string().regex(/^[A-Z][A-Z0-9_]*$/),
+    })
+    .optional(),
 });
 
 const fileSchema = z.strictObject({
@@ -31,6 +42,8 @@ export interface AdminRealm {
   clientId: string;
   clientSecret: string;
   sessionSeconds: number;
+  /** The read-only events client (K1), when configured. */
+  audit?: { clientId: string; clientSecret: string } | undefined;
 }
 
 export interface AdminAuthConfig {
@@ -62,6 +75,14 @@ export function parseAdminAuthConfig(text: string, env: Env): AdminAuthConfig {
       clientId: entry.clientId,
       clientSecret: secret(entry.clientSecretEnv),
       sessionSeconds: Math.round(entry.sessionHours * 3600),
+      ...(entry.audit
+        ? {
+            audit: {
+              clientId: entry.audit.clientId,
+              clientSecret: secret(entry.audit.clientSecretEnv),
+            },
+          }
+        : {}),
     });
   }
   const platform = result.data.platform;
@@ -74,6 +95,14 @@ export function parseAdminAuthConfig(text: string, env: Env): AdminAuthConfig {
       clientId: platform.clientId,
       clientSecret: secret(platform.clientSecretEnv),
       sessionSeconds: Math.round(platform.sessionHours * 3600),
+      ...(platform.audit
+        ? {
+            audit: {
+              clientId: platform.audit.clientId,
+              clientSecret: secret(platform.audit.clientSecretEnv),
+            },
+          }
+        : {}),
     });
   }
 

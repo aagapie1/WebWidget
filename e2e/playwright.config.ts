@@ -36,6 +36,11 @@ function adminServer() {
       ADMIN_OIDC_SECRET_PILOT: 'dev-secret-pilot-admin-ui',
       ADMIN_OIDC_SECRET_DEMO_PRIMARIE: 'dev-secret-demo-primarie-admin-ui',
       ADMIN_OIDC_SECRET_PLATFORM: 'dev-secret-platform-admin-ui',
+      // The audit log's Keycloak import (E5 B9): the realms' read-only events clients.
+      ADMIN_AUDIT_SECRET_PILOT: 'dev-audit-reader-pilot',
+      ADMIN_AUDIT_SECRET_DEMO_PRIMARIE: 'dev-audit-reader-demo-primarie',
+      ADMIN_AUDIT_SECRET_PLATFORM: 'dev-audit-reader-platform',
+      AUDIT_IMPORT_INTERVAL_SECONDS: '5',
       // Many logins from one address during a run (production default: 30 per 10 minutes).
       ADMIN_LOGIN_LIMIT: '1000',
       WIDGET_DIST_DIR: '../widget/dist',

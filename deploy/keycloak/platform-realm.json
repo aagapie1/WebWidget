@@ -79,6 +79,22 @@
           }
         }
       ]
+    },
+    {
+      "clientId": "widget-audit-reader",
+      "name": "Audit log import (read-only)",
+      "description": "Reads this realm's user and admin events for the admin audit log (E5 B9). Its service account has only realm-management/view-events (so the full scope is that role alone).",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "dev-audit-reader-platform",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "frontchannelLogout": false,
+      "fullScopeAllowed": true
     }
   ],
   "users": [
@@ -97,10 +113,22 @@
         }
       ],
       "groups": ["/Platform-Administratori"]
+    },
+    {
+      "username": "service-account-widget-audit-reader",
+      "enabled": true,
+      "serviceAccountClientId": "widget-audit-reader",
+      "clientRoles": {
+        "realm-management": ["view-events"]
+      }
     }
   ],
   "loginTheme": "widget-admin",
   "browserSecurityHeaders": {
     "contentSecurityPolicy": "frame-src 'self'; frame-ancestors 'self'; object-src 'none'; img-src 'self' data: http://localhost:3000 http://localhost:3100 http://localhost:3200;"
-  }
+  },
+  "eventsEnabled": true,
+  "eventsExpiration": 604800,
+  "adminEventsEnabled": true,
+  "adminEventsDetailsEnabled": true
 }

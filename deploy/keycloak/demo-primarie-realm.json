@@ -87,6 +87,22 @@
           }
         }
       ]
+    },
+    {
+      "clientId": "widget-audit-reader",
+      "name": "Audit log import (read-only)",
+      "description": "Reads this realm's user and admin events for the admin audit log (E5 B9). Its service account has only realm-management/view-events (so the full scope is that role alone).",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "dev-audit-reader-demo-primarie",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "frontchannelLogout": false,
+      "fullScopeAllowed": true
     }
   ],
   "users": [
@@ -137,6 +153,14 @@
         }
       ],
       "groups": []
+    },
+    {
+      "username": "service-account-widget-audit-reader",
+      "enabled": true,
+      "serviceAccountClientId": "widget-audit-reader",
+      "clientRoles": {
+        "realm-management": ["view-events"]
+      }
     }
   ],
   "loginTheme": "widget-admin",
@@ -145,5 +169,9 @@
   },
   "attributes": {
     "clientLogoUrl": "http://localhost:3100/w/t/demo-primarie/logo"
-  }
+  },
+  "eventsEnabled": true,
+  "eventsExpiration": 604800,
+  "adminEventsEnabled": true,
+  "adminEventsDetailsEnabled": true
 }
