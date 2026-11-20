@@ -505,6 +505,34 @@ test('keyboard: focus order through the editor, with a visible ring at every sto
   expect(noRing).toEqual([]);
 });
 
+test('motion: the sign-in button is still at load; transitions stop with reduced motion', async ({
+  page,
+}) => {
+  // Sign-in page: nothing animates once loaded, and the button keeps its place (docs/BACKLOG.md,
+  // the WebKit click timeout). Measured with the browser's default motion setting.
+  await page.goto(`${ADMIN}/admin/?org=pilot`);
+  const button = page.getByRole('button', { name: 'Continuă spre autentificare' });
+  await expect(button).toBeVisible();
+  const still = await button.evaluate(async (element) => {
+    const before = JSON.stringify(element.getBoundingClientRect());
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    return {
+      animations: document.getAnimations().length,
+      moved: before !== JSON.stringify(element.getBoundingClientRect()),
+    };
+  });
+  expect(still).toEqual({ animations: 0, moved: false });
+
+  // The admin's transitions follow prefers-reduced-motion (here for this page only, not globally).
+  await openEditor(page, PILOT_ADMIN);
+  const knob = page.locator('.switch__knob').first();
+  await expect(knob).toBeAttached();
+  const duration = () => knob.evaluate((element) => getComputedStyle(element).transitionDuration);
+  expect(await duration()).toBe('0.12s');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  expect(await duration()).toBe('0s');
+});
+
 test('keyboard: Escape closes the user menu, the preview panel and dialogs; focus comes back', async ({
   page,
 }) => {
