@@ -536,6 +536,30 @@ export function adminConfigRoutes(
     },
   );
 
+  // Uploaded images and where they are used; an unused one may be deleted (E5 K6).
+  app.get('/api/tenants/:tenant/assets', async (request, reply) => {
+    const found = await tenantFor(request, reply, 'read');
+    if (!found) return reply;
+    return { assets: await store.listAssets(found.tenant) };
+  });
+
+  app.delete('/api/tenants/:tenant/assets/:name', async (request, reply) => {
+    const found = await tenantFor(request, reply, 'assets');
+    if (!found) return reply;
+    const name = assetName.safeParse((request.params as { name?: unknown }).name);
+    if (!name.success) return adminError(reply, 'not_found');
+    const result = await store.deleteAsset(found.tenant, name.data, auditWhoOf(request));
+    if (result.kind === 'not_found') return adminError(reply, 'not_found');
+    if (result.kind === 'in_use') {
+      await denied(request, found.tenant, 'asset.delete', 'in_use', {
+        section: 'assets',
+        details: { name: name.data, versions: result.versions, draft: result.draft },
+      });
+      return adminError(reply, 'asset_in_use', { versions: result.versions, draft: result.draft });
+    }
+    return reply.code(204).send();
+  });
+
   // Thumbnails in the admin interface (images of a draft are not public until published).
   app.get('/api/tenants/:tenant/assets/:name', async (request, reply) => {
     const found = await tenantFor(request, reply, 'read');

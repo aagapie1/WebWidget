@@ -13,6 +13,7 @@ const STATUS = {
   invalid_request: 400,
   no_draft: 409,
   conflict: 409,
+  asset_in_use: 409,
   draft_conflict: 409,
   invalid_config: 422,
   too_large: 413,

@@ -404,6 +404,66 @@ describe.skipIf(!appUrl || !ownerUrl)('admin configuration API (Postgres)', () =
     expect((await auditRows()).map((row) => row.action)).toContain('asset.upload');
   });
 
+  it('deletes only an image no version or draft uses, recorded; editors cannot (E5 K6)', async () => {
+    const image = (background: string) =>
+      sharp({ create: { width: 32, height: 32, channels: 4, background } })
+        .png()
+        .toBuffer();
+    const admin = await as('widget-admin');
+    const upload = async (name: string, background: string) =>
+      (
+        await admin('POST', `/admin/api/tenants/gamma/assets?name=${name}`, await image(background))
+      ).json<{ file: string }>().file;
+    const used = await upload('used.png', '#112233');
+    const spare = await upload('spare.png', '#445566');
+
+    // Published once with `used`, then a draft without it: an old version still names it.
+    const { published } = (await admin('GET', CONFIG)).json<ConfigResponse>();
+    await saveDraft(admin, {
+      config: { ...published.config, launcher: { icon: { type: 'asset', file: used } } },
+    });
+    expect((await admin('POST', `${CONFIG}/publish`, {})).statusCode).toBe(200);
+
+    const list = (await admin('GET', '/admin/api/tenants/gamma/assets')).json<{
+      assets: { name: string; versions: number[]; draft: boolean; bytes: number }[];
+    }>().assets;
+    const usedEntry = list.find((asset) => asset.name === used);
+    expect(usedEntry?.versions.length).toBe(1);
+    expect(list.find((asset) => asset.name === spare)).toMatchObject({
+      versions: [],
+      draft: false,
+    });
+
+    const editor = await as('widget-editor');
+    expect((await editor('DELETE', `/admin/api/tenants/gamma/assets/${spare}`)).statusCode).toBe(
+      403,
+    );
+
+    const refused = await admin('DELETE', `/admin/api/tenants/gamma/assets/${used}`);
+    expect(refused.statusCode).toBe(409);
+    expect(refused.json()).toMatchObject({ error: { code: 'asset_in_use', draft: false } });
+
+    const deleted = await admin('DELETE', `/admin/api/tenants/gamma/assets/${spare}`);
+    expect(deleted.statusCode).toBe(204);
+    expect((await admin('GET', `/admin/api/tenants/gamma/assets/${spare}`)).statusCode).toBe(404);
+    expect((await admin('DELETE', `/admin/api/tenants/gamma/assets/${spare}`)).statusCode).toBe(
+      404,
+    );
+
+    const rows = (
+      await pool.query<{ action: string; result: string; reason: string | null; details: unknown }>(
+        `SELECT action, result, reason, details FROM audit_log
+          WHERE chain = 'gamma' AND action = 'asset.delete' ORDER BY seq`,
+      )
+    ).rows;
+    // The editor's attempt is an `access.denied` record (the role check comes first).
+    expect(rows.map((row) => [row.result, row.reason])).toEqual([
+      ['denied', 'in_use'],
+      ['success', null],
+    ]);
+    expect(rows.at(-1)?.details).toMatchObject({ name: spare, contentType: 'image/png' });
+  });
+
   it('previews the draft through a session-bound token, without changing the public widget', async () => {
     const admin = await as('widget-admin');
     const { published } = (await admin('GET', CONFIG)).json<ConfigResponse>();

@@ -1606,3 +1606,46 @@ details.advanced > summary {
 .preview-column[hidden] {
   display: none;
 }
+
+/* ---------- Uploaded images (E5 K6) ---------- */
+.asset-library__list {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.asset-library__item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.5rem;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+}
+.asset-library__thumb {
+  inline-size: 48px;
+  block-size: 48px;
+  object-fit: contain;
+  background: var(--bg);
+  border-radius: 6px;
+}
+.asset-library__info {
+  display: grid;
+  flex: 1 1 14rem;
+  min-inline-size: 0;
+}
+.asset-library__name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.asset-library__usage {
+  color: var(--ok);
+}
+.asset-library__usage--used {
+  color: var(--muted);
+}
+.asset-library__status:empty {
+  display: none;
+}

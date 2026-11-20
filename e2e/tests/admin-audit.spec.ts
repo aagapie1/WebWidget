@@ -284,3 +284,45 @@ test('isolation: each client sees only its own log; editors none; super-admin al
   expect(platformLog.json.events.every((event) => event.chain === 'platform')).toBe(true);
   await platformContext.close();
 });
+
+const PNG_BASE64 =
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+
+test('an unused image is deleted after confirmation, and the deletion is in the log (K6)', async ({
+  page,
+}) => {
+  await signIn(page, PILOT_ADMIN);
+  // Uploaded but not chosen anywhere: no version and no draft uses it.
+  const file = await page.evaluate(async (base64) => {
+    const session = (await fetch('/admin/api/session').then((r) => r.json())) as {
+      csrfToken: string;
+    };
+    const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
+    const response = await fetch('/admin/api/tenants/pilot/assets?name=de-sters.png', {
+      method: 'POST',
+      headers: { 'x-csrf-token': session.csrfToken, 'content-type': 'image/png' },
+      body: bytes,
+    });
+    return ((await response.json()) as { file: string }).file;
+  }, PNG_BASE64);
+  await page.reload();
+
+  const library = page.getByRole('region', { name: 'Imagini încărcate' });
+  const item = library.getByRole('listitem').filter({ hasText: file });
+  await expect(item).toContainText('Nefolosită');
+  await item.getByRole('button', { name: `Șterge imaginea ${file}` }).click();
+  const dialog = page.getByRole('dialog', { name: 'Ștergi imaginea?' });
+  await dialog.getByRole('button', { name: 'Șterge imaginea' }).click();
+  await expect(library.getByRole('status')).toHaveText(`Imaginea ${file} a fost ștearsă.`);
+  await expect(item).toHaveCount(0);
+
+  await openAudit(page);
+  await page.getByLabel('Acțiune').selectOption({ label: 'Imagini' });
+  await page.getByRole('button', { name: 'Aplică filtrele' }).click();
+  await expect(rows(page).first()).toContainText('Ștergere imagine');
+  await rows(page)
+    .first()
+    .getByRole('button', { name: /^Detalii:/ })
+    .click();
+  await expect(page.getByRole('dialog')).toContainText(file);
+});

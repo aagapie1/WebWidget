@@ -75,6 +75,10 @@ export interface AdminApi {
     body: { comment?: string; draftRevision: number },
   ): Promise<{ version: number }>;
   uploadAsset(tenant: string, file: Blob, name: string): Promise<{ file: string; url: string }>;
+  /** Uploaded images and where they are used (E5 K6). */
+  listAssets(tenant: string): Promise<{ assets: StoredAsset[] }>;
+  /** Deletes an image no version and no draft uses (409 `asset_in_use` otherwise). */
+  deleteAsset(tenant: string, name: string): Promise<void>;
   previewToken(tenant: string): Promise<{ id: string; url: string; expiresAt: string }>;
   discardDraft(tenant: string): Promise<void>;
   assistantDefaults(tenant: string): Promise<AssistantDefaults>;
@@ -84,6 +88,16 @@ export interface AdminApi {
   logout(): Promise<{ redirect: string }>;
   /** The audit log (E5 B9): one page, newest first. */
   auditList(query: AuditQuery): Promise<AuditPage>;
+}
+
+export interface StoredAsset {
+  name: string;
+  contentType: string;
+  bytes: number;
+  createdAt: string;
+  createdBy: string;
+  versions: number[];
+  draft: boolean;
 }
 
 /** Filters and paging of the audit log screen; empty values are left out. */
@@ -195,6 +209,9 @@ export function createApi(fetchImpl: Fetch = (...args) => fetch(...args)): Admin
     config: (tenant) => call('GET', `${base(tenant)}/config`),
     saveDraft: (tenant, body) => call('PUT', `${base(tenant)}/config/draft`, body),
     publish: (tenant, body) => call('POST', `${base(tenant)}/config/publish`, body),
+    listAssets: (tenant) => call('GET', `${base(tenant)}/assets`),
+    deleteAsset: (tenant, name) =>
+      call('DELETE', `${base(tenant)}/assets/${encodeURIComponent(name)}`),
     uploadAsset: (tenant, file, name) =>
       call(
         'POST',

@@ -21,7 +21,42 @@ export interface Draft {
 }
 
 export type AuditAction =
-  'draft.save' | 'draft.discard' | 'publish' | 'origins.change' | 'asset.upload';
+  'draft.save' | 'draft.discard' | 'publish' | 'origins.change' | 'asset.upload' | 'asset.delete';
+
+/** An uploaded image and where it is used (E5 K6: only an unused image may be deleted). */
+export interface StoredAsset {
+  name: string;
+  contentType: string;
+  bytes: number;
+  createdAt: string;
+  createdBy: string;
+  /** Published versions whose configuration names the image (newest first). */
+  versions: number[];
+  /** The current draft names it. */
+  draft: boolean;
+}
+
+export type DeleteAssetResult =
+  | { kind: 'deleted' }
+  | { kind: 'not_found' }
+  | { kind: 'in_use'; versions: number[]; draft: boolean };
+
+const USAGE = `
+  ARRAY(SELECT v.version FROM tenant_config_versions v
+         WHERE v.tenant_id = a.tenant_id AND v.config::text LIKE '%"' || a.name || '"%'
+         ORDER BY v.version DESC) AS versions,
+  EXISTS(SELECT 1 FROM tenant_config_drafts d
+          WHERE d.tenant_id = a.tenant_id AND d.config::text LIKE '%"' || a.name || '"%') AS draft`;
+
+interface AssetRow {
+  name: string;
+  content_type: string;
+  size: number;
+  created_at: Date;
+  created_by: string;
+  versions: number[];
+  draft: boolean;
+}
 
 /** Who changes the configuration, and from where (E5 B9): written to the audit chain. */
 export interface AuditWho {
@@ -225,6 +260,64 @@ export class AdminConfigStore {
           },
         });
       }
+    });
+  }
+
+  async listAssets(tenant: string): Promise<StoredAsset[]> {
+    const rows = await this.pool.query<AssetRow>(
+      `SELECT a.name, a.content_type, octet_length(a.bytes) AS size, a.created_at, a.created_by,${USAGE}
+         FROM tenant_assets a WHERE a.tenant_id = $1 ORDER BY a.created_at DESC, a.name`,
+      [tenant],
+    );
+    return rows.rows.map((row) => ({
+      name: row.name,
+      contentType: row.content_type,
+      bytes: row.size,
+      createdAt: row.created_at.toISOString(),
+      createdBy: row.created_by,
+      versions: row.versions,
+      draft: row.draft,
+    }));
+  }
+
+  /**
+   * Deletes an image no published version and no draft uses (E5 K6), recorded in the same
+   * transaction, under the publish lock. An editor still showing the image may save it into a
+   * draft afterwards: publishing then refuses the draft (validation reports the missing image).
+   */
+  async deleteAsset(tenant: string, name: string, who: AuditWho): Promise<DeleteAssetResult> {
+    return this.#transaction(async (client) => {
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`publish:${tenant}`]);
+      await client.query('SELECT 1 FROM tenant_config_drafts WHERE tenant_id = $1 FOR UPDATE', [
+        tenant,
+      ]);
+      const found = await client.query<AssetRow & { hash: string }>(
+        `SELECT a.name, a.hash, a.content_type, octet_length(a.bytes) AS size, a.created_at,
+                a.created_by,${USAGE}
+           FROM tenant_assets a WHERE a.tenant_id = $1 AND a.name = $2 FOR UPDATE`,
+        [tenant, name],
+      );
+      const row = found.rows[0];
+      if (!row) return { kind: 'not_found' };
+      if (row.versions.length > 0 || row.draft) {
+        return { kind: 'in_use', versions: row.versions, draft: row.draft };
+      }
+      await client.query('DELETE FROM tenant_assets WHERE tenant_id = $1 AND name = $2', [
+        tenant,
+        name,
+      ]);
+      await audit(client, tenant, who, 'asset.delete', {
+        section: 'assets',
+        details: {
+          name,
+          hash: row.hash,
+          contentType: row.content_type,
+          bytes: row.size,
+          uploadedAt: row.created_at.toISOString(),
+          uploadedBy: row.created_by,
+        },
+      });
+      return { kind: 'deleted' };
     });
   }
 

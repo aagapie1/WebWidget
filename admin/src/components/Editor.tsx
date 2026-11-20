@@ -22,6 +22,7 @@ import {
   type Path,
 } from '../model.js';
 import { AppHeader } from './AppHeader.js';
+import { AssetLibrary } from './AssetLibrary.js';
 import { AuditLog, PLATFORM } from './AuditLog.js';
 import { ConfigForm, type Area } from './ConfigForm.js';
 import { AREAS, Sidebar } from './Sidebar.js';
@@ -592,6 +593,15 @@ export function Editor({ api, tenant, onSessionExpired, gatewayOrigin, frame }: 
                     }
                   : undefined
               }
+            />
+          )}
+          {shown === 'aspect' && (
+            <AssetLibrary
+              api={api}
+              tenant={tenant}
+              canDelete={state.permissions.assets}
+              refresh={savedJson}
+              onSessionExpired={expired}
             />
           )}
         </main>

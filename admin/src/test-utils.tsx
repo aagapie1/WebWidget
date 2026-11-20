@@ -56,6 +56,8 @@ export function fakeApi(overrides: Partial<AdminApi> = {}): AdminApi {
     installations: () => Promise.resolve({ installations: [] }),
     citedDocuments: () => Promise.resolve({ documents: [] }),
     auditList: () => Promise.resolve({ chain: 'pilot', events: [] }),
+    listAssets: () => Promise.resolve({ assets: [] }),
+    deleteAsset: () => Promise.resolve(),
     ...overrides,
   };
 }
